@@ -3191,9 +3191,22 @@ SYSTEM_PROMPT = SystemPromptGatekeeper.get_gatekeeper_prompt()
 # -------------------------------------------------------------
 WS_MAGIC_KEY = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-def parse_ws_frame(rfile):
-    """Parses an RFC 6455 WebSocket frame from client socket."""
-    head = rfile.read(2)
+def recv_exact(sock, n):
+    """Direct unbuffered TCP socket read."""
+    buf = bytearray()
+    while len(buf) < n:
+        try:
+            chunk = sock.recv(n - len(buf))
+            if not chunk:
+                return None
+            buf.extend(chunk)
+        except Exception:
+            return None
+    return bytes(buf)
+
+def parse_ws_frame(sock):
+    """Parses an RFC 6455 WebSocket frame directly from raw socket."""
+    head = recv_exact(sock, 2)
     if not head or len(head) < 2:
         return None, None
     b1, b2 = head[0], head[1]
@@ -3201,33 +3214,29 @@ def parse_ws_frame(rfile):
     is_masked = (b2 & 0x80) != 0
     payload_len = b2 & 0x7f
     if payload_len == 126:
-        ext = rfile.read(2)
-        if len(ext) < 2:
+        ext = recv_exact(sock, 2)
+        if not ext or len(ext) < 2:
             return None, None
         payload_len = struct.unpack('!H', ext)[0]
     elif payload_len == 127:
-        ext = rfile.read(8)
-        if len(ext) < 8:
+        ext = recv_exact(sock, 8)
+        if not ext or len(ext) < 8:
             return None, None
         payload_len = struct.unpack('!Q', ext)[0]
-    mask = rfile.read(4) if is_masked else None
-    if is_masked and len(mask) < 4:
+    mask = recv_exact(sock, 4) if is_masked else None
+    if is_masked and (not mask or len(mask) < 4):
         return None, None
-    data = bytearray()
-    remaining = payload_len
-    while remaining > 0:
-        chunk = rfile.read(min(remaining, 65536))
-        if not chunk:
-            break
-        data.extend(chunk)
-        remaining -= len(chunk)
+    data = recv_exact(sock, payload_len)
+    if data is None:
+        return None, None
+    data = bytearray(data)
     if mask:
         for i in range(len(data)):
             data[i] ^= mask[i % 4]
     return opcode, bytes(data)
 
-def send_ws_frame(wfile, opcode, payload):
-    """Sends an RFC 6455 WebSocket frame to client socket."""
+def send_ws_frame(sock, opcode, payload):
+    """Sends an RFC 6455 WebSocket frame directly over raw socket."""
     data = payload if isinstance(payload, (bytes, bytearray)) else payload.encode('utf-8')
     length = len(data)
     first_byte = 0x80 | (opcode & 0x0f)
@@ -3238,8 +3247,7 @@ def send_ws_frame(wfile, opcode, payload):
     else:
         header = bytes([first_byte, 127]) + struct.pack('!Q', length)
     try:
-        wfile.write(header + data)
-        wfile.flush()
+        sock.sendall(header + data)
     except Exception:
         pass
 
@@ -3268,7 +3276,7 @@ def get_pcm24_from_text(text):
                 with wave.open(fpath, "rb") as wf:
                     return wf.readframes(wf.getnframes())
     except Exception as e:
-        print(f"[Vobiz Stream] Error getting PCM for text '{text[:20]}': {e}")
+        print(f"[Vobiz Stream] Error getting PCM for text '{text[:20]}': {e}", flush=True)
     return None
 
 def handle_vobiz_stream_ws(handler, query_params):
@@ -3280,6 +3288,9 @@ def handle_vobiz_stream_ws(handler, query_params):
     4. When caller finishes speaking, delivers second response intent via playAudio
     5. Cleanly concludes call
     """
+    raw_sock = handler.connection
+    raw_sock.settimeout(60.0)
+
     cust_name = query_params.get("customer_name", ["Customer"])[0]
     phone = query_params.get("phone", [""])[0]
     first_msg = query_params.get("custom_message", [""])[0]
@@ -3300,10 +3311,13 @@ def handle_vobiz_stream_ws(handler, query_params):
     silence_after_speech_count = 0
     start_time = time.time()
     
+    # Pre-generate greeting PCM immediately before loop
+    first_pcm = get_pcm24_from_text(first_msg)
+
     # 20ms chunks at 24kHz 16-bit mono = 24000 * 2 * 0.02 = 960 bytes
     CHUNK_BYTES = 960
 
-    print(f"[Vobiz Stream] Connected for {cust_name} ({phone}). Preparing first message...")
+    print(f"[Vobiz Stream] Connected for {cust_name} ({phone}). Initial PCM ready: {len(first_pcm) if first_pcm else 0} bytes.", flush=True)
 
     def stream_audio_bytes(pcm_bytes):
         if not pcm_bytes:
@@ -3321,17 +3335,17 @@ def handle_vobiz_stream_ws(handler, query_params):
             }
             if stream_id:
                 frame["streamId"] = stream_id
-            send_ws_frame(handler.wfile, 0x1, json.dumps(frame))
-            time.sleep(0.018)  # Smooth flow
+            send_ws_frame(raw_sock, 0x1, json.dumps(frame))
+            time.sleep(0.018)  # Smooth real-time flow
 
     try:
         while True:
-            opcode, raw_data = parse_ws_frame(handler.rfile)
+            opcode, raw_data = parse_ws_frame(raw_sock)
             if opcode is None or opcode == 0x8:  # Connection closed
-                print("[Vobiz Stream] WebSocket closed by client.")
+                print("[Vobiz Stream] WebSocket closed by client.", flush=True)
                 break
             if opcode == 0x9:  # Ping -> Pong
-                send_ws_frame(handler.wfile, 0xA, raw_data)
+                send_ws_frame(raw_sock, 0xA, raw_data)
                 continue
             if opcode == 0x1:  # Text frame (JSON event)
                 try:
@@ -3345,24 +3359,23 @@ def handle_vobiz_stream_ws(handler, query_params):
                     start_meta = event.get("start", {})
                     stream_id = event.get("streamId") or start_meta.get("streamId")
                     call_id = event.get("callId") or start_meta.get("callId") or start_meta.get("callUUID")
-                    print(f"[Vobiz Stream] Received 'start' event. streamId={stream_id}, callId={call_id}")
+                    print(f"[Vobiz Stream] Received 'start' event! streamId={stream_id}, callId={call_id}", flush=True)
 
                     # Play first greeting message
-                    first_pcm = get_pcm24_from_text(first_msg)
                     if first_pcm:
-                        print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...")
+                        print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...", flush=True)
                         stream_audio_bytes(first_pcm)
                         # Send checkpoint to ensure playback finishes before listening
                         if stream_id:
                             chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "greeting_done"}
-                            send_ws_frame(handler.wfile, 0x1, json.dumps(chk_frame))
+                            send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
                     state = "LISTENING_FOR_SPEECH"
-                    print("[Vobiz Stream] Now actively listening for caller speech (ignoring line silence)...")
+                    print("[Vobiz Stream] Now actively listening for caller speech (ignoring line silence)...", flush=True)
 
                 elif event_name == "checkpoint":
                     chk_name = event.get("name")
                     if chk_name == "second_response_done":
-                        print("[Vobiz Stream] Second response finished playing. Concluding call...")
+                        print("[Vobiz Stream] Second response finished playing. Concluding call...", flush=True)
                         time.sleep(1.0)
                         break
 
@@ -3374,20 +3387,20 @@ def handle_vobiz_stream_ws(handler, query_params):
                             pcm_in = base64.b64decode(payload_b64)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Speech detection threshold (standard telephony background is ~100-300; vocal speech is >650)
-                            if rms > 650:
+                            # Speech detection threshold (background noise is ~100-300; vocal speech is >600)
+                            if rms > 600:
                                 speech_energy_count += 1
                                 if speech_energy_count >= 3:
                                     if not speech_detected:
-                                        print(f"[Vobiz Stream] Caller speech detected! RMS={rms}")
+                                        print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
                                     speech_detected = True
                                     silence_after_speech_count = 0
                             else:
                                 if speech_detected:
                                     silence_after_speech_count += 1
-                                    # ~1.2s of silence (each media frame is ~20-50ms) indicates caller has finished speaking
+                                    # ~1.2s of silence indicates caller has finished speaking words
                                     if silence_after_speech_count >= 24:
-                                        print("[Vobiz Stream] Caller finished speaking words. Delivering second response...")
+                                        print("[Vobiz Stream] Caller finished speaking words. Delivering second response...", flush=True)
                                         state = "DELIVERING_SECOND_RESPONSE"
                                         
                                         reply_text = resp_intent or generate_intelligent_second_response("Ha kahiye", resp_intent)
@@ -3396,26 +3409,26 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             stream_audio_bytes(second_pcm)
                                             if stream_id:
                                                 chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "second_response_done"}
-                                                send_ws_frame(handler.wfile, 0x1, json.dumps(chk_frame))
+                                                send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
                                         else:
                                             time.sleep(2.0)
                                             break
-                        except Exception as ex:
+                        except Exception:
                             pass
 
                 elif event_name == "stop":
-                    print("[Vobiz Stream] Received 'stop' event from Vobiz.")
+                    print("[Vobiz Stream] Received 'stop' event from Vobiz.", flush=True)
                     break
 
-            # Safeguard timeout (45 seconds total per call)
-            if time.time() - start_time > 45:
-                print("[Vobiz Stream] Call timeout reached (45s). Exiting.")
+            # Safeguard timeout (50 seconds total per call)
+            if time.time() - start_time > 50:
+                print("[Vobiz Stream] Call timeout reached (50s). Exiting.", flush=True)
                 break
 
     except Exception as e:
-        print(f"[Vobiz Stream] Error in stream loop: {e}")
+        print(f"[Vobiz Stream] Error in stream loop: {e}", flush=True)
     finally:
-        print(f"[Vobiz Stream] Stream ended for {cust_name}.")
+        print(f"[Vobiz Stream] Stream ended for {cust_name}.", flush=True)
 
 class AchyutaWebHandler(SimpleHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
@@ -3429,11 +3442,15 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 self.send_error(400, "Missing Sec-WebSocket-Key")
                 return
             accept_val = base64.b64encode(hashlib.sha1((key + WS_MAGIC_KEY).encode()).digest()).decode()
-            self.send_response(101, "Switching Protocols")
-            self.send_header("Upgrade", "websocket")
-            self.send_header("Connection", "Upgrade")
-            self.send_header("Sec-WebSocket-Accept", accept_val)
-            self.end_headers()
+            
+            # Send HTTP 101 WebSocket handshake directly over unbuffered raw socket
+            handshake = (
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Accept: {accept_val}\r\n\r\n"
+            ).encode("latin-1")
+            self.connection.sendall(handshake)
             
             parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             handle_vobiz_stream_ws(self, parsed_query)
