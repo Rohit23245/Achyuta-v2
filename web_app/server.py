@@ -3300,72 +3300,95 @@ def calculate_pcm16_rms(pcm_bytes):
     except Exception:
         return 0
 
-def get_pcm24_from_direct_voice(customer_input, step_target, agent_instructions):
+class LiveGeminiBidiSession:
     """
-    Direct Native Voice-to-Voice: Bypasses intermediate LLM text roundtrips.
-    Feeds customer words directly into Gemini 2.5 Flash Native Audio Dialog session
-    and returns 24kHz raw PCM speech directly to stream to caller.
+    Maintains a persistent, low-latency Bidi WebSocket session to Gemini 2.5 Flash Native Audio.
+    Eliminates reconnection overhead, STT delay, and text LLM roundtrips.
     """
-    import asyncio, websockets
-    system_instruction = f"""You are a polite female Indian telephone calling executive named Priya.
-Rules:
-1. Speak in natural conversational Hindi directly to the customer in 1 to 2 short sentences.
-2. Directly answer or acknowledge what the customer said (e.g. if they say Hello or Kaun, answer politely and warmly).
-3. Smoothly deliver your conversation step goal: "{step_target}".
-4. Specific Instructions: "{agent_instructions}".
-5. You are a real human executive. Never say you are an AI, computer, or cannot shop.
-6. NEVER explain your thoughts or output meta text. Speak directly to the caller."""
+    def __init__(self, system_instruction):
+        self.uri = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key={VOICE_API_KEY}"
+        self.system_instruction = system_instruction
+        self.ws = None
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
+        try:
+            future = asyncio.run_coroutine_threadsafe(self._connect(), self.loop)
+            future.result(timeout=10)
+        except Exception as e:
+            print(f"[LiveGeminiBidi] Connection failed: {e}", flush=True)
 
-    async def fetch_direct_audio():
-        uri = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key={VOICE_API_KEY}"
-        async with websockets.connect(uri) as ws:
-            setup = {
-                "setup": {
-                    "model": f"models/{GEMINI_TTS_MODEL}",
-                    "generationConfig": {
-                        "responseModalities": ["AUDIO"],
-                        "speechConfig": {
-                            "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Aoede"}}
-                        }
-                    },
-                    "systemInstruction": {
-                        "parts": [{"text": system_instruction}]
+    def _run_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    async def _connect(self):
+        self.ws = await websockets.connect(self.uri)
+        setup = {
+            "setup": {
+                "model": f"models/{GEMINI_TTS_MODEL}",
+                "generationConfig": {
+                    "responseModalities": ["AUDIO"],
+                    "speechConfig": {
+                        "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Aoede"}}
                     }
+                },
+                "systemInstruction": {
+                    "parts": [{"text": self.system_instruction}]
                 }
             }
-            await ws.send(json.dumps(setup))
-            await ws.recv()
+        }
+        await self.ws.send(json.dumps(setup))
+        await self.ws.recv()
+        print("[LiveGeminiBidi] Persistent WebSocket session established successfully!", flush=True)
 
-            prompt_text = f'The customer on the phone said: "{customer_input}". Respond directly to them now:' if customer_input else f'Deliver this step goal directly to the customer: "{step_target}"'
-            await ws.send(json.dumps({
-                "clientContent": {
-                    "turns": [{
-                        "role": "user",
-                        "parts": [{"text": prompt_text}]
-                    }],
-                    "turnComplete": True
-                }
-            }))
+    def stream_speech_turn(self, caller_speech, step_target, on_pcm_chunk):
+        """
+        Sends speech prompt on the active session and yields 24kHz audio chunks as they arrive.
+        """
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                self._turn_streaming(caller_speech, step_target, on_pcm_chunk), 
+                self.loop
+            )
+            return future.result(timeout=14)
+        except Exception as e:
+            print(f"[LiveGeminiBidi] Error in speech turn: {e}", flush=True)
+            return False
 
-            accumulated_pcm = bytearray()
-            while True:
-                msg = await asyncio.wait_for(ws.recv(), timeout=12)
-                data = json.loads(msg)
-                sc = data.get("serverContent", {})
-                turn = sc.get("modelTurn", {})
-                for p in turn.get("parts", []):
-                    inline = p.get("inlineData") or p.get("inline_data")
-                    if inline and inline.get("data"):
-                        accumulated_pcm.extend(base64.b64decode(inline["data"]))
-                if sc.get("turnComplete"):
-                    break
-            return bytes(accumulated_pcm)
+    async def _turn_streaming(self, caller_speech, step_target, on_pcm_chunk):
+        prompt = (
+            f'The caller on phone said: "{caller_speech}". Reply directly in natural Hindi in 1-2 short sentences, and deliver this goal: "{step_target}"'
+            if caller_speech and caller_speech != "Ha kahiye"
+            else f'Speak directly to the caller in natural Hindi in 1-2 short sentences to deliver: "{step_target}"'
+        )
+        await self.ws.send(json.dumps({
+            "clientContent": {
+                "turns": [{"role": "user", "parts": [{"text": prompt}]}],
+                "turnComplete": True
+            }
+        }))
+        while True:
+            raw = await self.ws.recv()
+            d = json.loads(raw)
+            sc = d.get("serverContent", {})
+            turn = sc.get("modelTurn", {})
+            for p in turn.get("parts", []):
+                inline = p.get("inlineData") or p.get("inline_data")
+                if inline and inline.get("data"):
+                    chunk = base64.b64decode(inline["data"])
+                    on_pcm_chunk(chunk)
+            if sc.get("turnComplete"):
+                break
+        return True
 
-    try:
-        return asyncio.run(fetch_direct_audio())
-    except Exception as e:
-        print(f"[Vobiz Stream] Error generating direct voice: {e}", flush=True)
-        return None
+    def close(self):
+        try:
+            if self.ws:
+                future = asyncio.run_coroutine_threadsafe(self.ws.close(), self.loop)
+                future.result(timeout=3)
+        except Exception:
+            pass
 
 def get_pcm24_from_text(text):
     """Generates fresh 24kHz raw PCM bytes directly from Gemini TTS (no stale disk cache)."""
@@ -3426,6 +3449,18 @@ def handle_vobiz_stream_ws(handler, query_params):
     current_step_index = 0
     total_steps = len(steps_list)
     print(f"[Vobiz Stream] Initialized multi-turn flow for {phone}: First msg + {total_steps} response steps.", flush=True)
+
+    # Initialize persistent low-latency Gemini Live Bidi Session for the call
+    system_inst_full = (
+        f"You are a real human female calling executive named Priya calling on behalf of the configured business in natural Hindi.\n"
+        f"Rules:\n"
+        f"1. Always respond verbally directly to the human caller in natural, polite Hindi (1-2 short sentences max).\n"
+        f"2. Directly answer or acknowledge whatever the customer says (e.g. if they say Hello or ask who is calling, warmly answer that you are Priya).\n"
+        f"3. Specific Behavioral Instructions: \"{agent_inst}\".\n"
+        f"4. You are a real human executive. Never say you are an AI, computer, or cannot shop.\n"
+        f"5. NEVER explain your thoughts or output meta text. Speak directly to the caller."
+    )
+    bidi_session = LiveGeminiBidiSession(system_inst_full)
 
     stream_id = None
     call_id = None
@@ -3491,12 +3526,13 @@ def handle_vobiz_stream_ws(handler, query_params):
                     call_id = event.get("callId") or start_meta.get("callId") or start_meta.get("callUUID")
                     print(f"[Vobiz Stream] Received 'start' event! streamId={stream_id}, callId={call_id}", flush=True)
 
-                    # Play first greeting message
+                    # Give 1.0s grace period for line audio to connect before speaking greeting
+                    time.sleep(1.0)
                     if first_pcm:
                         print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...", flush=True)
                         stream_audio_bytes(first_pcm)
                         # Grace period for playback to finish before opening ear
-                        time.sleep(0.5)
+                        time.sleep(0.4)
                         if stream_id:
                             chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "greeting_done"}
                             send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
@@ -3544,8 +3580,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # ~0.8s of silence indicates caller has finished speaking words
-                                    if silence_after_speech_count >= 16:
+                                    # ~0.6s of silence indicates caller has finished speaking words
+                                    if silence_after_speech_count >= 12:
                                         print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
                                         state = "DELIVERING_RESPONSE"
 
@@ -3571,17 +3607,23 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         step_target = steps_list[current_step_index] if current_step_index < len(steps_list) else ""
                                         current_step_index += 1
 
-                                        caller_input = transcribed_words if transcribed_words else "Ha kahiye"
-                                        print(f"[Vobiz Stream] Generating direct voice for caller='{caller_input}', step='{step_target[:30]}'", flush=True)
-                                        second_pcm = get_pcm24_from_direct_voice(caller_input, step_target, agent_inst)
-                                        if not second_pcm:
+                                        caller_input = transcribed_words if transcribed_words else "Hello"
+                                        print(f"[Vobiz Stream] Streaming Gemini Live Native Audio for caller='{caller_input}', step='{step_target[:30]}'", flush=True)
+                                        
+                                        # Stream directly on the persistent Gemini Live WebSocket session chunk-by-chunk!
+                                        delivered = bidi_session.stream_speech_turn(
+                                            caller_input, 
+                                            step_target, 
+                                            lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
+                                        )
+                                        if not delivered:
+                                            # Fallback if session dropped
                                             reply_text = generate_intelligent_second_response(caller_input, step_target, agent_inst)
                                             second_pcm = get_pcm24_from_text(reply_text)
+                                            if second_pcm:
+                                                stream_audio_bytes(second_pcm)
                                         
-                                        if second_pcm:
-                                            stream_audio_bytes(second_pcm)
-                                            # Grace pause for speaker playback to fully deliver
-                                            time.sleep(0.4)
+                                        time.sleep(0.4)
                                         
                                         # Reset audio accumulator for next turn
                                         accumulated_caller_pcm.clear()
@@ -3613,6 +3655,10 @@ def handle_vobiz_stream_ws(handler, query_params):
     except Exception as e:
         print(f"[Vobiz Stream] Error in stream loop: {e}", flush=True)
     finally:
+        try:
+            bidi_session.close()
+        except Exception:
+            pass
         print(f"[Vobiz Stream] Stream ended for {cust_name}.", flush=True)
 
 class AchyutaWebHandler(SimpleHTTPRequestHandler):
