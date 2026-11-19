@@ -278,7 +278,11 @@
     </div>
   </div>
 
-  <aside id="main-sidebar" class="hidden md:flex w-72 border-r flex-col py-4 px-3 z-30 flex-shrink-0 select-none cursor-default transition-all duration-300 overflow-y-auto custom-scroll" style="background-color: var(--sidebar-bg); border-color: var(--border-color);">
+  <aside id="main-sidebar" class="hidden md:flex fixed md:static inset-y-0 left-0 w-72 border-r flex-col py-4 px-3 z-50 flex-shrink-0 select-none cursor-default transition-all duration-300 overflow-y-auto custom-scroll" style="background-color: var(--sidebar-bg); border-color: var(--border-color);">
+    <!-- Mobile toggle button to open the sidebar -->
+    <button type="button" onclick="document.getElementById('main-sidebar').classList.remove('hidden');" class="md:hidden fixed top-4 left-4 z-50">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+    </button>
     
     <!-- Top Area: Brand Header + Main Navigation Items -->
     <div class="flex flex-col gap-1 w-full min-h-0">
@@ -518,6 +522,10 @@
           <span id="mobile-top-bar-title" class="font-bold text-sm tracking-tight capitalize" style="color: var(--text);">New chat</span>
         </div>
       </div>
+      <!-- Logo for Small Screens -->
+      <div class="flex items-center">
+        <img src="/static/logo.jpg" alt="Achyuta" class="w-8 h-8 rounded-lg object-cover shadow-sm">
+      </div>
       <div class="flex items-center gap-1.5">
         <button type="button" onclick="clearChat()" title="New Chat" class="w-9 h-9 rounded-xl flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 transition active:scale-95">
           <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
@@ -543,7 +551,7 @@
 
           <!-- The Iconic Capsule Pill Input (Clean: No + icon, No Think, No Mic) -->
           <div class="w-full">
-            <form onsubmit="handleSend(event)" class="w-full h-[52px] rounded-full px-4 flex items-center gap-3 shadow-md border transition-all" style="background-color: var(--input-bg); border-color: var(--input-border);">
+            <form onsubmit="handleSend(event)" class="w-full max-w-full h-[52px] rounded-full px-4 flex items-center gap-2 sm:gap-3 shadow-md border transition-all" style="background-color: var(--input-bg); border-color: var(--input-border);">
               
               <!-- Main Input Field -->
               <input id="prompt-input" type="text" placeholder="Ask Achyuta or speak..." class="flex-1 bg-transparent text-[14.5px] focus:outline-none px-2" style="color: var(--text);" autocomplete="off">

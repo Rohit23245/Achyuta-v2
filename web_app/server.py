@@ -5639,7 +5639,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
 # GEMINI NATIVE AUDIO DIALOG ENGINE (2.5 FLASH UNLIMITED LIVE API)
 # ---------------------------------------------------------
 VOICE_API_KEY = os.environ.get('VOICE_API_KEY', '')
-GEMINI_TTS_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
+GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts"
 GEMINI_STT_MODEL = "gemini-2.5-flash"
 
 def generate_gemini_voice_audio(text_content):
