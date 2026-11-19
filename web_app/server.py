@@ -216,43 +216,33 @@ def get_or_create_voice_audio_file(text_content):
         print(f"Error caching voice audio: {e}")
     return None
 
-def generate_vobiz_call_xml(customer_name="Rohit", phone=""):
+def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message=""):
     cfg = get_calling_script_config()
     voice = cfg.get("voice_gender", "WOMAN")
     lang = cfg.get("language", "hi-IN")
     agent_name = cfg.get("agent_name", "Priya")
     comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
 
-    greeting = (cfg.get("greeting") or "Namaste {customer_name} ji!").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
-    pitch = (cfg.get("plans_pitch_speech") or "").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
-    objection = (cfg.get("objection_speech") or "Dhanyawaad!").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
+    # If custom message is passed directly in URL query, use it immediately
+    speech_text = str(custom_message or "").strip()
+    if not speech_text:
+        speech_text = (cfg.get("greeting") or "Namaste! Main Achyuta se baat kar raha hoon.").strip()
 
-    full_first_turn = f"{greeting} {pitch}".strip()
-    safe_speech = html.escape(full_first_turn)
-    safe_objection = html.escape(objection)
+    speech_text = speech_text.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
 
-    # Attempt to get natural human voice audio URL from Gemini Native Audio
-    audio_url = get_or_create_voice_audio_file(full_first_turn)
-    objection_audio_url = get_or_create_voice_audio_file(objection)
+    safe_speech = html.escape(speech_text)
 
-    action_url = f"https://achyuta-v2.onrender.com/voice-webhook/digits?customer_name={urllib.parse.quote(customer_name)}"
-
+    # Attempt to stream natural human audio via Gemini Native TTS, fallback to clean Speak
+    audio_url = get_or_create_voice_audio_file(speech_text)
     if audio_url:
-        first_turn_tag = f"<Play>{audio_url}</Play>"
+        speech_tag = f"<Play>{audio_url}</Play>"
     else:
-        first_turn_tag = f'<Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>'
+        speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>'
 
-    if objection_audio_url:
-        objection_tag = f"<Play>{objection_audio_url}</Play>"
-    else:
-        objection_tag = f'<Speak voice="{voice}" language="{lang}">{safe_objection}</Speak>'
-
+    # Pure direct call: No IVR menu, no press 1/2 buttons, just direct natural conversation
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <GetDigits action="{action_url}" method="POST" timeout="8" numDigits="1" retries="1">
-        {first_turn_tag}
-    </GetDigits>
-    {objection_tag}
+    {speech_tag}
 </Response>"""
     return xml
 
@@ -410,7 +400,7 @@ def get_ai_call_logs_data():
         except: pass
     return []
 
-def trigger_ai_outbound_call(phone, customer_name="Customer"):
+def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message=""):
     clean = re.sub(r'[^0-9]', '', str(phone))
     if len(clean) == 10:
         clean = '91' + clean
@@ -426,10 +416,16 @@ def trigger_ai_outbound_call(phone, customer_name="Customer"):
 
     url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/"
     encoded_name = urllib.parse.quote(str(customer_name or "Customer"))
+    encoded_msg = urllib.parse.quote(str(custom_message or "").strip())
+    
+    answer_url = f"https://achyuta-v2.onrender.com/voice-webhook?customer_name={encoded_name}&phone={clean}"
+    if encoded_msg:
+        answer_url += f"&custom_message={encoded_msg}"
+
     payload = {
         "from": did_number,
         "to": f"+{clean}",
-        "answer_url": f"https://achyuta-v2.onrender.com/voice-webhook?customer_name={encoded_name}&phone={clean}",
+        "answer_url": answer_url,
         "answer_method": "POST"
     }
     req_data = json.dumps(payload).encode("utf-8")
@@ -3093,7 +3089,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
             phone = parsed_query.get('phone', [''])[0]
-            xml_response = generate_vobiz_call_xml(cust_name, phone)
+            custom_msg = parsed_query.get('custom_message', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg)
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
@@ -4498,7 +4495,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
             phone = parsed_query.get('phone', [''])[0]
-            xml_response = generate_vobiz_call_xml(cust_name, phone)
+            custom_msg = parsed_query.get('custom_message', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg)
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
@@ -4528,7 +4526,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             data = json.loads(body)
             phone = data.get("phone", "")
             name = data.get("customer_name", "Customer")
-            success, msg, resp_data = trigger_ai_outbound_call(phone, name)
+            custom_message = data.get("message", "")
+            success, msg, resp_data = trigger_ai_outbound_call(phone, name, custom_message)
             
             self.send_response(200 if success else 400)
             self.send_header("Content-Type", "application/json")
