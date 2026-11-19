@@ -274,38 +274,29 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     speech_text = speech_text.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
     safe_speech = html.escape(speech_text)
 
-    first_audio_url = get_or_create_voice_audio_file(speech_text)
-    if first_audio_url:
-        first_speech_tag = f"<Play>{first_audio_url}</Play>"
-    else:
-        first_speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>'
-
     # 2. Second Response Intent
     intent_text = str(response_intent or cfg.get("second_response_intent") or "").strip()
     
-    if intent_text:
-        enc_intent = urllib.parse.quote(intent_text)
-        enc_cust = urllib.parse.quote(str(customer_name))
-        gather_action = f"https://achyuta-v2.onrender.com/voice-webhook/second-response?customer_name={enc_cust}&amp;intent={enc_intent}"
-        
-        # Safe fallback speak tag in case caller does not respond within 15 seconds
-        safe_fallback = html.escape(intent_text)
-        
-        # Real-time Speech Recognition Gather:
-        # Plays initial greeting prompt, then activates ASR speech recognition (hi-IN)
-        # Ignores initial line silence/blank audio and waits up to 15s for caller speech.
-        # Once human speech is spoken and finished, Vobiz submits to gather_action immediately!
-        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+    # WebSocket Streaming URL
+    enc_cust = urllib.parse.quote(str(customer_name))
+    enc_phone = urllib.parse.quote(str(phone))
+    enc_msg = urllib.parse.quote(speech_text)
+    enc_intent = urllib.parse.quote(intent_text)
+    
+    ws_stream_url = f"wss://achyuta-v2.onrender.com/ws?customer_name={enc_cust}&amp;phone={enc_phone}&amp;custom_message={enc_msg}&amp;response_intent={enc_intent}"
+    
+    # Vobiz Official Real-Time Conversational Voice Stream:
+    # 1. Bidirectional WebSocket stream connects to wss://achyuta-v2.onrender.com/ws
+    # 2. Agent delivers first message (Aoede natural voice) via playAudio frames
+    # 3. Agent strictly listens to caller audio and waits for true human speech (VAD / Energy detection)
+    # 4. Initial silence / blank noise is ignored
+    # 5. Only after caller speaks and completes, agent delivers second response intent
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Gather action="{gather_action}" method="POST" inputType="speech" language="{lang}" executionTimeout="15">
-        <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
-    </Gather>
-    <Speak voice="{voice}" language="{lang}">{safe_fallback}</Speak>
-</Response>"""
-    else:
-        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
+    <Stream bidirectional="true" audioTrack="inbound" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">
+        {ws_stream_url}
+    </Stream>
+    <Hangup/>
 </Response>"""
     return xml
 
@@ -3195,8 +3186,258 @@ class SystemPromptGatekeeper:
 
 SYSTEM_PROMPT = SystemPromptGatekeeper.get_gatekeeper_prompt()
 
+# -------------------------------------------------------------
+# VOBIZ BIDIRECTIONAL WEBSOCKET STREAMING ENGINE
+# -------------------------------------------------------------
+WS_MAGIC_KEY = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+def parse_ws_frame(rfile):
+    """Parses an RFC 6455 WebSocket frame from client socket."""
+    head = rfile.read(2)
+    if not head or len(head) < 2:
+        return None, None
+    b1, b2 = head[0], head[1]
+    opcode = b1 & 0x0f
+    is_masked = (b2 & 0x80) != 0
+    payload_len = b2 & 0x7f
+    if payload_len == 126:
+        ext = rfile.read(2)
+        if len(ext) < 2:
+            return None, None
+        payload_len = struct.unpack('!H', ext)[0]
+    elif payload_len == 127:
+        ext = rfile.read(8)
+        if len(ext) < 8:
+            return None, None
+        payload_len = struct.unpack('!Q', ext)[0]
+    mask = rfile.read(4) if is_masked else None
+    if is_masked and len(mask) < 4:
+        return None, None
+    data = bytearray()
+    remaining = payload_len
+    while remaining > 0:
+        chunk = rfile.read(min(remaining, 65536))
+        if not chunk:
+            break
+        data.extend(chunk)
+        remaining -= len(chunk)
+    if mask:
+        for i in range(len(data)):
+            data[i] ^= mask[i % 4]
+    return opcode, bytes(data)
+
+def send_ws_frame(wfile, opcode, payload):
+    """Sends an RFC 6455 WebSocket frame to client socket."""
+    data = payload if isinstance(payload, (bytes, bytearray)) else payload.encode('utf-8')
+    length = len(data)
+    first_byte = 0x80 | (opcode & 0x0f)
+    if length <= 125:
+        header = bytes([first_byte, length])
+    elif length <= 65535:
+        header = bytes([first_byte, 126]) + struct.pack('!H', length)
+    else:
+        header = bytes([first_byte, 127]) + struct.pack('!Q', length)
+    try:
+        wfile.write(header + data)
+        wfile.flush()
+    except Exception:
+        pass
+
+def calculate_pcm16_rms(pcm_bytes):
+    """Calculates RMS energy of 16-bit PCM audio samples."""
+    if not pcm_bytes:
+        return 0
+    count = len(pcm_bytes) // 2
+    if count == 0:
+        return 0
+    try:
+        shorts = struct.unpack(f'<{count}h', pcm_bytes[:count * 2])
+        sum_sq = sum(s * s for s in shorts)
+        return int(math.sqrt(sum_sq / count))
+    except Exception:
+        return 0
+
+def get_pcm24_from_text(text):
+    """Retrieves 24kHz raw PCM bytes from Gemini TTS audio cache."""
+    try:
+        url = get_or_create_voice_audio_file(text)
+        if url:
+            fname = url.split('/')[-1]
+            fpath = os.path.join(STATIC_DIR, "audio_cache", fname)
+            if os.path.exists(fpath):
+                with wave.open(fpath, "rb") as wf:
+                    return wf.readframes(wf.getnframes())
+    except Exception as e:
+        print(f"[Vobiz Stream] Error getting PCM for text '{text[:20]}': {e}")
+    return None
+
+def handle_vobiz_stream_ws(handler, query_params):
+    """
+    Handles bidirectional Vobiz WebSocket audio streaming (/ws):
+    1. Sends initial greeting via playAudio frames
+    2. Listens to caller media frames (PCM 16kHz) and computes real-time VAD / energy
+    3. Strictly waits for human caller to speak words (ignores initial line silence)
+    4. When caller finishes speaking, delivers second response intent via playAudio
+    5. Cleanly concludes call
+    """
+    cust_name = query_params.get("customer_name", ["Customer"])[0]
+    phone = query_params.get("phone", [""])[0]
+    first_msg = query_params.get("custom_message", [""])[0]
+    resp_intent = query_params.get("response_intent", [""])[0]
+    
+    if not first_msg:
+        cfg = get_calling_script_config()
+        first_msg = (cfg.get("greeting") or f"Namaste {cust_name} ji! Main Achyuta Enterprise se baat kar raha hoon.").replace("{customer_name}", cust_name)
+    if not resp_intent:
+        cfg = get_calling_script_config()
+        resp_intent = cfg.get("second_response_intent", "")
+
+    stream_id = None
+    call_id = None
+    state = "GREETING_QUEUED"
+    speech_detected = False
+    speech_energy_count = 0
+    silence_after_speech_count = 0
+    start_time = time.time()
+    
+    # 20ms chunks at 24kHz 16-bit mono = 24000 * 2 * 0.02 = 960 bytes
+    CHUNK_BYTES = 960
+
+    print(f"[Vobiz Stream] Connected for {cust_name} ({phone}). Preparing first message...")
+
+    def stream_audio_bytes(pcm_bytes):
+        if not pcm_bytes:
+            return
+        total_len = len(pcm_bytes)
+        for i in range(0, total_len, CHUNK_BYTES):
+            chunk = pcm_bytes[i:i + CHUNK_BYTES]
+            frame = {
+                "event": "playAudio",
+                "media": {
+                    "contentType": "audio/x-l16",
+                    "sampleRate": 24000,
+                    "payload": base64.b64encode(chunk).decode("ascii")
+                }
+            }
+            if stream_id:
+                frame["streamId"] = stream_id
+            send_ws_frame(handler.wfile, 0x1, json.dumps(frame))
+            time.sleep(0.018)  # Smooth flow
+
+    try:
+        while True:
+            opcode, raw_data = parse_ws_frame(handler.rfile)
+            if opcode is None or opcode == 0x8:  # Connection closed
+                print("[Vobiz Stream] WebSocket closed by client.")
+                break
+            if opcode == 0x9:  # Ping -> Pong
+                send_ws_frame(handler.wfile, 0xA, raw_data)
+                continue
+            if opcode == 0x1:  # Text frame (JSON event)
+                try:
+                    event = json.loads(raw_data.decode("utf-8", errors="ignore"))
+                except Exception:
+                    continue
+
+                event_name = event.get("event")
+                
+                if event_name == "start":
+                    start_meta = event.get("start", {})
+                    stream_id = event.get("streamId") or start_meta.get("streamId")
+                    call_id = event.get("callId") or start_meta.get("callId") or start_meta.get("callUUID")
+                    print(f"[Vobiz Stream] Received 'start' event. streamId={stream_id}, callId={call_id}")
+
+                    # Play first greeting message
+                    first_pcm = get_pcm24_from_text(first_msg)
+                    if first_pcm:
+                        print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...")
+                        stream_audio_bytes(first_pcm)
+                        # Send checkpoint to ensure playback finishes before listening
+                        if stream_id:
+                            chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "greeting_done"}
+                            send_ws_frame(handler.wfile, 0x1, json.dumps(chk_frame))
+                    state = "LISTENING_FOR_SPEECH"
+                    print("[Vobiz Stream] Now actively listening for caller speech (ignoring line silence)...")
+
+                elif event_name == "checkpoint":
+                    chk_name = event.get("name")
+                    if chk_name == "second_response_done":
+                        print("[Vobiz Stream] Second response finished playing. Concluding call...")
+                        time.sleep(1.0)
+                        break
+
+                elif event_name == "media" and state == "LISTENING_FOR_SPEECH":
+                    media = event.get("media", {})
+                    payload_b64 = media.get("payload", "")
+                    if payload_b64:
+                        try:
+                            pcm_in = base64.b64decode(payload_b64)
+                            rms = calculate_pcm16_rms(pcm_in)
+                            
+                            # Speech detection threshold (standard telephony background is ~100-300; vocal speech is >650)
+                            if rms > 650:
+                                speech_energy_count += 1
+                                if speech_energy_count >= 3:
+                                    if not speech_detected:
+                                        print(f"[Vobiz Stream] Caller speech detected! RMS={rms}")
+                                    speech_detected = True
+                                    silence_after_speech_count = 0
+                            else:
+                                if speech_detected:
+                                    silence_after_speech_count += 1
+                                    # ~1.2s of silence (each media frame is ~20-50ms) indicates caller has finished speaking
+                                    if silence_after_speech_count >= 24:
+                                        print("[Vobiz Stream] Caller finished speaking words. Delivering second response...")
+                                        state = "DELIVERING_SECOND_RESPONSE"
+                                        
+                                        reply_text = resp_intent or generate_intelligent_second_response("Ha kahiye", resp_intent)
+                                        second_pcm = get_pcm24_from_text(reply_text)
+                                        if second_pcm:
+                                            stream_audio_bytes(second_pcm)
+                                            if stream_id:
+                                                chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "second_response_done"}
+                                                send_ws_frame(handler.wfile, 0x1, json.dumps(chk_frame))
+                                        else:
+                                            time.sleep(2.0)
+                                            break
+                        except Exception as ex:
+                            pass
+
+                elif event_name == "stop":
+                    print("[Vobiz Stream] Received 'stop' event from Vobiz.")
+                    break
+
+            # Safeguard timeout (45 seconds total per call)
+            if time.time() - start_time > 45:
+                print("[Vobiz Stream] Call timeout reached (45s). Exiting.")
+                break
+
+    except Exception as e:
+        print(f"[Vobiz Stream] Error in stream loop: {e}")
+    finally:
+        print(f"[Vobiz Stream] Stream ended for {cust_name}.")
+
 class AchyutaWebHandler(SimpleHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
     def do_GET(self):
+        # WebSocket Streaming Endpoint: /ws
+        if self.path.startswith("/ws") and self.headers.get("Upgrade", "").lower() == "websocket":
+            self.close_connection = True
+            key = self.headers.get("Sec-WebSocket-Key")
+            if not key:
+                self.send_error(400, "Missing Sec-WebSocket-Key")
+                return
+            accept_val = base64.b64encode(hashlib.sha1((key + WS_MAGIC_KEY).encode()).digest()).decode()
+            self.send_response(101, "Switching Protocols")
+            self.send_header("Upgrade", "websocket")
+            self.send_header("Connection", "Upgrade")
+            self.send_header("Sec-WebSocket-Accept", accept_val)
+            self.end_headers()
+            
+            parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            handle_vobiz_stream_ws(self, parsed_query)
+            return
         if self.path.startswith("/voice-webhook/second-response"):
             parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             cust_name = parsed_query.get('customer_name', ['Customer'])[0]
@@ -4779,6 +5020,19 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 update_live_call_state(call_uuid, "ringing")
             self.send_response(200)
             self.end_headers()
+            return
+
+        elif self.path == "/stream-status":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8', errors="replace") if content_length > 0 else ""
+            parsed = urllib.parse.parse_qs(body)
+            event_type = parsed.get("Event", [""])[0] or parsed.get("event", [""])[0]
+            call_uuid = parsed.get("CallUUID", [""])[0] or parsed.get("call_uuid", [""])[0]
+            print(f"[Vobiz Stream Status] event={event_type}, call={call_uuid}")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok": true}')
             return
 
         elif self.path == "/api/voice_agent/hangup_callback":
