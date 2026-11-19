@@ -3487,19 +3487,21 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         second_pcm = get_pcm24_from_text(reply_text)
                                         if second_pcm:
                                             stream_audio_bytes(second_pcm)
-                                            if stream_id:
-                                                chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "step_response_done"}
-                                                send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
+                                            # Grace pause for speaker playback to fully deliver
+                                            time.sleep(0.4)
+                                        
+                                        # Check if we finished all configured flow steps
+                                        if current_step_index >= total_steps:
+                                            print(f"[Vobiz Stream] Final step {current_step_index}/{total_steps} finished playing. Concluding call safely...", flush=True)
+                                            time.sleep(1.5)
+                                            break
                                         else:
-                                            # If audio generation failed or last step, finish
-                                            if current_step_index >= total_steps:
-                                                time.sleep(1.5)
-                                                break
-                                            else:
-                                                state = "LISTENING_FOR_SPEECH"
-                                                speech_detected = False
-                                                speech_energy_count = 0
-                                                silence_after_speech_count = 0
+                                            # Automatically unlock ear and listen for caller's next reply!
+                                            print(f"[Vobiz Stream] Step {current_step_index}/{total_steps} delivered. Automatically listening for caller turn {current_step_index + 1}...", flush=True)
+                                            state = "LISTENING_FOR_SPEECH"
+                                            speech_detected = False
+                                            speech_energy_count = 0
+                                            silence_after_speech_count = 0
                         except Exception as ex:
                             print(f"[Vobiz Stream] Media processing error: {ex}", flush=True)
 
@@ -3507,9 +3509,9 @@ def handle_vobiz_stream_ws(handler, query_params):
                     print("[Vobiz Stream] Received 'stop' event from Vobiz.", flush=True)
                     break
 
-            # Safeguard timeout (50 seconds total per call)
-            if time.time() - start_time > 50:
-                print("[Vobiz Stream] Call timeout reached (50s). Exiting.", flush=True)
+            # Safeguard timeout (120 seconds total per multi-step call)
+            if time.time() - start_time > 120:
+                print("[Vobiz Stream] Multi-turn call timeout reached (120s). Exiting.", flush=True)
                 break
 
     except Exception as e:
