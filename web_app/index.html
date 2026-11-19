@@ -5697,7 +5697,7 @@
         return;
       }
 
-      // Show live call banner with active styling
+      // Show live call banner initially in 'Dialing / Ringing' state
       const banner = document.getElementById('calling-live-banner');
       const phoneEl = document.getElementById('calling-live-phone');
       const titleEl = document.getElementById('calling-banner-title');
@@ -5708,19 +5708,14 @@
 
       _liveCallSeconds = 0;
       if (_liveCallTicker) clearInterval(_liveCallTicker);
-      _liveCallTicker = setInterval(() => {
-        _liveCallSeconds++;
-        const mins = String(Math.floor(_liveCallSeconds / 60)).padStart(2, '0');
-        const secs = String(_liveCallSeconds % 60).padStart(2, '0');
-        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
-      }, 1000);
+      if (timerEl) timerEl.textContent = '00:00';
 
       if (banner && phoneEl) {
         phoneEl.textContent = clean;
-        if (titleEl) titleEl.textContent = 'Live AI Call in Progress';
-        if (subEl) subEl.textContent = 'Connected via Secure Telephony Gateway';
+        if (titleEl) titleEl.textContent = 'Initiating Call...';
+        if (subEl) subEl.textContent = 'Calling your phone via Vobiz';
         if (dotEl) {
-          dotEl.className = 'w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping flex-shrink-0';
+          dotEl.className = 'w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0';
         }
         if (endBtn) endBtn.classList.remove('hidden');
         banner.classList.remove('hidden');
@@ -5741,7 +5736,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          showScreenToast('AI Outbound Call connected!');
+          showScreenToast('Call placed! Ringing your phone...');
           loadCallingAgentData();
 
           const callUuid = data.data?.api_id || data.data?.request_uuid || '';
@@ -5749,26 +5744,52 @@
           if (_activeCallTimer) clearTimeout(_activeCallTimer);
           if (_activeCallPolling) clearInterval(_activeCallPolling);
 
-                    function startVobizCallPolling(callUuid) {
+          let callAnswered = false;
+
+          function startVobizCallPolling(callUuid) {
             if (_activeCallPolling) clearInterval(_activeCallPolling);
+            // Fast 1.5s real-time polling to catch Ringing -> Pick -> Disconnect instantly
             _activeCallPolling = setInterval(async () => {
-              loadCallingAgentData();
               if (callUuid) {
                 try {
                   const stRes = await fetch(`/api/voice_agent/call_status/${callUuid}`);
                   const stData = await stRes.json();
+                  
                   if (stData.is_ended) {
                     endLiveCallNow(true);
+                    loadCallingAgentData();
+                    return;
+                  }
+
+                  if (stData.is_connected && !callAnswered) {
+                    callAnswered = true;
+                    if (titleEl) titleEl.textContent = 'Call Connected (Live AI Conversation)';
+                    if (subEl) subEl.textContent = 'Customer answered phone';
+                    if (dotEl) dotEl.className = 'w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping flex-shrink-0';
+                    
+                    // Start conversation timer ONLY after call is answered
+                    if (!_liveCallTicker) {
+                      _liveCallTicker = setInterval(() => {
+                        _liveCallSeconds++;
+                        const mins = String(Math.floor(_liveCallSeconds / 60)).padStart(2, '0');
+                        const secs = String(_liveCallSeconds % 60).padStart(2, '0');
+                        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+                      }, 1000);
+                    }
+                  } else if (stData.is_ringing && !callAnswered) {
+                    if (titleEl) titleEl.textContent = 'Phone is Ringing... 🔔';
+                    if (subEl) subEl.textContent = 'Waiting for you to pick up the call';
+                    if (dotEl) dotEl.className = 'w-3.5 h-3.5 rounded-full bg-amber-400 animate-ping flex-shrink-0';
                   }
                 } catch(e) {}
               }
-            }, 5000);
+            }, 1500);
           }
           startVobizCallPolling(callUuid);
 
           _activeCallTimer = setTimeout(() => {
             endLiveCallNow(true);
-          }, 60000);
+          }, 90000);
 
         } else {
           showScreenToast(data.message || 'Call trigger failed');

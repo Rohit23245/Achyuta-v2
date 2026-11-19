@@ -495,6 +495,20 @@ def get_ai_call_logs_data():
 
     return final_logs
 
+# In-memory dictionary to track live call states in real time: "queued" -> "ringing" -> "connected" -> "ended"
+LIVE_CALL_TRACKER = {}
+
+def update_live_call_state(call_uuid, state, extra=None):
+    if not call_uuid:
+        return
+    if call_uuid not in LIVE_CALL_TRACKER:
+        LIVE_CALL_TRACKER[call_uuid] = {"state": state, "updated_at": time.time()}
+    else:
+        LIVE_CALL_TRACKER[call_uuid]["state"] = state
+        LIVE_CALL_TRACKER[call_uuid]["updated_at"] = time.time()
+    if extra and isinstance(extra, dict):
+        LIVE_CALL_TRACKER[call_uuid].update(extra)
+
 def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="", response_intent=""):
     clean = re.sub(r'[^0-9]', '', str(phone))
     if len(clean) == 10:
@@ -520,11 +534,18 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
     if encoded_intent:
         answer_url += f"&response_intent={encoded_intent}"
 
+    hangup_url = "https://achyuta-v2.onrender.com/api/voice_agent/hangup_callback"
+    ring_url = "https://achyuta-v2.onrender.com/api/voice_agent/ring_callback"
+
     payload = {
         "from": did_number,
         "to": f"+{clean}",
         "answer_url": answer_url,
-        "answer_method": "POST"
+        "answer_method": "POST",
+        "hangup_url": hangup_url,
+        "hangup_method": "POST",
+        "ring_url": ring_url,
+        "ring_method": "POST"
     }
     req_data = json.dumps(payload).encode("utf-8")
     headers = {
@@ -538,11 +559,14 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
         with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
             res = json.loads(r.read().decode("utf-8"))
             
+            uuid_val = res.get("api_id") or res.get("request_uuid") or f"vobiz_{int(time.time())}"
+            update_live_call_state(uuid_val, "queued", {"phone": f"+{clean}", "name": customer_name})
+
             logs = get_ai_call_logs_data()
             curr_time = int(time.time())
             new_log = {
                 "id": f"call_{len(logs)+1}_{curr_time}",
-                "call_uuid": res.get("api_id") or res.get("request_uuid") or f"vobiz_{curr_time}",
+                "call_uuid": uuid_val,
                 "customer_phone": f"+{clean}",
                 "customer_name": customer_name,
                 "call_status": "Initiated",
@@ -4545,32 +4569,55 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
 
         elif self.path.startswith("/api/voice_agent/call_status/"):
             call_uuid = self.path.split("/")[-1].split("?")[0]
-            url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Call/{call_uuid}/"
-            headers = {
-                "X-Auth-ID": VOBIZ_AUTH_ID,
-                "X-Auth-Token": VOBIZ_AUTH_TOKEN
-            }
-            req = urllib.request.Request(url, headers=headers)
-            call_data = {}
-            try:
-                with urllib.request.urlopen(req, timeout=5) as r:
-                    call_data = json.loads(r.read().decode('utf-8'))
-            except Exception as e:
-                pass
+            
+            # 1. First check in-memory real-time state from callbacks
+            tracked = LIVE_CALL_TRACKER.get(call_uuid, {})
+            current_state = tracked.get("state", "initiated")
 
-            is_ended = bool(call_data.get("end_time") or call_data.get("hangup_cause"))
-            bill_duration = call_data.get("bill_duration") or 0
-            hangup_cause = call_data.get("hangup_cause") or ""
+            is_ended = current_state in ["ended", "completed", "busy", "rejected", "failed"]
+            is_ringing = current_state == "ringing"
+            is_connected = current_state == "connected"
+            hangup_cause = tracked.get("hangup_cause", "")
+            bill_duration = tracked.get("bill_duration", 0)
+
+            # 2. If not ended yet, query Vobiz Cloud CDR directly to sync actual status
+            if not is_ended:
+                url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Call/{call_uuid}/"
+                headers = {
+                    "X-Auth-ID": VOBIZ_AUTH_ID,
+                    "X-Auth-Token": VOBIZ_AUTH_TOKEN
+                }
+                req = urllib.request.Request(url, headers=headers)
+                call_data = {}
+                try:
+                    with urllib.request.urlopen(req, timeout=4) as r:
+                        call_data = json.loads(r.read().decode('utf-8'))
+                except Exception as e:
+                    pass
+
+                if call_data.get("end_time") or call_data.get("hangup_cause"):
+                    is_ended = True
+                    current_state = "ended"
+                    hangup_cause = call_data.get("hangup_cause") or "Completed"
+                    bill_duration = int(call_data.get("bill_duration") or 0)
+                    update_live_call_state(call_uuid, "ended", {"hangup_cause": hangup_cause, "bill_duration": bill_duration})
+                elif call_data.get("answer_time"):
+                    is_connected = True
+                    is_ringing = False
+                    current_state = "connected"
+                    update_live_call_state(call_uuid, "connected")
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({
                 "call_uuid": call_uuid,
+                "state": current_state,
+                "is_ringing": is_ringing,
+                "is_connected": is_connected,
                 "is_ended": is_ended,
                 "bill_duration": bill_duration,
-                "hangup_cause": hangup_cause,
-                "call_state": call_data.get("call_state")
+                "hangup_cause": hangup_cause
             }).encode("utf-8"))
             return
 
@@ -4682,7 +4729,16 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             return
 
         elif self.path.startswith("/voice-webhook"):
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else ""
+            parsed_body = urllib.parse.parse_qs(body)
             parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            
+            call_uuid = parsed_body.get("CallUUID", [""])[0] or parsed_body.get("call_uuid", [""])[0]
+            if call_uuid:
+                # Customer answered phone! Mark connected in real time
+                update_live_call_state(call_uuid, "connected")
+
             cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
             phone = parsed_query.get('phone', [''])[0]
             custom_msg = parsed_query.get('custom_message', [''])[0]
@@ -4692,6 +4748,44 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
             self.wfile.write(xml_response.encode("utf-8"))
+            return
+
+        elif self.path == "/api/voice_agent/ring_callback":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else ""
+            parsed = urllib.parse.parse_qs(body)
+            call_uuid = parsed.get("CallUUID", [""])[0] or parsed.get("call_uuid", [""])[0]
+            if call_uuid:
+                update_live_call_state(call_uuid, "ringing")
+            self.send_response(200)
+            self.end_headers()
+            return
+
+        elif self.path == "/api/voice_agent/hangup_callback":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else ""
+            parsed = urllib.parse.parse_qs(body)
+            call_uuid = parsed.get("CallUUID", [""])[0] or parsed.get("call_uuid", [""])[0]
+            hangup_cause = parsed.get("HangupCause", [""])[0] or parsed.get("hangup_cause", [""])[0] or "Normal Hangup"
+            duration = int(parsed.get("BillDuration", ["0"])[0] or parsed.get("bill_duration", ["0"])[0] or 0)
+            if call_uuid:
+                update_live_call_state(call_uuid, "ended", {"hangup_cause": hangup_cause, "bill_duration": duration})
+                # Immediately mark in call logs vault as completed
+                try:
+                    if os.path.exists(CALL_LOGS_PATH):
+                        with open(CALL_LOGS_PATH, "r", encoding="utf-8") as f:
+                            logs = json.load(f)
+                        for l in logs:
+                            if l.get("call_uuid") == call_uuid:
+                                l["call_status"] = "Completed" if duration > 0 else "Ended"
+                                l["duration_seconds"] = duration
+                                break
+                        with open(CALL_LOGS_PATH, "w", encoding="utf-8") as f:
+                            json.dump(logs, f, indent=2)
+                except Exception:
+                    pass
+            self.send_response(200)
+            self.end_headers()
             return
 
         elif self.path == "/api/voice_agent/script_config":
