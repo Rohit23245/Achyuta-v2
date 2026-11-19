@@ -218,9 +218,25 @@ def trigger_ai_outbound_call(phone, customer_name="Customer"):
     if len(clean) == 10:
         clean = '91' + clean
 
-    payload = {"phone": clean}
+    auth_id = os.environ.get('VOBIZ_AUTH_ID')
+    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN')
+    did_number = os.environ.get('DID_NUMBER')
+    
+    # Correct Vobiz API URL
+    url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/"
+    payload = {
+        "from": did_number,
+        "to": f"+{clean}",
+        "answer_url": "https://achyuta-v2.onrender.com/voice-webhook",
+        "answer_method": "POST"
+    }
     req_data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(VOBIZ_TRIGGER_URL, data=req_data, headers={"Content-Type": "application/json"})
+    headers = {
+        "X-Auth-ID": auth_id,
+        "X-Auth-Token": auth_token,
+        "Content-Type": "application/json"
+    }
+    req = urllib.request.Request(url, data=req_data, headers=headers)
 
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
