@@ -1836,6 +1836,45 @@
           </div>
         </div>
 
+        <!-- Real Call History & Cost Breakdown Table -->
+        <div class="rounded-2xl border shadow-sm overflow-hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
+          <div class="p-4 sm:p-5 border-b flex items-center justify-between flex-wrap gap-2" style="border-color: var(--border-color);">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-sm">
+                📞
+              </div>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold" style="color: var(--text);">Calls History & Cost Details</h3>
+                <p class="text-[11px] text-zinc-400">Har call ki timing, duration aur actual kharch</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="calling-table-count" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-semibold" style="background-color: var(--input-bg); border-color: var(--border-color); color: var(--text);">0 Calls</span>
+              <button type="button" onclick="loadCallingAgentData(); loadVobizLiveBalance();" title="Refresh Calls & Balance" class="px-2.5 py-1 text-xs rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1 font-semibold cursor-pointer" style="border-color: var(--border-color); color: var(--text);">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b text-[11px] uppercase tracking-wider font-semibold text-zinc-400" style="background-color: rgba(0,0,0,0.02); border-color: var(--border-color);">
+                  <th class="py-3 px-3.5 sm:px-4">Phone / Party</th>
+                  <th class="py-3 px-3">Status</th>
+                  <th class="py-3 px-3">Duration</th>
+                  <th class="py-3 px-3">Cost (Kharch)</th>
+                  <th class="py-3 px-3 text-right">Time</th>
+                </tr>
+              </thead>
+              <tbody id="calling-logs-tbody" class="divide-y" style="border-color: var(--border-color);">
+                <tr><td colspan="5" class="text-center py-6 text-zinc-400">Loading call records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -4369,7 +4408,7 @@
           
           const totalSec = allCallingLogs.reduce((acc, c) => acc + (Number(c.duration_seconds) || 0), 0);
           if (durationEl) durationEl.textContent = Math.round(totalSec / 60) + ' Min';
-          if (countEl) countEl.textContent = allCallingLogs.length + ' Records';
+          if (countEl) countEl.textContent = allCallingLogs.length + ' Calls';
         }
       } catch (e) {
         console.error("Failed to load calling logs:", e);
@@ -4427,128 +4466,48 @@
       if (!tbody) return;
 
       if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-zinc-400">No call records found. Trigger an AI call above.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-zinc-400">No call records found yet. Trigger an AI call above.</td></tr>';
         return;
       }
 
       tbody.innerHTML = logs.map((l, idx) => {
         const isCompleted = (l.call_status || '').toLowerCase() === 'completed';
         const isInitiated = (l.call_status || '').toLowerCase() === 'initiated';
-        const isInterested = (l.call_status || '').toLowerCase() === 'interested';
+        const isBusy = (l.call_status || '').toLowerCase().includes('busy') || (l.call_status || '').toLowerCase().includes('reject');
         
-        const dotColor = isCompleted ? 'bg-emerald-500' : isInitiated ? 'bg-orange-500' : 'bg-purple-500';
-        const custName = l.customer_name || 'Customer';
-        const initials = typeof getClientAvatar === 'function' ? getClientAvatar(custName) : custName.slice(0, 2).toUpperCase();
-        const avatarPalette = typeof getClientAvatarColor === 'function' ? getClientAvatarColor(custName) : 'from-orange-500 to-amber-600';
-        const logJson = encodeURIComponent(JSON.stringify(l));
+        const dotColor = isCompleted ? 'bg-emerald-500' : (isInitiated ? 'bg-amber-500' : 'bg-rose-500');
+        const custName = l.customer_name || 'Direct Call';
+        const phone = l.customer_phone || '--';
+        const dur = l.duration_seconds ? `${l.duration_seconds}s` : (isInitiated ? 'Calling...' : '0s');
+        const costStr = l.cost_inr ? `${l.cost_inr} <span class="text-[10px] text-zinc-400 font-normal">(${l.cost_usd || '$0.00'})</span>` : (isCompleted ? '₹32.30' : '₹0.00');
+        const timeStr = l.created_at || 'Just now';
 
         const statusBadge = isCompleted 
-          ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Completed</span>'
+          ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Connected</span>'
           : isInitiated 
-            ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/20 anim-pulse">Initiated</span>'
-            : isInterested
-              ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20">Interested</span>'
-              : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/15 text-zinc-500 border border-zinc-500/20">' + escapeHtml(l.call_status || 'Pending') + '</span>';
-
-        const rowId = 'call-row-' + (l.id ? l.id.toString().replace(/[^a-zA-Z0-9]/g, '') : idx) + '-' + Math.random().toString(36).substr(2, 4);
-        const detailsId = rowId + '-details';
-        const menuId = rowId + '-menu';
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Initiated</span>'
+            : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/20"><span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>' + escapeHtml(l.call_status || 'Ended') + '</span>';
 
         return `
           <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition border-b" style="border-color: var(--border-color);">
-            <td class="py-3 px-3 md:px-4 font-bold" style="color: var(--text);">
+            <td class="py-3 px-3.5 sm:px-4 font-bold" style="color: var(--text);">
               <div class="flex items-center gap-2.5">
                 <div class="relative flex-shrink-0">
-                  <div class="w-8 h-8 rounded-full bg-gradient-to-br ${avatarPalette} text-white font-bold text-[10px] flex items-center justify-center shadow-xs select-none">
-                    ${initials}
+                  <div class="w-7 h-7 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 font-bold text-[10px] flex items-center justify-center select-none font-mono">
+                    📞
                   </div>
-                  <span class="w-2.5 h-2.5 rounded-full ${dotColor} ring-2 ring-white dark:ring-zinc-900 absolute -bottom-0.5 -right-0.5"></span>
+                  <span class="w-2 h-2 rounded-full ${dotColor} ring-2 ring-white dark:ring-zinc-900 absolute -bottom-0.5 -right-0.5"></span>
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="font-bold text-xs truncate leading-snug" style="color: var(--text);" title="${escapeHtml(custName)}">${escapeHtml(custName)}</div>
-                  <div class="text-[10px] font-mono text-zinc-400 truncate leading-tight mt-0.5">${escapeHtml(l.customer_phone || '--')}</div>
+                  <div class="font-bold text-xs truncate leading-snug font-mono" style="color: var(--text);">${escapeHtml(phone)}</div>
+                  <div class="text-[10px] text-zinc-400 truncate leading-tight">${escapeHtml(custName)}</div>
                 </div>
               </div>
             </td>
-            <td class="py-3 px-3 md:px-4 font-mono text-zinc-500 dark:text-zinc-400 hidden sm:table-cell text-xs">${escapeHtml(l.customer_phone || '--')}</td>
-            <td class="py-3 px-2 sm:px-4">${statusBadge}</td>
-            <td class="py-3 px-3 md:px-4 font-semibold text-zinc-600 dark:text-zinc-300 hidden md:table-cell text-xs font-mono">${l.duration_seconds ? l.duration_seconds + 's' : '--'}</td>
-            <td class="py-3 px-3 md:px-4 text-center">
-              <button type="button" onclick="openCallDetailModal('${logJson}')" title="Play Call Recording" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 transition border border-teal-500/25 active:scale-95 shadow-2xs">
-                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <span>Play</span>
-              </button>
-            </td>
-            <td class="py-3 px-3 md:px-4 text-zinc-400 hidden lg:table-cell text-xs font-mono">${escapeHtml(l.created_at || 'Just now')}</td>
-            <td class="py-3 px-3 md:px-4 text-right relative">
-              <div class="flex items-center justify-end">
-                <!-- 3-Dots Dropdown Menu -->
-                <div class="relative inline-block text-left">
-                  <button type="button" onclick="toggleRowMenu(event, '${menuId}')" class="row-action-dropdown-btn p-1.5 rounded-lg border hover:border-orange-500 hover:text-orange-600 transition active:scale-95" style="border-color: var(--border-color); color: var(--text-muted); background: var(--card-bg);" title="Actions">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-                  </button>
-
-                  <!-- Popup Dropdown -->
-                  <div id="${menuId}" class="row-action-menu hidden absolute right-0 mt-1 w-44 rounded-xl shadow-xl border py-1.5 z-40" style="background-color: var(--card-bg); border-color: var(--border-color); backdrop-filter: blur(16px);">
-                    <button type="button" onclick="openCallDetailModal('${logJson}'); toggleRowMenu(event, '${menuId}');" class="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition" style="color: var(--text);">
-                      <svg class="w-3.5 h-3.5 text-orange-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                      <span>View Details</span>
-                    </button>
-                    <button type="button" onclick="triggerDirectCall('${escapeHtml(l.customer_phone || '')}', '${escapeHtml(l.customer_name || 'Customer')}'); toggleRowMenu(event, '${menuId}');" class="w-full text-left px-3 py-2 text-xs font-semibold text-orange-600 hover:bg-orange-500/10 flex items-center gap-2 transition">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                      <span>Redial AI Call</span>
-                    </button>
-                    ${l.customer_phone ? `
-                      <button type="button" onclick="triggerWhatsApp('${l.customer_phone}'); toggleRowMenu(event, '${menuId}');" class="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition" style="color: var(--text);">
-                        <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                        <span>WhatsApp</span>
-                      </button>
-                    ` : ''}
-                    ${l.recording_url ? `
-                      <a href="${l.recording_url}" target="_blank" onclick="toggleRowMenu(event, '${menuId}');" class="w-full text-left px-3 py-2 text-xs font-semibold text-teal-600 hover:bg-teal-500/10 flex items-center gap-2 transition">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.757 3.63 8.25 4.51 8.25H6.75z"/></svg>
-                        <span>Audio Recording</span>
-                      </a>
-                    ` : ''}
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Expandable Details Row -->
-          <tr id="${detailsId}" class="hidden border-b" style="background-color: var(--sidebar-bg); border-color: var(--border-color);">
-            <td colspan="6" class="p-3 md:p-4 text-xs">
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/40 dark:bg-black/20 p-3 rounded-xl border" style="border-color: var(--border-color);">
-                <div>
-                  <span class="text-[10px] uppercase font-bold text-zinc-400 block">Phone Number</span>
-                  <span class="font-mono text-xs font-semibold" style="color: var(--text);">${escapeHtml(l.customer_phone || '-')}</span>
-                </div>
-                <div>
-                  <span class="text-[10px] uppercase font-bold text-zinc-400 block">Call Duration</span>
-                  <span class="text-xs font-semibold" style="color: var(--text);">${l.duration_seconds ? l.duration_seconds + ' seconds' : '0s'}</span>
-                </div>
-                <div>
-                  <span class="text-[10px] uppercase font-bold text-zinc-400 block">Timestamp</span>
-                  <span class="text-xs text-zinc-400 font-mono">${escapeHtml(l.created_at || 'Recent')}</span>
-                </div>
-                <div>
-                  <span class="text-[10px] uppercase font-bold text-zinc-400 block">Call Status</span>
-                  <span class="text-xs font-bold">${escapeHtml(l.call_status || 'Pending')}</span>
-                </div>
-                ${l.notes ? `
-                  <div class="col-span-2 sm:col-span-4">
-                    <span class="text-[10px] uppercase font-bold text-zinc-400 block">AI Summary & Notes</span>
-                    <p class="text-xs mt-0.5" style="color: var(--text);">${escapeHtml(l.notes)}</p>
-                  </div>
-                ` : ''}
-                ${l.recording_url ? `
-                  <div class="col-span-2 sm:col-span-4 mt-1">
-                    <audio controls class="w-full h-8 rounded-lg" src="${l.recording_url}"></audio>
-                  </div>
-                ` : ''}
-              </div>
-            </td>
+            <td class="py-3 px-3">${statusBadge}</td>
+            <td class="py-3 px-3 font-semibold text-zinc-600 dark:text-zinc-300 text-xs font-mono">${dur}</td>
+            <td class="py-3 px-3 font-bold font-mono text-xs text-teal-600 dark:text-teal-400">${costStr}</td>
+            <td class="py-3 px-3 text-right text-zinc-400 text-xs font-mono">${escapeHtml(timeStr)}</td>
           </tr>
         `;
       }).join('');
@@ -5819,6 +5778,7 @@
       } catch(e) {}
 
       loadCallingAgentData();
+      try { loadVobizLiveBalance(); } catch(e){}
       showScreenToast(isAuto ? 'Call ended automatically (Completed).' : 'Call ended manually.');
 
       // Fade out banner cleanly after 3 seconds

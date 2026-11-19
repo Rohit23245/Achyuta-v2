@@ -310,16 +310,24 @@ init_call_logs_vault()
 
 def fetch_vobiz_real_call_logs():
     """
-    Directly syncs actual call metadata and recordings from the official Vobiz Telephony API.
+    Directly syncs actual call metadata, cost, and recordings from the official Vobiz Telephony API.
     """
-    url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Call/?limit=30"
+    auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
+    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
+    url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/?limit=40"
+    
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    
     headers = {
-        "X-Auth-ID": VOBIZ_AUTH_ID,
-        "X-Auth-Token": VOBIZ_AUTH_TOKEN
+        "X-Auth-ID": auth_id,
+        "X-Auth-Token": auth_token
     }
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=8) as r:
+        with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
             data = json.loads(r.read().decode('utf-8'))
             return data.get("objects", [])
     except Exception as e:
@@ -329,76 +337,107 @@ def get_realtime_vobiz_recordings():
     """
     Retrieves live recordings directly from Vobiz Cloud.
     """
-    url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Recording/?limit=30"
+    auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
+    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
+    url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Recording/?limit=30"
+    
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    
     headers = {
-        "X-Auth-ID": VOBIZ_AUTH_ID,
-        "X-Auth-Token": VOBIZ_AUTH_TOKEN
+        "X-Auth-ID": auth_id,
+        "X-Auth-Token": auth_token
     }
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=8) as r:
+        with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
             data = json.loads(r.read().decode('utf-8'))
             return data.get("objects", [])
     except Exception as e:
         return []
 
 def get_ai_call_logs_data():
+    """
+    Returns authentic call records directly from Vobiz Telephony API with real cost breakdown,
+    merging any newly initiated outbound calls.
+    """
+    real_vobiz_calls = fetch_vobiz_real_call_logs()
+    
+    # Read locally initiated calls to preserve customer name / custom notes
+    local_logs = []
     if os.path.exists(CALL_LOGS_PATH):
         try:
             with open(CALL_LOGS_PATH, "r", encoding="utf-8") as f:
-                logs = json.load(f)
-                
-            # Auto-reconcile call statuses with real Vobiz API
-            now_ts = int(time.time())
-            changed = False
+                local_logs = json.load(f)
+        except Exception:
+            local_logs = []
 
-            # Query real Vobiz API to cross-verify call status and durations
-            real_vobiz_calls = fetch_vobiz_real_call_logs()
-            vobiz_map = {c.get("call_uuid"): c for c in real_vobiz_calls if c.get("call_uuid")}
+    local_map = {l.get("call_uuid"): l for l in local_logs if l.get("call_uuid")}
 
-            for l in logs:
-                c_uuid = l.get("call_uuid")
-                if c_uuid and c_uuid in vobiz_map:
-                    v_obj = vobiz_map[c_uuid]
-                    bill_dur = v_obj.get("bill_duration") or v_obj.get("duration")
-                    hangup = v_obj.get("hangup_cause")
-                    if bill_dur is not None and bill_dur > 0:
-                        l["call_status"] = "Completed"
-                        l["duration_seconds"] = int(bill_dur)
-                        changed = True
-                    elif hangup in ["USER_BUSY", "CALL_REJECTED"]:
-                        l["call_status"] = "Busy" if hangup == "USER_BUSY" else "Rejected"
-                        changed = True
-                    elif v_obj.get("end_time"):
-                        l["call_status"] = "Completed" if (bill_dur and bill_dur > 0) else "No Answer"
-                        changed = True
+    final_logs = []
+    seen_uuids = set()
 
-                if l.get("call_status") == "Initiated":
-                    call_ts = l.get("initiated_at")
-                    if not call_ts:
-                        id_parts = str(l.get("id", "")).split("_")
-                        if len(id_parts) >= 3 and id_parts[2].isdigit():
-                            call_ts = int(id_parts[2])
-                        else:
-                            call_ts = now_ts - 30
-                        l["initiated_at"] = call_ts
-                    
-                    elapsed = now_ts - call_ts
-                    if elapsed >= 30:
-                        l["call_status"] = "Completed"
-                        if not l.get("duration_seconds") or l.get("duration_seconds") == 0:
-                            l["duration_seconds"] = min(elapsed, 35)
-                        changed = True
+    for c in real_vobiz_calls:
+        uuid = c.get("call_uuid")
+        if not uuid or uuid in seen_uuids:
+            continue
+        seen_uuids.add(uuid)
+        
+        # Calculate real duration & cost
+        bill_dur = int(c.get("bill_duration") or 0)
+        cost_val = float(c.get("cost") or 0.0)
+        cost_inr = round(cost_val * 85.0, 2)
+        hangup = c.get("hangup_cause_name") or c.get("hangup_cause") or "Completed"
+        status = "Completed" if bill_dur > 0 else ("Busy" if "busy" in hangup.lower() else ("No Answer" if not c.get("answer_time") else hangup))
+        
+        to_num = c.get("to_number") or ""
+        if to_num and not to_num.startswith("+"):
+            to_num = "+" + to_num
 
-            if changed:
-                try:
-                    with open(CALL_LOGS_PATH, "w", encoding="utf-8") as f:
-                        json.dump(logs, f, indent=2)
-                except:
-                    pass
-            return logs
-        except: pass
-    return []
+        # Check local notes or customer name if user entered one
+        matched_local = local_map.get(uuid, {})
+        cust_name = matched_local.get("customer_name") or "Direct Call"
+        notes = matched_local.get("notes") or ("Outbound AI Call via Vobiz" if bill_dur > 0 else f"Call outcome: {hangup}")
+
+        final_logs.append({
+            "id": matched_local.get("id") or f"vobiz_{uuid[:8]}",
+            "call_uuid": uuid,
+            "customer_phone": to_num,
+            "customer_name": cust_name,
+            "call_status": status,
+            "duration_seconds": bill_dur,
+            "cost": cost_val,
+            "cost_usd": f"${cost_val:.3f}",
+            "cost_inr": f"₹{cost_inr:.2f}",
+            "currency": c.get("currency", "USD"),
+            "initiated_at": c.get("initiation_time") or c.get("created_at") or "",
+            "created_at": c.get("initiation_time") or c.get("created_at") or "Recent",
+            "notes": notes
+        })
+
+    # Also include any local initiated calls that haven't appeared in Vobiz list yet (just clicked Call Now)
+    for l in local_logs:
+        l_uuid = l.get("call_uuid")
+        if l_uuid and l_uuid not in seen_uuids:
+            final_logs.insert(0, {
+                "id": l.get("id"),
+                "call_uuid": l_uuid,
+                "customer_phone": l.get("customer_phone", ""),
+                "customer_name": l.get("customer_name", "Customer"),
+                "call_status": l.get("call_status", "Initiated"),
+                "duration_seconds": l.get("duration_seconds", 0),
+                "cost": 0.0,
+                "cost_usd": "$0.000",
+                "cost_inr": "₹0.00",
+                "currency": "INR",
+                "initiated_at": l.get("initiated_at") or "Just now",
+                "created_at": "Just now",
+                "notes": l.get("notes") or "Connecting..."
+            })
+
+    return final_logs
 
 def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message=""):
     clean = re.sub(r'[^0-9]', '', str(phone))
