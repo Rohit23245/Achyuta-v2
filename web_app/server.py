@@ -238,13 +238,16 @@ def generate_intelligent_second_response(customer_speech, intent_direction="", a
     if api_key and speech:
         try:
             extra_inst = f"\nSpecific Custom Behavior & Instruction: {custom_inst}" if custom_inst else ""
-            prompt = f"""You are Priya, a polite professional AI telecaller assistant for Achyuta Enterprise Solutions speaking over phone to an Indian client.
+            prompt = f"""You are an Indian professional phone caller representing the business/script goal below.
 The client just responded with: "{speech}"
-Your conversation goal / intent direction is: "{intent}"{extra_inst}
+Your exact conversation goal / intent direction is: "{intent}"{extra_inst}
 
-Directly speak to the client in 1 short, polite, engaging Hindi/Hinglish sentence aligned with the goal. 
-Speak warmly and directly. Do NOT talk about random things, do NOT introduce yourself as Gemini or AI.
-Do NOT use asterisks, markdown, quotation marks, or emojis. Only return the exact words to speak out loud."""
+Rules:
+1. Speak ONLY in direct, conversational natural Hindi / Hinglish.
+2. Directly deliver the intent message to the client. Do NOT say you work for Achyuta unless the intent says so.
+3. Pronounce names and brand words accurately as typed (e.g. if the intent says "KV traders", pronounce it naturally as "KV traders" or "के वी ट्रेडर्स", do NOT guess other names like Kavya).
+4. Do NOT introduce yourself as Gemini or AI.
+5. Do NOT use asterisks, markdown, quotation marks, or emojis. Only return the exact words to speak out loud."""
             
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={api_key}"
             payload = {
@@ -511,10 +514,26 @@ def update_live_call_state(call_uuid, state, extra=None):
     if extra and isinstance(extra, dict):
         LIVE_CALL_TRACKER[call_uuid].update(extra)
 
+# Global in-memory cache for pre-computed speech PCM audio to eliminate phone pickup delay
+_OUTBOUND_PRECOMPUTED_PCM = {}
+
 def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="", response_intent="", agent_instructions=""):
     clean = re.sub(r'[^0-9]', '', str(phone))
     if len(clean) == 10:
         clean = '91' + clean
+
+    # Pre-generate greeting PCM asynchronously or in background thread so audio is 100% ready when user answers phone
+    msg_to_speak = str(custom_message or "").strip()
+    if msg_to_speak:
+        def _pregen():
+            try:
+                pcm = get_pcm24_from_text(msg_to_speak)
+                if pcm:
+                    _OUTBOUND_PRECOMPUTED_PCM[clean] = pcm
+                    print(f"[Outbound Pre-gen] Pre-computed {len(pcm)} bytes PCM for {clean}", flush=True)
+            except Exception as e:
+                print(f"[Outbound Pre-gen] Error: {e}", flush=True)
+        threading.Thread(target=_pregen, daemon=True).start()
 
     auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
     auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
@@ -3331,8 +3350,13 @@ def handle_vobiz_stream_ws(handler, query_params):
     silence_after_speech_count = 0
     start_time = time.time()
     
-    # Pre-generate greeting PCM immediately before loop
-    first_pcm = get_pcm24_from_text(first_msg)
+    clean_phone = re.sub(r'[^0-9]', '', str(phone))
+    first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(clean_phone, None)
+    if not first_pcm:
+        print(f"[Vobiz Stream] Pre-computed PCM not found in memory, generating now for '{first_msg[:25]}'...", flush=True)
+        first_pcm = get_pcm24_from_text(first_msg)
+    else:
+        print(f"[Vobiz Stream] Instant zero-delay greeting PCM ready from memory ({len(first_pcm)} bytes)!", flush=True)
 
     # 20ms chunks at 24kHz 16-bit mono = 24000 * 2 * 0.02 = 960 bytes
     CHUNK_BYTES = 960
