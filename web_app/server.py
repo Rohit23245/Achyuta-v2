@@ -4,12 +4,20 @@ import os
 import html
 import hashlib
 import base64
+import struct
+import math
+import wave
+import io
 import urllib.request
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import threading
 import time
 from datetime import datetime
+try:
+    import websockets
+except ImportError:
+    websockets = None
 try:
     import whatsapp_engine
 except ImportError:
