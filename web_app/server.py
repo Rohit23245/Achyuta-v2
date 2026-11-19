@@ -238,15 +238,15 @@ def generate_intelligent_second_response(customer_speech, intent_direction="", a
     if api_key and speech:
         try:
             extra_inst = f"\nSpecific Custom Behavior & Instruction: {custom_inst}" if custom_inst else ""
-            prompt = f"""You are an Indian professional phone caller representing the business/script goal below.
+            prompt = f"""You are an Indian professional female phone caller representing the business/script goal below.
 The client just responded with: "{speech}"
 Your exact conversation goal / intent direction is: "{intent}"{extra_inst}
 
 Rules:
 1. Speak ONLY in direct, conversational natural Hindi / Hinglish.
-2. Directly deliver the intent message to the client. Do NOT say you work for Achyuta unless the intent says so.
-3. Pronounce names and brand words accurately as typed (e.g. if the intent says "KV traders", pronounce it naturally as "KV traders" or "के वी ट्रेडर्स", do NOT guess other names like Kavya).
-4. Do NOT introduce yourself as Gemini or AI.
+2. You are a real human executive. NEVER say or admit you are an AI, computer, model, or that you cannot shop or have no human preferences. If customer mentions shopping or likes, respond enthusiastically as a human!
+3. Directly answer the customer's point and smoothly deliver the intent goal in 1 to 2 short sentences.
+4. Pronounce names and brand words accurately as typed.
 5. Do NOT use asterisks, markdown, quotation marks, or emojis. Only return the exact words to speak out loud."""
             
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={api_key}"
@@ -6821,6 +6821,11 @@ def generate_gemini_voice_audio(text_content):
                                 }
                             }
                         }
+                    },
+                    "systemInstruction": {
+                        "parts": [{
+                            "text": "You are a professional Hindi voice artist. Your ONLY task is to read aloud the exact text provided verbatim in clear natural Hindi. Never answer questions, never explain your thoughts, and never mention that you are an AI or cannot shop. Only speak the provided text word-for-word."
+                        }]
                     }
                 }
             }
@@ -6831,7 +6836,7 @@ def generate_gemini_voice_audio(text_content):
                 "clientContent": {
                     "turns": [{
                         "role": "user",
-                        "parts": [{"text": f"Say: {clean_text}"}]
+                        "parts": [{"text": f"Read verbatim in Hindi: {clean_text}"}]
                     }],
                     "turnComplete": True
                 }
@@ -6908,7 +6913,7 @@ def transcribe_gemini_voice_audio(audio_base64, mime_type="audio/webm;codecs=opu
     elif "mp4" in mime_type or "m4a" in mime_type:
         clean_mime = "audio/mp4"
 
-    candidate_models = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-flash-latest"]
+    candidate_models = ["gemini-3.5-flash", "gemini-flash-latest"]
     for model_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={VOICE_API_KEY}"
         payload = {
