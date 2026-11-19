@@ -2,6 +2,8 @@ import re
 import json
 import os
 import html
+import hashlib
+import base64
 import urllib.request
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -99,6 +101,7 @@ def generate_standard_meet_link():
     return f"https://meet.google.com/{p1}-{p2}-{p3}"
 
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(DATA_DIR, "static")
 PORT = 5000
 
 # ---------------------------------------------------------
