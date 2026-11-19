@@ -4911,7 +4911,22 @@
           if (_activeCallTimer) clearTimeout(_activeCallTimer);
           if (_activeCallPolling) clearInterval(_activeCallPolling);
 
-                    startVobizCallPolling(callUuid);
+                    function startVobizCallPolling(callUuid) {
+            if (_activeCallPolling) clearInterval(_activeCallPolling);
+            _activeCallPolling = setInterval(async () => {
+              loadCallingAgentData();
+              if (callUuid) {
+                try {
+                  const stRes = await fetch(`/api/voice_agent/call_status/${callUuid}`);
+                  const stData = await stRes.json();
+                  if (stData.is_ended) {
+                    endLiveCallNow(true);
+                  }
+                } catch(e) {}
+              }
+            }, 5000);
+          }
+          startVobizCallPolling(callUuid);
 
           _activeCallTimer = setTimeout(() => {
             endLiveCallNow(true);
