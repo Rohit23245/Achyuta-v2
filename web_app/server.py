@@ -3463,10 +3463,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
     {speech_tag}
     <Wait length="2"/>
 </Response>"""
+            xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(xml_bytes)))
             self.end_headers()
-            self.wfile.write(xml_response.encode("utf-8"))
+            self.wfile.write(xml_bytes)
             return
 
         if self.path.startswith("/voice-webhook/digits"):
@@ -3474,10 +3476,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             digits = parsed_query.get('Digits', ['1'])[0]
             cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
             xml_response = generate_vobiz_digits_xml(digits, cust_name)
+            xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(xml_bytes)))
             self.end_headers()
-            self.wfile.write(xml_response.encode("utf-8"))
+            self.wfile.write(xml_bytes)
             return
 
         if self.path.startswith("/voice-webhook"):
@@ -3487,10 +3491,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             custom_msg = parsed_query.get('custom_message', [''])[0]
             resp_intent = parsed_query.get('response_intent', [''])[0]
             xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent)
+            xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(xml_bytes)))
             self.end_headers()
-            self.wfile.write(xml_response.encode("utf-8"))
+            self.wfile.write(xml_bytes)
             return
 
         if self.path == "/api/voice_agent/script_config":
@@ -4969,10 +4975,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
     {speech_tag}
     <Wait length="2"/>
 </Response>"""
+            xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(xml_bytes)))
             self.end_headers()
-            self.wfile.write(xml_response.encode("utf-8"))
+            self.wfile.write(xml_bytes)
             return
 
         elif self.path.startswith("/voice-webhook/digits"):
@@ -4983,10 +4991,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             digits = parsed_body.get('Digits', [''])[0] or parsed_query.get('Digits', ['1'])[0] or '1'
             cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
             xml_response = generate_vobiz_digits_xml(digits, cust_name)
+            xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(xml_bytes)))
             self.end_headers()
-            self.wfile.write(xml_response.encode("utf-8"))
+            self.wfile.write(xml_bytes)
             return
 
         elif self.path.startswith("/voice-webhook"):
@@ -5005,10 +5015,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             custom_msg = parsed_query.get('custom_message', [''])[0]
             resp_intent = parsed_query.get('response_intent', [''])[0]
             xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent)
+            xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(xml_bytes)))
             self.end_headers()
-            self.wfile.write(xml_response.encode("utf-8"))
+            self.wfile.write(xml_bytes)
             return
 
         elif self.path == "/api/voice_agent/ring_callback":
