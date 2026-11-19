@@ -5885,8 +5885,11 @@
       renderCallingListSelect();
       if (select) {
         select.value = 'direct';
-        onCallingListSelected('direct');
       }
+      // Reset inputs back to initial clean single number row
+      setCallingNumbers(['+918707526283']);
+      const delBtn = document.getElementById('caller-delete-list-btn');
+      if (delBtn) delBtn.classList.add('hidden');
     }
 
     async function openCreateCallingListModalDirect() {
