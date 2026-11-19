@@ -210,10 +210,7 @@ def get_or_create_voice_audio_file(text_content):
         filename = f"tts_{h}.wav"
         file_path = os.path.join(cache_dir, filename)
 
-        if os.path.exists(file_path) and os.path.getsize(file_path) > 1000:
-            return f"https://achyuta-v2.onrender.com/static/audio_cache/{filename}"
-
-        # Generate audio using Gemini native voice
+        # Force fresh audio generation (no stale cache re-use)
         b64_audio, err = generate_gemini_voice_audio(clean)
         if b64_audio and not err:
             wav_bytes = base64.b64decode(b64_audio)
@@ -3278,17 +3275,15 @@ def calculate_pcm16_rms(pcm_bytes):
         return 0
 
 def get_pcm24_from_text(text):
-    """Retrieves 24kHz raw PCM bytes from Gemini TTS audio cache."""
+    """Generates fresh 24kHz raw PCM bytes directly from Gemini TTS (no stale disk cache)."""
     try:
-        url = get_or_create_voice_audio_file(text)
-        if url:
-            fname = url.split('/')[-1]
-            fpath = os.path.join(STATIC_DIR, "audio_cache", fname)
-            if os.path.exists(fpath):
-                with wave.open(fpath, "rb") as wf:
-                    return wf.readframes(wf.getnframes())
+        b64_audio, err = generate_gemini_voice_audio(text)
+        if b64_audio and not err:
+            wav_bytes = base64.b64decode(b64_audio)
+            with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+                return wf.readframes(wf.getnframes())
     except Exception as e:
-        print(f"[Vobiz Stream] Error getting PCM for text '{text[:20]}': {e}", flush=True)
+        print(f"[Vobiz Stream] Error generating fresh PCM for text '{text[:20]}': {e}", flush=True)
     return None
 
 def handle_vobiz_stream_ws(handler, query_params):
@@ -6716,9 +6711,6 @@ def generate_gemini_voice_audio(text_content):
                     "model": f"models/{GEMINI_TTS_MODEL}",
                     "generationConfig": {
                         "responseModalities": ["AUDIO"],
-                        "thinkingConfig": {
-                            "thinkingBudget": 0
-                        },
                         "speechConfig": {
                             "voiceConfig": {
                                 "prebuiltVoiceConfig": {
@@ -6726,11 +6718,6 @@ def generate_gemini_voice_audio(text_content):
                                 }
                             }
                         }
-                    },
-                    "systemInstruction": {
-                        "parts": [{
-                            "text": "You are a text-to-speech speaker. Your only task is to say aloud the text provided by the user in a natural Hindi/Hinglish speaking tone."
-                        }]
                     }
                 }
             }
@@ -6741,7 +6728,7 @@ def generate_gemini_voice_audio(text_content):
                 "clientContent": {
                     "turns": [{
                         "role": "user",
-                        "parts": [{"text": clean_text}]
+                        "parts": [{"text": f"Say: {clean_text}"}]
                     }],
                     "turnComplete": True
                 }
