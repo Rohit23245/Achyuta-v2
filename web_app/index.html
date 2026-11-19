@@ -4307,27 +4307,6 @@
         // Re-enable floating tooltips in collapsed mode
         tooltips.forEach(t => t.style.display = '');
       }
-
-        if (bottomControls) {
-          bottomControls.classList.remove('justify-between');
-          bottomControls.classList.add('justify-center');
-        }
-        if (userBtn) {
-          userBtn.classList.add('justify-center');
-        }
-
-        // Hide text labels
-        textElements.forEach(el => el.classList.add('hidden'));
-
-        // Center button contents
-        btnInners.forEach(el => {
-          el.classList.remove('justify-start');
-          el.classList.add('justify-center');
-        });
-
-        // Re-enable floating tooltips in collapsed mode
-        tooltips.forEach(t => t.style.display = '');
-      }
     }
 
     function toggleSidebar() {
