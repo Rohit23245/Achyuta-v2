@@ -216,7 +216,50 @@ def get_or_create_voice_audio_file(text_content):
         print(f"Error caching voice audio: {e}")
     return None
 
-def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message=""):
+def generate_intelligent_second_response(customer_speech, intent_direction=""):
+    """
+    Generates intelligent dynamic conversational reply based on user intent direction and client words.
+    """
+    cfg = get_calling_script_config()
+    intent = (intent_direction or cfg.get("second_response_intent") or "").strip()
+    speech = (customer_speech or "").strip()
+
+    if not intent:
+        return "Theek hai ji, aapka bahut bahut dhanyawaad. Hum aapse jald hi WhatsApp par sampark karenge."
+
+    # If Gemini API key is available, use fast Gemini flash to formulate exact Hindi/Hinglish reply aligned with intent
+    api_key = os.environ.get('AI_API_KEY') or os.environ.get('GEMINI_API_KEY') or AI_API_KEY
+    if api_key and speech:
+        try:
+            prompt = f"""You are Priya, a polite professional AI telecaller assistant for Achyuta Enterprise Solutions speaking over phone to an Indian client.
+The client just responded with: "{speech}"
+Your conversation goal / intent direction is: "{intent}"
+
+Reply directly in 1-2 natural, polite, engaging Hindi/Hinglish sentences aligned with the goal. Speak warmly and directly.
+Do NOT use asterisks, markdown, quotation marks, or emojis. Only return the exact words to speak out loud."""
+            
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.4, "maxOutputTokens": 100}
+            }
+            req = urllib.request.Request(
+                url, 
+                data=json.dumps(payload).encode("utf-8"), 
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=6) as r:
+                res = json.loads(r.read().decode("utf-8"))
+                reply = res["candidates"][0]["content"]["parts"][0]["text"].strip()
+                if reply:
+                    return re.sub(r'[\*\#\_\"\`]', '', reply)
+        except Exception as e:
+            print(f"Gemini second response error: {e}")
+
+    # Fallback response using intent direction
+    return f"Theek hai ji, bilkul samajh gaya. {intent}. Aapka bahut dhanyawaad!"
+
+def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", response_intent=""):
     cfg = get_calling_script_config()
     voice = cfg.get("voice_gender", "WOMAN")
     lang = cfg.get("language", "hi-IN")
@@ -239,10 +282,17 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message=""):
     else:
         speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>'
 
-    # Pure direct call: No IVR menu, no press 1/2 buttons, just direct natural conversation
+    # If response intent is provided, after speaking first message listen with GetDigits or conversational pause
+    enc_intent = urllib.parse.quote(str(response_intent or cfg.get("second_response_intent") or "").strip())
+    enc_cust = urllib.parse.quote(str(customer_name))
+    action_url = f"https://achyuta-v2.onrender.com/voice-webhook/second-response?customer_name={enc_cust}&amp;intent={enc_intent}"
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     {speech_tag}
+    <GetDigits action="{action_url}" method="POST" timeout="5" finishOnKey="#" numDigits="1">
+        <Speak voice="{voice}" language="{lang}"> </Speak>
+    </GetDigits>
 </Response>"""
     return xml
 
@@ -277,33 +327,9 @@ def generate_vobiz_digits_xml(digits, customer_name="Rohit"):
 
 def init_call_logs_vault():
     if not os.path.exists(CALL_LOGS_PATH):
-        sample_logs = [
-            {
-                "id": "call_101",
-                "call_uuid": "vobiz_req_987621",
-                "customer_phone": "+918707526283",
-                "customer_name": "Rohit",
-                "call_status": "Completed",
-                "duration_seconds": 64,
-                "recording_url": "https://media.vobiz.ai/v1/Account/MA_GXPJ6O1C/Recording/rec_demo.mp3",
-                "created_at": "Today, 11:30 AM",
-                "notes": "Automated qualification call via Vobiz AI Voice Agent."
-            },
-            {
-                "id": "call_102",
-                "call_uuid": "vobiz_req_987622",
-                "customer_phone": "+918492066444",
-                "customer_name": "Rohit Sher",
-                "call_status": "Interested",
-                "duration_seconds": 128,
-                "recording_url": "",
-                "created_at": "Yesterday, 04:15 PM",
-                "notes": "Discussed commercial consultation requirements."
-            }
-        ]
         try:
             with open(CALL_LOGS_PATH, "w", encoding="utf-8") as f:
-                json.dump(sample_logs, f, indent=2)
+                json.dump([], f, indent=2)
         except: pass
 
 init_call_logs_vault()
@@ -358,6 +384,17 @@ def get_realtime_vobiz_recordings():
     except Exception as e:
         return []
 
+def format_indian_call_time(raw_str):
+    if not raw_str or str(raw_str).strip().lower() in ['just now', 'recent', 'none', '']:
+        return 'Just now'
+    raw_str = str(raw_str).strip()
+    try:
+        base = raw_str.split('+')[0].split('.')[0].strip()
+        dt = datetime.strptime(base, '%Y-%m-%d %H:%M:%S')
+        return dt.strftime('%d %b, %I:%M %p')
+    except Exception:
+        return raw_str
+
 def get_ai_call_logs_data():
     """
     Returns authentic call records directly from Vobiz Telephony API with real cost breakdown,
@@ -373,6 +410,9 @@ def get_ai_call_logs_data():
                 local_logs = json.load(f)
         except Exception:
             local_logs = []
+
+    # Filter out any lingering fake dummy numbers if any exist
+    local_logs = [l for l in local_logs if l.get("customer_phone") != "+918492066444" and not str(l.get("id", "")).startswith("call_10")]
 
     local_map = {l.get("call_uuid"): l for l in local_logs if l.get("call_uuid")}
 
@@ -390,7 +430,7 @@ def get_ai_call_logs_data():
         cost_val = float(c.get("cost") or 0.0)
         cost_inr = round(cost_val * 85.0, 2)
         hangup = c.get("hangup_cause_name") or c.get("hangup_cause") or "Completed"
-        status = "Completed" if bill_dur > 0 else ("Busy" if "busy" in hangup.lower() else ("No Answer" if not c.get("answer_time") else hangup))
+        status = "Connected" if bill_dur > 0 else ("Busy" if "busy" in hangup.lower() else ("No Answer" if not c.get("answer_time") else hangup))
         
         to_num = c.get("to_number") or ""
         if to_num and not to_num.startswith("+"):
@@ -400,6 +440,9 @@ def get_ai_call_logs_data():
         matched_local = local_map.get(uuid, {})
         cust_name = matched_local.get("customer_name") or "Direct Call"
         notes = matched_local.get("notes") or ("Outbound AI Call via Vobiz" if bill_dur > 0 else f"Call outcome: {hangup}")
+
+        raw_time = c.get("initiation_time") or c.get("created_at") or ""
+        display_time = format_indian_call_time(raw_time)
 
         final_logs.append({
             "id": matched_local.get("id") or f"vobiz_{uuid[:8]}",
@@ -412,8 +455,8 @@ def get_ai_call_logs_data():
             "cost_usd": f"${cost_val:.3f}",
             "cost_inr": f"₹{cost_inr:.2f}",
             "currency": c.get("currency", "USD"),
-            "initiated_at": c.get("initiation_time") or c.get("created_at") or "",
-            "created_at": c.get("initiation_time") or c.get("created_at") or "Recent",
+            "initiated_at": raw_time,
+            "created_at": display_time,
             "notes": notes
         })
 
@@ -433,13 +476,13 @@ def get_ai_call_logs_data():
                 "cost_inr": "₹0.00",
                 "currency": "INR",
                 "initiated_at": l.get("initiated_at") or "Just now",
-                "created_at": "Just now",
+                "created_at": format_indian_call_time(l.get("created_at")),
                 "notes": l.get("notes") or "Connecting..."
             })
 
     return final_logs
 
-def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message=""):
+def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="", response_intent=""):
     clean = re.sub(r'[^0-9]', '', str(phone))
     if len(clean) == 10:
         clean = '91' + clean
@@ -456,10 +499,13 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="")
     url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/"
     encoded_name = urllib.parse.quote(str(customer_name or "Customer"))
     encoded_msg = urllib.parse.quote(str(custom_message or "").strip())
+    encoded_intent = urllib.parse.quote(str(response_intent or "").strip())
     
     answer_url = f"https://achyuta-v2.onrender.com/voice-webhook?customer_name={encoded_name}&phone={clean}"
     if encoded_msg:
         answer_url += f"&custom_message={encoded_msg}"
+    if encoded_intent:
+        answer_url += f"&response_intent={encoded_intent}"
 
     payload = {
         "from": did_number,
@@ -3113,6 +3159,32 @@ SYSTEM_PROMPT = SystemPromptGatekeeper.get_gatekeeper_prompt()
 
 class AchyutaWebHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith("/voice-webhook/second-response"):
+            parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            cust_name = parsed_query.get('customer_name', ['Customer'])[0]
+            intent = parsed_query.get('intent', [''])[0]
+            
+            # Generate smart intent-steered reply
+            reply_text = generate_intelligent_second_response("Ha kahiye", intent)
+            safe_text = html.escape(reply_text)
+            
+            cfg = get_calling_script_config()
+            voice = cfg.get("voice_gender", "WOMAN")
+            lang = cfg.get("language", "hi-IN")
+            
+            audio_url = get_or_create_voice_audio_file(reply_text)
+            speech_tag = f"<Play>{audio_url}</Play>" if audio_url else f'<Speak voice="{voice}" language="{lang}">{safe_text}</Speak>'
+            
+            xml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    {speech_tag}
+</Response>"""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(xml_response.encode("utf-8"))
+            return
+
         if self.path.startswith("/voice-webhook/digits"):
             parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             digits = parsed_query.get('Digits', ['1'])[0]
@@ -3129,7 +3201,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
             phone = parsed_query.get('phone', [''])[0]
             custom_msg = parsed_query.get('custom_message', [''])[0]
-            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg)
+            resp_intent = parsed_query.get('response_intent', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent)
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
@@ -4551,6 +4624,36 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 }).encode("utf-8"))
             return
 
+        elif self.path.startswith("/voice-webhook/second-response"):
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else ""
+            parsed_body = urllib.parse.parse_qs(body)
+            parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            
+            cust_name = parsed_query.get('customer_name', ['Customer'])[0]
+            intent = parsed_query.get('intent', [''])[0]
+            speech_input = parsed_body.get('SpeechResult', [''])[0] or parsed_body.get('Digits', [''])[0] or "Customer replied"
+            
+            reply_text = generate_intelligent_second_response(speech_input, intent)
+            safe_text = html.escape(reply_text)
+            
+            cfg = get_calling_script_config()
+            voice = cfg.get("voice_gender", "WOMAN")
+            lang = cfg.get("language", "hi-IN")
+            
+            audio_url = get_or_create_voice_audio_file(reply_text)
+            speech_tag = f"<Play>{audio_url}</Play>" if audio_url else f'<Speak voice="{voice}" language="{lang}">{safe_text}</Speak>'
+            
+            xml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    {speech_tag}
+</Response>"""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(xml_response.encode("utf-8"))
+            return
+
         elif self.path.startswith("/voice-webhook/digits"):
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else ""
@@ -4570,7 +4673,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
             phone = parsed_query.get('phone', [''])[0]
             custom_msg = parsed_query.get('custom_message', [''])[0]
-            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg)
+            resp_intent = parsed_query.get('response_intent', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent)
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
@@ -4600,8 +4704,9 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             data = json.loads(body)
             phone = data.get("phone", "")
             name = data.get("customer_name", "Customer")
-            custom_message = data.get("message", "")
-            success, msg, resp_data = trigger_ai_outbound_call(phone, name, custom_message)
+            custom_message = data.get("message", "") or data.get("first_message", "")
+            response_intent = data.get("intent", "") or data.get("response_intent", "")
+            success, msg, resp_data = trigger_ai_outbound_call(phone, name, custom_message, response_intent)
             
             self.send_response(200 if success else 400)
             self.send_header("Content-Type", "application/json")

@@ -1784,7 +1784,7 @@
           </div>
         </div>
 
-        <!-- Super Simple Card: Number + Message Box -->
+                <!-- Super Simple Card: Number + Two-Box Agent Speech Setup -->
         <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-5" style="background-color: var(--card-bg); border-color: var(--border-color);">
           
           <!-- 1. Phone Number Input -->
@@ -1796,13 +1796,31 @@
             </div>
           </div>
 
-          <!-- 2. Speech Message Textarea -->
-          <div>
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-xs font-bold" style="color: var(--text);">Agent Speech (Phone call pe ye bolega)</label>
-              <span class="text-[10px] text-zinc-400">Pure Hindi / Hinglish</span>
+          <!-- 2. Two-Column Agent Speech: First Message & Second Response Direction -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Box 1: First Message (Call connect hote hi ye bolega) -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
+                  <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+                  <span>1. First Message (Initial Speech)</span>
+                </label>
+                <span class="text-[10px] text-zinc-400">Call connect hote hi</span>
+              </div>
+              <textarea id="simple-call-message" rows="5" placeholder="Call connect hote hi agent exact ye initial message bolega..." class="w-full p-3 rounded-xl border text-xs sm:text-sm leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Namaste! Main Achyuta Enterprise Solutions se Priya baat kar rahi hoon. Hum aapke business sales aur operations ko automate karne ke liye vishesh AI plans lekar aaye hain. Kya aapse 1 minute baat ho sakti hai?</textarea>
             </div>
-            <textarea id="simple-call-message" rows="7" placeholder="Yahan wo message likhein jo agent call connect hote hi customer ko bolega..." class="w-full p-3.5 rounded-xl border text-sm leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Namaste! Main Achyuta Enterprise Solutions se Priya baat kar rahi hoon. Hum aapke business sales aur operations ko automate karne ke liye vishesh AI plans lekar aaye hain. Kya aapse 1 minute baat ho sakti hai?</textarea>
+
+            <!-- Box 2: Second Response Direction / Intent (Sunne ke baad kya reply dena hai) -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>2. Second Response Intent (Sunkar Reply)</span>
+                </label>
+                <span class="text-[10px] text-zinc-400">Direction / Goal</span>
+              </div>
+              <textarea id="simple-call-intent" rows="5" placeholder="Customer ki baat sunkar agent ko kis direction me reply dena hai (e.g. samjhana ki hum AI automation dete hain aur WhatsApp pe demo share kar denge)..." class="w-full p-3 rounded-xl border text-xs sm:text-sm leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Customer ki baat ko sunkar aur samajhkar politely samjhao ki hum AI voice agent aur CRM automate karte hain jisse unka time bachta hai, aur unhe bolo ki main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap dekh sakein.</textarea>
+            </div>
           </div>
 
           <!-- 3. Trigger Call CTA Button -->
@@ -1811,7 +1829,7 @@
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
               <span>Call Now</span>
             </button>
-            <p class="text-[11px] text-zinc-400 text-center mt-2.5">Call connect hote hi agent exact upar likha hua message bolega.</p>
+            <p class="text-[11px] text-zinc-400 text-center mt-2.5">Call connect hote hi agent first message bolega, fir customer ki baat sunkar second response intent ke anusaar reply karega.</p>
           </div>
 
         </div>
@@ -1848,8 +1866,9 @@
                 <p class="text-[11px] text-zinc-400">Har call ki timing, duration aur actual kharch</p>
               </div>
             </div>
-            <div class="flex items-center gap-2">
-              <span id="calling-table-count" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-semibold" style="background-color: var(--input-bg); border-color: var(--border-color); color: var(--text);">0 Calls</span>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="calling-table-count" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-bold text-teal-600 dark:text-teal-400" style="background-color: var(--input-bg); border-color: var(--border-color);">Total: 0 Calls</span>
+              <span id="calling-table-spent" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-bold text-emerald-600 dark:text-emerald-400" style="background-color: var(--input-bg); border-color: var(--border-color);">Spent: ₹0.00</span>
               <button type="button" onclick="loadCallingAgentData(); loadVobizLiveBalance();" title="Refresh Calls & Balance" class="px-2.5 py-1 text-xs rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1 font-semibold cursor-pointer" style="border-color: var(--border-color); color: var(--text);">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
                 <span>Refresh</span>
@@ -4408,7 +4427,16 @@
           
           const totalSec = allCallingLogs.reduce((acc, c) => acc + (Number(c.duration_seconds) || 0), 0);
           if (durationEl) durationEl.textContent = Math.round(totalSec / 60) + ' Min';
-          if (countEl) countEl.textContent = allCallingLogs.length + ' Calls';
+          if (countEl) countEl.textContent = 'Total: ' + allCallingLogs.length + ' Calls';
+
+          const spentEl = document.getElementById('calling-table-spent');
+          if (spentEl) {
+            const totalSpentInr = allCallingLogs.reduce((acc, c) => {
+              const inrVal = parseFloat(String(c.cost_inr || '0').replace(/[^0-9.]/g, '')) || 0;
+              return acc + inrVal;
+            }, 0);
+            spentEl.textContent = 'Spent: ₹' + totalSpentInr.toFixed(2);
+          }
         }
       } catch (e) {
         console.error("Failed to load calling logs:", e);
@@ -5614,10 +5642,12 @@
     async function triggerSimpleDirectCall() {
       const phoneInput = document.getElementById('simple-call-phone');
       const msgInput = document.getElementById('simple-call-message');
+      const intentInput = document.getElementById('simple-call-intent');
       const btn = document.getElementById('btn-simple-call-trigger');
 
       const phone = phoneInput ? phoneInput.value.trim() : '';
       const message = msgInput ? msgInput.value.trim() : '';
+      const intent = intentInput ? intentInput.value.trim() : '';
 
       const clean = phone.replace(/[^0-9]/g, '');
       if (clean.length < 10) {
@@ -5625,7 +5655,7 @@
         return;
       }
       if (!message) {
-        showScreenToast('Kripya wo message likhein jo agent ko bolna hai');
+        showScreenToast('Kripya wo first message likhein jo agent ko bolna hai');
         return;
       }
 
@@ -5635,19 +5665,20 @@
       }
 
       try {
-        // Save speech message first so webhook plays exact text
+        // Save speech message & second response intent so webhook plays exact text
         await fetch('/api/voice_agent/script_config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             greeting: message,
+            second_response_intent: intent,
             plans_pitch_speech: '',
             objection_speech: 'Aapka dhanyawaad!'
           })
         });
 
-        // Trigger the outbound call with exact custom message
-        await triggerDirectCall(clean, 'Customer', message);
+        // Trigger the outbound call with exact custom first message & response intent
+        await triggerDirectCall(clean, 'Customer', message, intent);
       } catch (e) {
         console.error('Direct call error:', e);
         showScreenToast('Call trigger karne me error aayi');
@@ -5659,7 +5690,7 @@
       }
     }
 
-    async function triggerDirectCall(phone, name, customMessage = '') {
+    async function triggerDirectCall(phone, name, customMessage = '', responseIntent = '') {
       const clean = phone.replace(/[^0-9]/g, '');
       if (clean.length < 10) {
         showScreenToast('Enter valid 10-digit mobile number');
@@ -5701,7 +5732,12 @@
         const res = await fetch('/api/voice_agent/trigger', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: clean, customer_name: name || 'Customer', message: customMessage || '' })
+          body: JSON.stringify({ 
+            phone: clean, 
+            customer_name: name || 'Customer', 
+            message: customMessage || '',
+            intent: responseIntent || ''
+          })
         });
         const data = await res.json();
         if (data.success) {
