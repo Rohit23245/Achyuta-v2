@@ -2887,8 +2887,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/voice-webhook"):
             xml_response = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Speak voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
-    <Say voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Say>
+    <Speak voice="WOMAN" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
 </Response>"""
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
@@ -4219,8 +4218,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
         elif self.path.startswith("/voice-webhook"):
             xml_response = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Speak voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
-    <Say voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Say>
+    <Speak voice="WOMAN" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
 </Response>"""
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")

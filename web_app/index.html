@@ -508,7 +508,7 @@
   <!-- Main View Area -->
   <main class="flex-1 flex flex-col min-h-0 h-full relative overflow-hidden" style="background-color: var(--bg); color: var(--text);">
     <!-- Mobile Sticky Top Bar (Hamburger + Logo + Quick Chat) -->
-    <header id="mobile-top-bar" class="w-full h-13 px-3.5 border-b items-center justify-between flex-shrink-0 z-20 flex md:hidden" style="background-color: var(--sidebar-bg); border-color: var(--border-color);">
+    <header id="mobile-top-bar" class="w-full h-14 px-3.5 border-b items-center justify-between flex-shrink-0 z-20 flex md:hidden" style="background-color: var(--sidebar-bg); border-color: var(--border-color);">
       <div class="flex items-center gap-2.5">
         <button type="button" onclick="openMobileSidebar()" class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 transition active:scale-95" title="Open Navigation Menu">
           <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -551,7 +551,7 @@
             <form onsubmit="handleSend(event)" class="w-full max-w-full h-[52px] rounded-full px-4 flex items-center gap-2 sm:gap-3 shadow-md border transition-all" style="background-color: var(--input-bg); border-color: var(--input-border);">
               
               <!-- Main Input Field -->
-              <input id="prompt-input" type="text" placeholder="Ask Achyuta or speak..." class="flex-1 bg-transparent text-[14.5px] focus:outline-none px-2" style="color: var(--text);" autocomplete="off">
+              <input id="prompt-input" type="text" placeholder="Ask Achyuta or speak..." class="flex-1 min-w-0 bg-transparent text-[14.5px] focus:outline-none px-2" style="color: var(--text);" autocomplete="off">
 
               <!-- Inline Gemini-style Soundwave Frequency Bars (Chat) -->
               <div id="chat-voice-wave" class="hidden items-center gap-1 px-1.5 h-6 gemini-wave-container transition-all" title="Listening to your voice...">
@@ -1728,14 +1728,14 @@
       </div>
     </div>
     <!-- Fixed Floating Compact Prompt Dock (Fixed position, zero layout space, contextual in-place execution) -->
-    <div id="universal-prompt-dock" class="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-[720px] px-4 z-50 pointer-events-none transition-all duration-300">
-      <form onsubmit="handleUniversalSend(event)" id="universal-prompt-form" class="pointer-events-auto w-full h-[52px] rounded-full px-4 flex items-center gap-3 shadow-2xl border backdrop-blur-md transition-all hover:border-teal-500/50 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20" style="background-color: var(--card-bg); border-color: var(--border-color);">
+    <div id="universal-prompt-dock" class="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-[720px] px-3 sm:px-4 z-50 pointer-events-none transition-all duration-300">
+      <form onsubmit="handleUniversalSend(event)" id="universal-prompt-form" class="pointer-events-auto w-full h-[52px] rounded-full px-3 sm:px-4 flex items-center gap-2 sm:gap-3 shadow-2xl border backdrop-blur-md transition-all hover:border-teal-500/50 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20" style="background-color: var(--card-bg); border-color: var(--border-color);">
         
         <div id="universal-dock-badge" class="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 border border-teal-500/30 shadow-sm transition-all p-0">
           <img src="/static/logo.jpg" alt="Achyuta" class="w-full h-full object-cover rounded-full pointer-events-none">
         </div>
 
-        <input id="universal-prompt-input" type="text" placeholder="Ask or speak to Achyuta..." class="flex-1 bg-transparent text-[14px] focus:outline-none px-2 transition-all" style="color: var(--text);" autocomplete="off">
+        <input id="universal-prompt-input" type="text" placeholder="Ask or speak to Achyuta..." class="flex-1 min-w-0 bg-transparent text-[14px] focus:outline-none px-1.5 sm:px-2 transition-all" style="color: var(--text);" autocomplete="off">
 
         <!-- Inline Gemini-style Soundwave Frequency Bars (Universal Dock) -->
         <div id="dock-voice-wave" class="hidden items-center gap-1 px-1.5 h-6 gemini-wave-container transition-all" title="Listening to your voice...">
@@ -5371,10 +5371,11 @@
           <div class="absolute inset-0 rounded-2xl border border-teal-400/50 animate-ping opacity-25 pointer-events-none"></div>
         </div>
         <div class="flex items-center gap-2.5 py-1.5 px-3 rounded-2xl border shadow-sm backdrop-blur-md" style="background: var(--card-bg); border-color: var(--border-color); color: var(--text);">
-          <div class="flex items-center gap-1">
-            <span class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" style="animation-delay: 0.2s;"></span>
-            <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" style="animation-delay: 0.4s;"></span>
+          <div class="relative w-5 h-5 flex items-center justify-center">
+            <svg class="w-4 h-4 animate-spin text-teal-600 dark:text-teal-400" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.5"></circle>
+              <path class="opacity-95" d="M12 3 A9 9 0 0 1 21 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path>
+            </svg>
           </div>
           <span class="text-xs font-semibold tracking-wide bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500 bg-clip-text text-transparent select-none">Thinking...</span>
           <span id="${timerId}" class="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 text-teal-600 dark:text-teal-400 select-none">0s</span>
@@ -11931,7 +11932,7 @@
       } else if (state === 'thinking') {
         if (chatWave) { chatWave.classList.add('hidden'); }
         if (dockWave) { dockWave.classList.add('hidden'); }
-        const thinkingIcon = '<div class="flex items-center justify-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" style="animation-delay: 0.2s;"></span><span class="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" style="animation-delay: 0.4s;"></span></div>';
+        const thinkingIcon = '<div class="relative w-6 h-6 flex items-center justify-center"><svg class="w-5 h-5 animate-spin text-teal-600 dark:text-teal-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.5"></circle><path class="opacity-95" d="M12 3 A9 9 0 0 1 21 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg></div>';
         if (chatMicBtn) {
           chatMicBtn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30';
           chatMicBtn.style.backgroundColor = 'rgba(13, 148, 136, 0.15)';
@@ -11939,7 +11940,7 @@
           chatMicBtn.style.borderColor = 'rgba(13, 148, 136, 0.3)';
           chatMicBtn.innerHTML = thinkingIcon;
           chatMicBtn.style.transform = 'scale(1)';
-          chatMicBtn.style.boxShadow = '0 0 10px rgba(13, 148, 136, 0.25)';
+          chatMicBtn.style.boxShadow = '0 0 12px rgba(13, 148, 136, 0.3)';
         }
         if (dockMicBtn) {
           dockMicBtn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30';
@@ -11948,7 +11949,7 @@
           dockMicBtn.style.borderColor = 'rgba(13, 148, 136, 0.3)';
           dockMicBtn.innerHTML = thinkingIcon;
           dockMicBtn.style.transform = 'scale(1)';
-          dockMicBtn.style.boxShadow = '0 0 10px rgba(13, 148, 136, 0.25)';
+          dockMicBtn.style.boxShadow = '0 0 12px rgba(13, 148, 136, 0.3)';
         }
         if (chatPromptInput) chatPromptInput.placeholder = "Thinking...";
         if (dockPromptInput) dockPromptInput.placeholder = "Thinking...";
