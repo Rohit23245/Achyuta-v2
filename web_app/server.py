@@ -221,13 +221,14 @@ def get_or_create_voice_audio_file(text_content):
         print(f"Error caching voice audio: {e}")
     return None
 
-def generate_intelligent_second_response(customer_speech, intent_direction=""):
+def generate_intelligent_second_response(customer_speech, intent_direction="", agent_instructions=""):
     """
-    Generates intelligent dynamic conversational reply based on user intent direction and client words.
+    Generates intelligent dynamic conversational reply based on user intent direction, client words, and custom instructions.
     """
     cfg = get_calling_script_config()
     intent = (intent_direction or cfg.get("second_response_intent") or "").strip()
     speech = (customer_speech or "").strip()
+    custom_inst = (agent_instructions or cfg.get("agent_instructions") or "").strip()
 
     if not intent:
         return "Theek hai ji, aapka bahut bahut dhanyawaad. Hum aapse jald hi WhatsApp par sampark karenge."
@@ -236,9 +237,10 @@ def generate_intelligent_second_response(customer_speech, intent_direction=""):
     api_key = os.environ.get('AI_API_KEY') or os.environ.get('GEMINI_API_KEY') or AI_API_KEY
     if api_key and speech:
         try:
+            extra_inst = f"\nSpecific Custom Behavior & Instruction: {custom_inst}" if custom_inst else ""
             prompt = f"""You are Priya, a polite professional AI telecaller assistant for Achyuta Enterprise Solutions speaking over phone to an Indian client.
 The client just responded with: "{speech}"
-Your conversation goal / intent direction is: "{intent}"
+Your conversation goal / intent direction is: "{intent}"{extra_inst}
 
 Directly speak to the client in 1 short, polite, engaging Hindi/Hinglish sentence aligned with the goal. 
 Speak warmly and directly. Do NOT talk about random things, do NOT introduce yourself as Gemini or AI.
@@ -265,7 +267,7 @@ Do NOT use asterisks, markdown, quotation marks, or emojis. Only return the exac
     # Fallback response using intent direction
     return f"Theek hai ji, bilkul samajh gaya. {intent}. Aapka bahut dhanyawaad!"
 
-def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", response_intent=""):
+def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", response_intent="", agent_instructions=""):
     cfg = get_calling_script_config()
     voice = cfg.get("voice_gender", "WOMAN")
     lang = cfg.get("language", "hi-IN")
@@ -280,16 +282,18 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     speech_text = speech_text.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
     safe_speech = html.escape(speech_text)
 
-    # 2. Second Response Intent
+    # 2. Second Response Intent & Custom Instructions
     intent_text = str(response_intent or cfg.get("second_response_intent") or "").strip()
+    inst_text = str(agent_instructions or cfg.get("agent_instructions") or "").strip()
     
     # WebSocket Streaming URL
     enc_cust = urllib.parse.quote(str(customer_name))
     enc_phone = urllib.parse.quote(str(phone))
     enc_msg = urllib.parse.quote(speech_text)
     enc_intent = urllib.parse.quote(intent_text)
+    enc_inst = urllib.parse.quote(inst_text)
     
-    ws_stream_url = f"wss://achyuta-v2.onrender.com/ws?customer_name={enc_cust}&amp;phone={enc_phone}&amp;custom_message={enc_msg}&amp;response_intent={enc_intent}"
+    ws_stream_url = f"wss://achyuta-v2.onrender.com/ws?customer_name={enc_cust}&amp;phone={enc_phone}&amp;custom_message={enc_msg}&amp;response_intent={enc_intent}&amp;agent_instructions={enc_inst}"
     
     # Vobiz Official Real-Time Conversational Voice Stream:
     # 1. Bidirectional WebSocket stream connects to wss://achyuta-v2.onrender.com/ws
@@ -507,7 +511,7 @@ def update_live_call_state(call_uuid, state, extra=None):
     if extra and isinstance(extra, dict):
         LIVE_CALL_TRACKER[call_uuid].update(extra)
 
-def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="", response_intent=""):
+def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="", response_intent="", agent_instructions=""):
     clean = re.sub(r'[^0-9]', '', str(phone))
     if len(clean) == 10:
         clean = '91' + clean
@@ -525,12 +529,15 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
     encoded_name = urllib.parse.quote(str(customer_name or "Customer"))
     encoded_msg = urllib.parse.quote(str(custom_message or "").strip())
     encoded_intent = urllib.parse.quote(str(response_intent or "").strip())
+    encoded_inst = urllib.parse.quote(str(agent_instructions or "").strip())
     
     answer_url = f"https://achyuta-v2.onrender.com/voice-webhook?customer_name={encoded_name}&phone={clean}"
     if encoded_msg:
         answer_url += f"&custom_message={encoded_msg}"
     if encoded_intent:
         answer_url += f"&response_intent={encoded_intent}"
+    if encoded_inst:
+        answer_url += f"&agent_instructions={encoded_inst}"
 
     hangup_url = "https://achyuta-v2.onrender.com/api/voice_agent/hangup_callback"
     ring_url = "https://achyuta-v2.onrender.com/api/voice_agent/ring_callback"
@@ -3307,6 +3314,7 @@ def handle_vobiz_stream_ws(handler, query_params):
     phone = get_param("phone", "")
     first_msg = get_param("custom_message", "")
     resp_intent = get_param("response_intent", "")
+    agent_inst = get_param("agent_instructions", "")
     
     if not first_msg:
         cfg = get_calling_script_config()
@@ -3418,7 +3426,7 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         print("[Vobiz Stream] Caller finished speaking words. Delivering second response...", flush=True)
                                         state = "DELIVERING_SECOND_RESPONSE"
                                         
-                                        reply_text = resp_intent or generate_intelligent_second_response("Ha kahiye", resp_intent)
+                                        reply_text = generate_intelligent_second_response("Ha kahiye", resp_intent, agent_inst)
                                         second_pcm = get_pcm24_from_text(reply_text)
                                         if second_pcm:
                                             stream_audio_bytes(second_pcm)
@@ -3531,7 +3539,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             phone = parsed_query.get('phone', [''])[0]
             custom_msg = parsed_query.get('custom_message', [''])[0]
             resp_intent = parsed_query.get('response_intent', [''])[0]
-            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent)
+            agent_inst = parsed_query.get('agent_instructions', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent, agent_inst)
             xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
@@ -5059,7 +5068,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             phone = parsed_query.get('phone', [''])[0]
             custom_msg = parsed_query.get('custom_message', [''])[0]
             resp_intent = parsed_query.get('response_intent', [''])[0]
-            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent)
+            agent_inst = parsed_query.get('agent_instructions', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone, custom_msg, resp_intent, agent_inst)
             xml_bytes = xml_response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
@@ -5144,7 +5154,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             name = data.get("customer_name", "Customer")
             custom_message = data.get("message", "") or data.get("first_message", "")
             response_intent = data.get("intent", "") or data.get("response_intent", "")
-            success, msg, resp_data = trigger_ai_outbound_call(phone, name, custom_message, response_intent)
+            agent_instructions = data.get("instructions", "") or data.get("agent_instructions", "")
+            success, msg, resp_data = trigger_ai_outbound_call(phone, name, custom_message, response_intent, agent_instructions)
             
             self.send_response(200 if success else 400)
             self.send_header("Content-Type", "application/json")

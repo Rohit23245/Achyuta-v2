@@ -1823,6 +1823,27 @@
             </div>
           </div>
 
+          <!-- 3. Dynamic Agent Settings & Custom Instructions Accordion -->
+          <div class="rounded-xl border p-3.5 transition" style="background-color: var(--input-bg); border-color: var(--border-color);">
+            <div class="flex items-center justify-between cursor-pointer select-none" onclick="toggleCallAgentSettings()">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">⚙️</span>
+                <span class="text-xs font-bold" style="color: var(--text);">Agent Behavior & Call Settings</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 font-semibold">Custom Instructions</span>
+              </div>
+              <svg id="call-settings-arrow" class="w-4 h-4 text-zinc-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+              </svg>
+            </div>
+            
+            <div id="call-settings-body" class="hidden mt-3.5 pt-3.5 border-t space-y-3" style="border-color: var(--border-color);">
+              <div>
+                <label class="block text-[11px] font-bold mb-1" style="color: var(--text);">Agent Instructions (How the agent should behave / baat kaise karni hai):</label>
+                <textarea id="simple-call-instructions" rows="2" placeholder="e.g. Idhar udhar ki baat bilkul na kare, customer se unka budget puche, hamesha respectful Hinglish me baat kare..." class="w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">Idhar udhar ki baat bilkul na kare, customer ki baat ko dhyan se sunkar short and direct response de, hamesha respectful professional tone me baat kare.</textarea>
+              </div>
+            </div>
+          </div>
+
           <!-- 3. Trigger Call CTA Button -->
           <div class="pt-2">
             <button type="button" id="btn-simple-call-trigger" onclick="triggerSimpleDirectCall()" class="w-full h-12 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2.5 bg-teal-600 hover:bg-teal-500 transition active:scale-[0.98] shadow-md cursor-pointer">
@@ -5639,15 +5660,28 @@
       }
     }
 
+    function toggleCallAgentSettings() {
+      const body = document.getElementById('call-settings-body');
+      const arrow = document.getElementById('call-settings-arrow');
+      if (body) {
+        body.classList.toggle('hidden');
+        if (arrow) {
+          arrow.style.transform = body.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+      }
+    }
+
     async function triggerSimpleDirectCall() {
       const phoneInput = document.getElementById('simple-call-phone');
       const msgInput = document.getElementById('simple-call-message');
       const intentInput = document.getElementById('simple-call-intent');
+      const instInput = document.getElementById('simple-call-instructions');
       const btn = document.getElementById('btn-simple-call-trigger');
 
       const phone = phoneInput ? phoneInput.value.trim() : '';
       const message = msgInput ? msgInput.value.trim() : '';
       const intent = intentInput ? intentInput.value.trim() : '';
+      const instructions = instInput ? instInput.value.trim() : '';
 
       const clean = phone.replace(/[^0-9]/g, '');
       if (clean.length < 10) {
@@ -5665,20 +5699,21 @@
       }
 
       try {
-        // Save speech message & second response intent so webhook plays exact text
+        // Save speech message, second response intent & dynamic instructions
         await fetch('/api/voice_agent/script_config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             greeting: message,
             second_response_intent: intent,
+            agent_instructions: instructions,
             plans_pitch_speech: '',
             objection_speech: 'Aapka dhanyawaad!'
           })
         });
 
-        // Trigger the outbound call with exact custom first message & response intent
-        await triggerDirectCall(clean, 'Customer', message, intent);
+        // Trigger the outbound call with exact custom first message, response intent & instructions
+        await triggerDirectCall(clean, 'Customer', message, intent, instructions);
       } catch (e) {
         console.error('Direct call error:', e);
         showScreenToast('Call trigger karne me error aayi');
@@ -5690,7 +5725,7 @@
       }
     }
 
-    async function triggerDirectCall(phone, name, customMessage = '', responseIntent = '') {
+    async function triggerDirectCall(phone, name, customMessage = '', responseIntent = '', agentInstructions = '') {
       const clean = phone.replace(/[^0-9]/g, '');
       if (clean.length < 10) {
         showScreenToast('Enter valid 10-digit mobile number');
@@ -5731,7 +5766,8 @@
             phone: clean, 
             customer_name: name || 'Customer', 
             message: customMessage || '',
-            intent: responseIntent || ''
+            intent: responseIntent || '',
+            instructions: agentInstructions || ''
           })
         });
         const data = await res.json();
