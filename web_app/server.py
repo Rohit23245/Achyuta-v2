@@ -7,7 +7,10 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import threading
 import time
 from datetime import datetime
-import whatsapp_engine
+try:
+    import whatsapp_engine
+except ImportError:
+    whatsapp_engine = None
 import random
 import string
 from google_auth_oauthlib.flow import Flow
@@ -102,6 +105,7 @@ PORT = 5000
 # ---------------------------------------------------------
 VOBIZ_AUTH_ID = 'MA_GXPJ6O1C'
 VOBIZ_AUTH_TOKEN = 'UWi7AWe87Eaq1QEdo52FnUBXZKYxz4mczC070F1aHx5pjx8S5brkHSdZNSrFBCM8'
+VOBIZ_DID_NUMBER = os.environ.get('DID_NUMBER', '+918065354620')
 VOBIZ_TRIGGER_URL = 'https://kavyatraders.in/trigger-call'
 CALL_LOGS_PATH = os.path.join(DATA_DIR, "call_logs_vault.json")
 
@@ -218,11 +222,15 @@ def trigger_ai_outbound_call(phone, customer_name="Customer"):
     if len(clean) == 10:
         clean = '91' + clean
 
-    auth_id = os.environ.get('VOBIZ_AUTH_ID')
-    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN')
-    did_number = os.environ.get('DID_NUMBER')
+    auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
+    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
+    did_number = os.environ.get('DID_NUMBER', VOBIZ_DID_NUMBER)
     
-    # Correct Vobiz API URL
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
     url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/"
     payload = {
         "from": did_number,
@@ -239,7 +247,7 @@ def trigger_ai_outbound_call(phone, customer_name="Customer"):
     req = urllib.request.Request(url, data=req_data, headers=headers)
 
     try:
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
             res = json.loads(r.read().decode("utf-8"))
             
             logs = get_ai_call_logs_data()
@@ -262,7 +270,10 @@ def trigger_ai_outbound_call(phone, customer_name="Customer"):
 
             return True, "Calling initiated successfully via Vobiz AI", res
     except urllib.error.HTTPError as e:
-        return False, f"Call trigger error (HTTP {e.code})", None
+        err_msg = ""
+        try: err_msg = e.read().decode("utf-8")
+        except: pass
+        return False, f"Call trigger error (HTTP {e.code}): {err_msg}", None
     except Exception as e:
         return False, f"Call trigger exception: {str(e)}", None
 
@@ -311,7 +322,21 @@ ACCOUNTS_VAULT_PATH = os.path.join(DATA_DIR, "accounts_vault.json")
 SALARY_VAULT_PATH = os.path.join(DATA_DIR, "salary_vault.json")
 MEETINGS_VAULT_PATH = os.path.join(DATA_DIR, "meetings_vault.json")
 INVOICES_VAULT_PATH = os.path.join(DATA_DIR, "invoices_vault.json")
-AI_API_KEY = os.environ.get('AI_API_KEY', '')
+
+def load_gemini_api_key():
+    k = os.environ.get('AI_API_KEY', '').strip()
+    if not k or k == 'YOUR_CHAT_API_KEY':
+        try:
+            key_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gemini_api_key.json")
+            if os.path.exists(key_file):
+                with open(key_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get('gemini_api_key') or data.get('voice_api_key') or ''
+        except Exception:
+            pass
+    return k
+
+AI_API_KEY = load_gemini_api_key()
 AI_MODEL = "gemini-3.1-flash-lite"
 
 
@@ -827,7 +852,21 @@ ACCOUNTS_VAULT_PATH = os.path.join(DATA_DIR, "accounts_vault.json")
 SALARY_VAULT_PATH = os.path.join(DATA_DIR, "salary_vault.json")
 MEETINGS_VAULT_PATH = os.path.join(DATA_DIR, "meetings_vault.json")
 INVOICES_VAULT_PATH = os.path.join(DATA_DIR, "invoices_vault.json")
-AI_API_KEY = os.environ.get('AI_API_KEY', '')
+
+def load_gemini_api_key():
+    k = os.environ.get('AI_API_KEY', '').strip()
+    if not k or k == 'YOUR_CHAT_API_KEY':
+        try:
+            key_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gemini_api_key.json")
+            if os.path.exists(key_file):
+                with open(key_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get('gemini_api_key') or data.get('voice_api_key') or ''
+        except Exception:
+            pass
+    return k
+
+AI_API_KEY = load_gemini_api_key()
 AI_MODEL = "gemini-3.1-flash-lite"
 
 
@@ -2845,6 +2884,18 @@ SYSTEM_PROMPT = SystemPromptGatekeeper.get_gatekeeper_prompt()
 
 class AchyutaWebHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith("/voice-webhook"):
+            xml_response = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Speak voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
+    <Say voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Say>
+</Response>"""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(xml_response.encode("utf-8"))
+            return
+
         if self.path.startswith("/proposal/"):
             prop_id = self.path[10:].split('?')[0].strip()
             invoices_file = os.path.join(DATA_DIR, "invoices_vault.json")
@@ -4165,13 +4216,14 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 }).encode("utf-8"))
             return
 
-        elif self.path == "/voice-webhook":
+        elif self.path.startswith("/voice-webhook"):
             xml_response = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say>Hello, this is a test call from Achyuta AI.</Say>
+    <Speak voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
+    <Say voice="female" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Say>
 </Response>"""
             self.send_response(200)
-            self.send_header("Content-Type", "application/xml")
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
             self.wfile.write(xml_response.encode("utf-8"))
             return
@@ -5638,9 +5690,24 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
 # ---------------------------------------------------------
 # GEMINI NATIVE AUDIO DIALOG ENGINE (2.5 FLASH UNLIMITED LIVE API)
 # ---------------------------------------------------------
-VOICE_API_KEY = os.environ.get('VOICE_API_KEY', '')
-GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts"
-GEMINI_STT_MODEL = "gemini-2.5-flash"
+def load_voice_api_key():
+    k = os.environ.get('VOICE_API_KEY', '').strip()
+    if not k or k == 'YOUR_VOICE_API_KEY':
+        try:
+            key_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gemini_api_key.json")
+            if os.path.exists(key_file):
+                with open(key_file, "r", encoding="utf-8") as f:
+                    local_keys = json.load(f)
+                    return local_keys.get('voice_api_key') or local_keys.get('gemini_api_key') or ''
+        except Exception as e:
+            print(f"Error loading voice key from file: {e}")
+    return k
+
+VOICE_API_KEY = load_voice_api_key()
+print(f"DEBUG: Using Voice API Key: {VOICE_API_KEY[:5]}...")
+
+GEMINI_TTS_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
+GEMINI_STT_MODEL = "gemini-3.5-transcribe"
 
 def generate_gemini_voice_audio(text_content):
     """
