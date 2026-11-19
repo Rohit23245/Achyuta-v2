@@ -1,6 +1,7 @@
 import re
 import json
 import os
+import html
 import urllib.request
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -108,6 +109,103 @@ VOBIZ_AUTH_TOKEN = 'UWi7AWe87Eaq1QEdo52FnUBXZKYxz4mczC070F1aHx5pjx8S5brkHSdZNSrF
 VOBIZ_DID_NUMBER = os.environ.get('DID_NUMBER', '+918065354620')
 VOBIZ_TRIGGER_URL = 'https://kavyatraders.in/trigger-call'
 CALL_LOGS_PATH = os.path.join(DATA_DIR, "call_logs_vault.json")
+CALLING_SCRIPT_CONFIG_PATH = os.path.join(DATA_DIR, "calling_script_config.json")
+
+DEFAULT_CALLING_SCRIPT_CONFIG = {
+    "preset": "sales_pitch",
+    "agent_name": "Priya",
+    "company_name": "Achyuta Enterprise Solutions",
+    "voice_gender": "WOMAN",
+    "language": "hi-IN",
+    "greeting": "Namaste {customer_name} ji! Main {company_name} se {agent_name} baat kar rahi hoon. Aapse 1 minute baat ho sakti hai?",
+    "intro_reason": "Hum aapke business ki sales aur client operations automate karne ke liye vishesh plans lekar aaye hain.",
+    "plans": [
+        {
+            "id": "plan_1",
+            "name": "Starter AI Business Plan",
+            "price": "₹4,999/month",
+            "pitch": "Isme aapko automated CRM, WhatsApp business integration aur real-time lead tracking milta hai."
+        },
+        {
+            "id": "plan_2",
+            "name": "Growth Pro Suite",
+            "price": "₹12,999/month",
+            "pitch": "Isme Starter ke sabhi features ke sath automatic outbound AI calling agent aur luxury quotation generator shamil hai."
+        }
+    ],
+    "plans_pitch_speech": "Humare paas aapke business ke liye do mukhya plans hain. Starter Plan ₹4,999 me aur Growth Pro Plan ₹12,999 me. Starter plan lene ke liye 1 dabayein, ya Pro plan lene ke liye 2 dabayein.",
+    "objection_speech": "Koi baat nahi {customer_name} ji! Hum samajhte hain aap abhi vyast honge. Main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap free time me dekh sakein. Dhanyawaad aur aapka din shubh ho!",
+    "confirmation_speech": "Bahut bahut dhanyawaad {customer_name} ji! Aapka plan interest successfully note kar liya gaya hai aur hamari support team aapse jald hi connect karegi. Aapka din shubh ho!",
+    "whatsapp_followup_enabled": True
+}
+
+def get_calling_script_config():
+    if os.path.exists(CALLING_SCRIPT_CONFIG_PATH):
+        try:
+            with open(CALLING_SCRIPT_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return DEFAULT_CALLING_SCRIPT_CONFIG
+
+def save_calling_script_config(data):
+    try:
+        with open(CALLING_SCRIPT_CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error saving calling script config: {e}")
+        return False
+
+def generate_vobiz_call_xml(customer_name="Rohit", phone=""):
+    cfg = get_calling_script_config()
+    voice = cfg.get("voice_gender", "WOMAN")
+    lang = cfg.get("language", "hi-IN")
+    agent_name = cfg.get("agent_name", "Priya")
+    comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
+
+    greeting = (cfg.get("greeting") or "Namaste {customer_name} ji!").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
+    intro = (cfg.get("intro_reason") or "").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
+    pitch = (cfg.get("plans_pitch_speech") or "").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
+    objection = (cfg.get("objection_speech") or "Dhanyawaad!").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
+
+    full_first_turn = f"{greeting} {intro} {pitch}".strip()
+    safe_speech = html.escape(full_first_turn)
+    safe_objection = html.escape(objection)
+
+    action_url = f"https://achyuta-v2.onrender.com/voice-webhook/digits?customer_name={urllib.parse.quote(customer_name)}"
+
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <GetDigits action="{action_url}" method="POST" timeout="8" numDigits="1" retries="1">
+        <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
+    </GetDigits>
+    <Speak voice="{voice}" language="{lang}">{safe_objection}</Speak>
+</Response>"""
+    return xml
+
+def generate_vobiz_digits_xml(digits, customer_name="Rohit"):
+    cfg = get_calling_script_config()
+    voice = cfg.get("voice_gender", "WOMAN")
+    lang = cfg.get("language", "hi-IN")
+    plans = cfg.get("plans", [])
+    confirm = (cfg.get("confirmation_speech") or "Aapka plan book kar diya gaya hai.").replace("{customer_name}", customer_name)
+    objection = (cfg.get("objection_speech") or "Aapka dhanyawaad!").replace("{customer_name}", customer_name)
+
+    if digits == "1" and len(plans) > 0:
+        p = plans[0]
+        text = f"Aapne {p.get('name', 'Starter Plan')} chuna hai. Iska price {p.get('price', '')} hai. {p.get('pitch', '')}. {confirm}"
+    elif digits == "2" and len(plans) > 1:
+        p = plans[1]
+        text = f"Aapne {p.get('name', 'Growth Pro Plan')} chuna hai. Iska price {p.get('price', '')} hai. {p.get('pitch', '')}. {confirm}"
+    else:
+        text = objection
+
+    safe_text = html.escape(text)
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Speak voice="{voice}" language="{lang}">{safe_text}</Speak>
+</Response>"""
 
 def init_call_logs_vault():
     if not os.path.exists(CALL_LOGS_PATH):
@@ -232,10 +330,11 @@ def trigger_ai_outbound_call(phone, customer_name="Customer"):
     ctx.verify_mode = ssl.CERT_NONE
 
     url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/"
+    encoded_name = urllib.parse.quote(str(customer_name or "Customer"))
     payload = {
         "from": did_number,
         "to": f"+{clean}",
-        "answer_url": "https://achyuta-v2.onrender.com/voice-webhook",
+        "answer_url": f"https://achyuta-v2.onrender.com/voice-webhook?customer_name={encoded_name}&phone={clean}",
         "answer_method": "POST"
     }
     req_data = json.dumps(payload).encode("utf-8")
@@ -2884,15 +2983,34 @@ SYSTEM_PROMPT = SystemPromptGatekeeper.get_gatekeeper_prompt()
 
 class AchyutaWebHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path.startswith("/voice-webhook"):
-            xml_response = """<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Speak voice="WOMAN" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
-</Response>"""
+        if self.path.startswith("/voice-webhook/digits"):
+            parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            digits = parsed_query.get('Digits', ['1'])[0]
+            cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
+            xml_response = generate_vobiz_digits_xml(digits, cust_name)
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
             self.wfile.write(xml_response.encode("utf-8"))
+            return
+
+        if self.path.startswith("/voice-webhook"):
+            parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
+            phone = parsed_query.get('phone', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(xml_response.encode("utf-8"))
+            return
+
+        if self.path == "/api/voice_agent/script_config":
+            cfg = get_calling_script_config()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "config": cfg}).encode("utf-8"))
             return
 
         if self.path.startswith("/proposal/"):
@@ -4215,15 +4333,46 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 }).encode("utf-8"))
             return
 
-        elif self.path.startswith("/voice-webhook"):
-            xml_response = """<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Speak voice="WOMAN" language="hi-IN">Namaste Rohit ji! Main Achyuta AI assistant baat kar raha hoon. Aapki test call successfully connect ho chuki hai.</Speak>
-</Response>"""
+        elif self.path.startswith("/voice-webhook/digits"):
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else ""
+            parsed_body = urllib.parse.parse_qs(body)
+            parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            digits = parsed_body.get('Digits', [''])[0] or parsed_query.get('Digits', ['1'])[0] or '1'
+            cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
+            xml_response = generate_vobiz_digits_xml(digits, cust_name)
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
             self.end_headers()
             self.wfile.write(xml_response.encode("utf-8"))
+            return
+
+        elif self.path.startswith("/voice-webhook"):
+            parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            cust_name = parsed_query.get('customer_name', ['Rohit'])[0]
+            phone = parsed_query.get('phone', [''])[0]
+            xml_response = generate_vobiz_call_xml(cust_name, phone)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(xml_response.encode("utf-8"))
+            return
+
+        elif self.path == "/api/voice_agent/script_config":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                data = json.loads(body)
+                save_calling_script_config(data)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "message": "Script updated successfully"}).encode("utf-8"))
+            except Exception as e:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
             return
 
         elif self.path == "/api/voice_agent/trigger":
