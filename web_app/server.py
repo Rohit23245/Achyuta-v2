@@ -266,33 +266,45 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     agent_name = cfg.get("agent_name", "Priya")
     comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
 
-    # If custom message is passed directly in URL query, use it immediately
+    # 1. First Message (Initial Speech)
     speech_text = str(custom_message or "").strip()
     if not speech_text:
         speech_text = (cfg.get("greeting") or "Namaste! Main Achyuta se baat kar raha hoon.").strip()
 
     speech_text = speech_text.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
-
     safe_speech = html.escape(speech_text)
 
-    # Attempt to stream natural human audio via Gemini Native TTS, fallback to clean Speak
-    audio_url = get_or_create_voice_audio_file(speech_text)
-    if audio_url:
-        speech_tag = f"<Play>{audio_url}</Play>"
+    first_audio_url = get_or_create_voice_audio_file(speech_text)
+    if first_audio_url:
+        first_speech_tag = f"<Play>{first_audio_url}</Play>"
     else:
-        speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>'
+        first_speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>'
 
-    # If response intent is provided, after speaking first message listen with GetDigits or conversational pause
-    enc_intent = urllib.parse.quote(str(response_intent or cfg.get("second_response_intent") or "").strip())
-    enc_cust = urllib.parse.quote(str(customer_name))
-    action_url = f"https://achyuta-v2.onrender.com/voice-webhook/second-response?customer_name={enc_cust}&amp;intent={enc_intent}"
+    # 2. Second Response Intent
+    intent_text = str(response_intent or cfg.get("second_response_intent") or "").strip()
+    
+    # If second response / intent is set, play first message, wait 3 seconds to listen to customer, then speak second response
+    if intent_text:
+        # Check if intent is a direct response phrase or general guidance
+        second_speech = intent_text
+        safe_second = html.escape(second_speech)
+        second_audio_url = get_or_create_voice_audio_file(second_speech)
+        if second_audio_url:
+            second_speech_tag = f"<Play>{second_audio_url}</Play>"
+        else:
+            second_speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_second}</Speak>'
 
-    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    {speech_tag}
-    <GetDigits action="{action_url}" method="POST" timeout="5" finishOnKey="#" numDigits="1">
-        <Speak voice="{voice}" language="{lang}"> </Speak>
-    </GetDigits>
+    {first_speech_tag}
+    <Wait length="3"/>
+    {second_speech_tag}
+    <Wait length="2"/>
+</Response>"""
+    else:
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    {first_speech_tag}
 </Response>"""
     return xml
 
