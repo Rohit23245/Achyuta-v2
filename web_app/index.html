@@ -1780,24 +1780,96 @@
           </div>
         </div>
 
-        <!-- Segmented Mode Switcher -->
+        <!-- Segmented Mode Switcher (KISS: Campaigns, Script Studio, Call Recordings) -->
         <div class="flex items-center p-1 rounded-xl border gap-1" style="background-color: var(--card-bg); border-color: var(--border-color);">
-          <button type="button" onclick="switchCallingSubTab('studio')" id="btn-call-sub-studio" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-teal-600 text-white shadow-xs">
+          <button type="button" onclick="switchCallingSubTab('campaigns')" id="btn-call-sub-campaigns" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-teal-600 text-white shadow-xs">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.16-1.608-.37A17.206 17.206 0 014.5 12c0-2.89.704-5.617 1.957-8.004.348-.53 1.057-.688 1.608-.37l.657.379c.523.302.71.962.463 1.512a17.26 17.26 0 00-.985 2.783m0 9.18a17.15 17.15 0 010-9.18m0 9.18h7.32a3 3 0 002.9-2.222l1.32-5.28A3 3 0 0019.22 9h-8.88"/></svg>
+            <span>Campaigns</span>
+          </button>
+          <button type="button" onclick="switchCallingSubTab('studio')" id="btn-call-sub-studio" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 01-3-3V4.5a3 3 0 016 0v7.5a3 3 0 01-3 3z"/></svg>
-            <span>Script & Flow Studio</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-white/20 text-white font-mono font-bold">360°</span>
+            <span>Script Studio</span>
+          </button>
+          <button type="button" onclick="switchCallingSubTab('recordings')" id="btn-call-sub-recordings" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
+            <span>Call Recordings</span>
           </button>
           <button type="button" onclick="switchCallingSubTab('dialer')" id="btn-call-sub-dialer" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
-            <span>Direct Dialer</span>
+            <span>Quick Dialer</span>
           </button>
         </div>
       </div>
 
       <!-- ============================================================== -->
-      <!-- SUB-PANE 1: AI SCRIPT & MULTI-TURN CONVERSATION FLOW STUDIO    -->
+      <!-- SUB-PANE 0: CAMPAIGNS MANAGEMENT (KISS ARCHITECTURE)           -->
       <!-- ============================================================== -->
-      <div id="calling-pane-studio" class="space-y-6">
+      <div id="calling-pane-campaigns" class="space-y-6">
+        
+        <!-- Header Bar with Add Campaign CTA -->
+        <div class="rounded-2xl border p-4 sm:p-5 shadow-sm flex items-center justify-between flex-wrap gap-3" style="background-color: var(--card-bg); border-color: var(--border-color);">
+          <div>
+            <h3 class="text-base font-bold" style="color: var(--text);">Campaigns & Outbound Call Lists</h3>
+            <p class="text-xs text-zinc-400">Manage campaign number lists, run call loops, and configure script settings</p>
+          </div>
+          <button type="button" onclick="openCampaignModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-teal-600 hover:bg-teal-500 text-white transition active:scale-95 flex items-center gap-2 shadow-xs">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            <span>Create Campaign</span>
+          </button>
+        </div>
+
+        <!-- Campaigns Table & Details -->
+        <div class="rounded-2xl border overflow-hidden shadow-sm" style="background-color: var(--card-bg); border-color: var(--border-color);">
+          <div class="p-3.5 border-b flex items-center justify-between" style="border-color: var(--border-color);">
+            <div class="flex items-center gap-2 font-bold text-xs" style="color: var(--text);">
+              <span>Campaigns List</span>
+              <span id="campaigns-count-badge" class="px-2 py-0.5 rounded-full text-[10px] bg-teal-500/15 text-teal-600 font-mono">0 Campaigns</span>
+            </div>
+          </div>
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-left text-xs">
+              <thead class="border-b text-[11px] font-semibold text-zinc-400 uppercase tracking-wider" style="border-color: var(--border-color); background-color: var(--sidebar-bg);">
+                <tr>
+                  <th class="py-3 px-4">Campaign Name</th>
+                  <th class="py-3 px-4">Numbers</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4">Script</th>
+                  <th class="py-3 px-4">Created Date</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="campaigns-table-tbody" class="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
+                <tr><td colspan="6" class="text-center py-8 text-zinc-400">Loading campaigns...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Numbers Details Drawer / List (When user clicks on a campaign) -->
+        <div id="campaign-numbers-drawer" class="rounded-2xl border p-4 sm:p-5 shadow-sm hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
+          <div class="flex items-center justify-between pb-3 border-b mb-3" style="border-color: var(--border-color);">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-teal-500/15 text-teal-600 flex items-center justify-center font-bold text-xs">📱</div>
+              <div>
+                <h4 id="drawer-campaign-name" class="text-xs sm:text-sm font-bold" style="color: var(--text);">Campaign Numbers</h4>
+                <p id="drawer-campaign-subtitle" class="text-[11px] text-zinc-400 font-mono">0 numbers configured</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" id="drawer-script-btn" onclick="openScriptSettingsForCampaign()" class="p-1.5 rounded-lg border text-zinc-400 hover:text-teal-600 transition" style="border-color: var(--border-color);" title="Script Settings">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </button>
+              <button type="button" onclick="document.getElementById('campaign-numbers-drawer').classList.add('hidden')" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="drawer-numbers-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+            <!-- Numbers pills rendered here -->
+          </div>
+        </div>
+
+      </div>
         
         <!-- Preset Switcher Bar -->
         <div class="rounded-2xl border p-3.5 sm:p-4 shadow-sm" style="background-color: var(--card-bg); border-color: var(--border-color);">
@@ -1858,12 +1930,12 @@
               </div>
             </div>
 
-            <!-- Card 1: Step 1 - Introduction & Greeting -->
+            <!-- Card 1: Step 1 - Greetings Speech (Simplified: Intro hook removed) -->
             <div class="rounded-2xl border p-4 sm:p-5 shadow-sm space-y-3" style="background-color: var(--card-bg); border-color: var(--border-color);">
               <div class="flex items-center justify-between border-b pb-2.5" style="border-color: var(--border-color);">
                 <div class="flex items-center gap-2">
                   <span class="w-5 h-5 rounded-full bg-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center text-xs font-bold">1</span>
-                  <h3 class="text-sm font-bold" style="color: var(--text);">Step 1: Introduction & Greeting Speech</h3>
+                  <h3 class="text-sm font-bold" style="color: var(--text);">Step 1: Greetings Speech</h3>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <button type="button" onclick="insertScriptToken('script-greeting-text', '{customer_name}')" class="text-[10px] px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-600 hover:bg-teal-500/20 transition">+ {customer_name}</button>
@@ -1871,12 +1943,8 @@
                 </div>
               </div>
               <div>
-                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Opening Line (Immediate Speech on Call Connect):</label>
+                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Opening Greetings (Immediate Speech on Call Connect):</label>
                 <textarea id="script-greeting-text" rows="2" oninput="updateScriptSimulation()" class="w-full p-2.5 rounded-xl border text-xs focus:outline-none focus:border-teal-500 transition leading-relaxed custom-scroll" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Namaste {customer_name} ji! Main {company_name} se {agent_name} baat kar rahi hoon. Aapse 1 minute baat ho sakti hai?</textarea>
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Intro Hook / Purpose of Call:</label>
-                <textarea id="script-intro-reason" rows="2" oninput="updateScriptSimulation()" class="w-full p-2.5 rounded-xl border text-xs focus:outline-none focus:border-teal-500 transition leading-relaxed custom-scroll" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Hum aapke business ki sales aur customer operations automate karne ke liye vishesh plans lekar aaye hain.</textarea>
               </div>
             </div>
 
@@ -1914,12 +1982,7 @@
                 <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-600 border border-amber-500/20">Branch: If Customer says No</span>
               </div>
               <p class="text-[11px] text-zinc-400">Jab customer bole ki *"Abhi time nahi hai / Nahi chahiye / Busy hoon"*, to agent ye bolega:</p>
-              <textarea id="script-objection-text" rows="3" oninput="updateScriptSimulation()" class="w-full p-2.5 rounded-xl border text-xs focus:outline-none focus:border-amber-500 transition leading-relaxed custom-scroll" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Koi baat nahi {customer_name} ji! Hum samajhte hain aap abhi vyast honge. Main aapke WhatsApp par hamara plan brochure aur proposal link bhej rahi hoon taaki aap free time me dekh sakein. Dhanyawaad aur aapka din shubh ho!</textarea>
-              
-              <div class="flex items-center gap-2 pt-1">
-                <input type="checkbox" id="script-whatsapp-followup" checked class="rounded border-teal-500 text-teal-600 focus:ring-teal-500">
-                <label for="script-whatsapp-followup" class="text-xs font-medium cursor-pointer" style="color: var(--text-muted);">Mana karne par WhatsApp proposal/quotation brochure link automatically deliver karein</label>
-              </div>
+              <textarea id="script-objection-text" rows="3" oninput="updateScriptSimulation()" class="w-full p-2.5 rounded-xl border text-xs focus:outline-none focus:border-amber-500 transition leading-relaxed custom-scroll" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Koi baat nahi {customer_name} ji! Hum samajhte hain aap abhi vyast honge. Hamari team aapse agle hafte connect karegi. Dhanyawaad aur aapka din shubh ho!</textarea>
             </div>
 
             <!-- Card 4: Step 4 - Booking & Confirmation Speech -->
@@ -2100,11 +2163,110 @@
 
       </div>
 
+      <!-- ============================================================== -->
+      <!-- SUB-PANE 3: REAL-TIME CALL RECORDINGS (VOBIZ CONNECTED)        -->
+      <!-- ============================================================== -->
+      <div id="calling-pane-recordings" class="space-y-6 hidden">
+        <div class="rounded-2xl border p-4 sm:p-5 shadow-sm flex items-center justify-between flex-wrap gap-3" style="background-color: var(--card-bg); border-color: var(--border-color);">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.757 3.63 8.25 4.51 8.25H6.75z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-base font-bold" style="color: var(--text);">Real-time Call Recordings & Audio Logs</h3>
+              <p class="text-xs text-zinc-400">Streamed live via Vobiz AI Telephony Gateway</p>
+            </div>
+          </div>
+          <button type="button" onclick="loadCallRecordings()" class="px-3.5 py-1.5 rounded-xl border text-xs font-semibold hover:border-teal-500 transition flex items-center gap-1.5" style="border-color: var(--border-color); color: var(--text);">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+            <span>Sync Vobiz</span>
+          </button>
+        </div>
+
+        <!-- Recordings List Card -->
+        <div class="rounded-2xl border overflow-hidden shadow-sm" style="background-color: var(--card-bg); border-color: var(--border-color);">
+          <div class="p-3.5 border-b flex items-center justify-between" style="border-color: var(--border-color);">
+            <div class="flex items-center gap-2 font-bold text-xs" style="color: var(--text);">
+              <span>Audio Vault</span>
+              <span id="recordings-count-badge" class="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/15 text-purple-600 font-mono">0 Recordings</span>
+            </div>
+          </div>
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-left text-xs">
+              <thead class="border-b text-[11px] uppercase tracking-wider text-zinc-400" style="border-color: var(--border-color); background-color: var(--sidebar-bg);">
+                <tr>
+                  <th class="p-3">Customer / Phone</th>
+                  <th class="p-3">Duration</th>
+                  <th class="p-3">Date & Time</th>
+                  <th class="p-3">Audio Playback</th>
+                  <th class="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="recordings-table-body" class="divide-y" style="border-color: var(--border-color);">
+                <tr>
+                  <td colspan="5" class="p-8 text-center text-zinc-400">Connecting to Vobiz audio vault...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
 
   </main>
 
   <!-- Global Search & Command Palette Modal (Search Intelligence) -->
+  <div id="campaign-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" style="background-color: rgba(0,0,0,0.55); backdrop-filter: blur(4px);">
+    <div class="w-full max-w-lg rounded-2xl border shadow-2xl p-5 sm:p-6 transition flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150" style="background-color: var(--card-bg); border-color: var(--border-color);">
+      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border-color);">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold">📢</div>
+          <div>
+            <h3 id="campaign-modal-title" class="text-sm font-bold" style="color: var(--text);">Create Outbound Campaign</h3>
+            <p class="text-[11px] text-zinc-400">Keep it simple: Type numbers and link an active script</p>
+          </div>
+        </div>
+        <button onclick="closeCampaignModal()" class="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-lg hover:bg-black/5">✕</button>
+      </div>
+
+      <div class="space-y-3.5 my-4">
+        <input type="hidden" id="campaign-modal-id" value="">
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text);">Campaign Name</label>
+          <input type="text" id="campaign-input-name" placeholder="e.g. November Sales Outreach" class="w-full h-9 px-3 rounded-xl border text-xs focus:outline-none focus:border-teal-500 font-medium" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text);">Assigned Script</label>
+          <select id="campaign-input-script" class="w-full h-9 px-3 rounded-xl border text-xs focus:outline-none focus:border-teal-500 font-medium" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">
+            <option value="default_script">Main Pitch & Pricing Script (Studio)</option>
+            <option value="appointment_script">Consultation & Booking Script</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold" style="color: var(--text);">Customer Number List</label>
+            <span class="text-[10px] text-zinc-400">Type or paste comma / newline separated numbers</span>
+          </div>
+          <textarea id="campaign-input-numbers" rows="5" placeholder="8707526283&#10;9876543210&#10;+918065354620" class="w-full p-2.5 rounded-xl border text-xs font-mono focus:outline-none focus:border-teal-500 custom-scroll" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);"></textarea>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t flex items-center justify-end gap-2" style="border-color: var(--border-color);">
+        <button type="button" onclick="closeCampaignModal()" class="px-4 py-2 rounded-xl text-xs font-medium border text-zinc-400 hover:text-zinc-200 transition" style="border-color: var(--border-color);">
+          Cancel
+        </button>
+        <button type="button" id="btn-save-campaign-modal" onclick="handleSaveCampaign()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-teal-600 hover:bg-teal-500 text-white transition active:scale-95 shadow-xs">
+          Save Campaign
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="global-search-modal" class="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 hidden" style="background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
     <div class="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden transition flex flex-col max-h-[80vh]" style="background-color: var(--bg); border-color: var(--border-color);">
       
@@ -5359,29 +5521,285 @@
     };
 
     function switchCallingSubTab(mode) {
+      const campaignsPane = document.getElementById('calling-pane-campaigns');
       const studioPane = document.getElementById('calling-pane-studio');
       const dialerPane = document.getElementById('calling-pane-dialer');
+      const recordingsPane = document.getElementById('calling-pane-recordings');
+
+      const btnCampaigns = document.getElementById('btn-call-sub-campaigns');
       const btnStudio = document.getElementById('btn-call-sub-studio');
+      const btnRecordings = document.getElementById('btn-call-sub-recordings');
       const btnDialer = document.getElementById('btn-call-sub-dialer');
 
-      if (mode === 'studio') {
-        if (studioPane) studioPane.classList.remove('hidden');
-        if (dialerPane) dialerPane.classList.add('hidden');
-        if (btnStudio) {
-          btnStudio.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-teal-600 text-white shadow-xs";
+      const panes = [
+        { id: 'campaigns', el: campaignsPane, btn: btnCampaigns },
+        { id: 'studio', el: studioPane, btn: btnStudio },
+        { id: 'recordings', el: recordingsPane, btn: btnRecordings },
+        { id: 'dialer', el: dialerPane, btn: btnDialer }
+      ];
+
+      panes.forEach(p => {
+        if (p.el) {
+          if (p.id === mode) {
+            p.el.classList.remove('hidden');
+          } else {
+            p.el.classList.add('hidden');
+          }
         }
-        if (btnDialer) {
-          btnDialer.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200";
+        if (p.btn) {
+          if (p.id === mode) {
+            p.btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-teal-600 text-white shadow-xs";
+          } else {
+            p.btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200";
+          }
+        }
+      });
+
+      if (mode === 'campaigns') loadCampaigns();
+      if (mode === 'recordings') loadCallRecordings();
+    }
+
+    // ==========================================
+    // CAMPAIGNS MANAGEMENT JS (KISS PRINCIPLE)
+    // ==========================================
+    let campaignsCache = [];
+
+    async function loadCampaigns() {
+      try {
+        const res = await fetch('/api/voice_agent/campaigns');
+        const d = await res.json();
+        if (d && d.success) {
+          campaignsCache = d.campaigns || [];
+          renderCampaignsTable();
+        }
+      } catch (e) {
+        console.error('Error loading campaigns:', e);
+      }
+    }
+
+    function renderCampaignsTable() {
+      const tbody = document.getElementById('campaigns-table-body');
+      const badge = document.getElementById('campaigns-count-badge');
+      if (badge) badge.textContent = `${campaignsCache.length} Campaigns`;
+      if (!tbody) return;
+
+      if (!campaignsCache.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-zinc-400">No campaigns yet. Click "Create Campaign" to add your first call list.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = campaignsCache.map(c => `
+        <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition">
+          <td class="p-3 font-semibold" style="color: var(--text);">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full ${c.status === 'Running' ? 'bg-emerald-500 animate-ping' : 'bg-teal-500'}"></span>
+              <span>${escapeHtml(c.name)}</span>
+            </div>
+          </td>
+          <td class="p-3">
+            <button onclick="viewCampaignNumbers('${escapeHtml(c.id)}')" class="px-2.5 py-1 rounded-lg border text-[11px] font-mono hover:border-teal-500 transition" style="border-color: var(--border-color); color: var(--text);">
+              📞 ${(c.numbers || []).length} Numbers (View)
+            </button>
+          </td>
+          <td class="p-3">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs">${escapeHtml(c.script_id || 'default_script')}</span>
+              <button onclick="openScriptSettingsForCampaign('${escapeHtml(c.script_id || 'default_script')}')" title="Open Script Settings" class="p-1 rounded hover:bg-black/5 text-zinc-400 hover:text-teal-500 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </button>
+            </div>
+          </td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${c.status === 'Running' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-zinc-500/15 text-zinc-400'}">${escapeHtml(c.status || 'Draft')}</span>
+          </td>
+          <td class="p-3 text-zinc-400 text-[11px]">${escapeHtml(c.created_at || 'Recently')}</td>
+          <td class="p-3 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              <button onclick="editCampaign('${escapeHtml(c.id)}')" class="p-1 rounded text-zinc-400 hover:text-teal-500 transition" title="Edit Campaign">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/></svg>
+              </button>
+              <button onclick="deleteCampaign('${escapeHtml(c.id)}')" class="p-1 rounded text-zinc-400 hover:text-rose-500 transition" title="Delete Campaign">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openCampaignModal(campaignId = null) {
+      const modal = document.getElementById('campaign-modal');
+      const title = document.getElementById('campaign-modal-title');
+      const idInput = document.getElementById('campaign-modal-id');
+      const nameInput = document.getElementById('campaign-input-name');
+      const scriptInput = document.getElementById('campaign-input-script');
+      const numInput = document.getElementById('campaign-input-numbers');
+
+      if (campaignId) {
+        const c = campaignsCache.find(x => x.id === campaignId);
+        if (c) {
+          title.textContent = 'Edit Outbound Campaign';
+          idInput.value = c.id;
+          nameInput.value = c.name || '';
+          scriptInput.value = c.script_id || 'default_script';
+          numInput.value = (c.numbers || []).join('\n');
         }
       } else {
-        if (studioPane) studioPane.classList.add('hidden');
-        if (dialerPane) dialerPane.classList.remove('hidden');
-        if (btnDialer) {
-          btnDialer.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-teal-600 text-white shadow-xs";
+        title.textContent = 'Create Outbound Campaign';
+        idInput.value = '';
+        nameInput.value = '';
+        scriptInput.value = 'default_script';
+        numInput.value = '';
+      }
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeCampaignModal() {
+      const modal = document.getElementById('campaign-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function editCampaign(id) {
+      openCampaignModal(id);
+    }
+
+    async function handleSaveCampaign() {
+      const id = document.getElementById('campaign-modal-id').value;
+      const name = document.getElementById('campaign-input-name').value.trim();
+      const script_id = document.getElementById('campaign-input-script').value;
+      const rawNumbers = document.getElementById('campaign-input-numbers').value;
+
+      if (!name) {
+        showScreenToast('Please enter a campaign name');
+        return;
+      }
+
+      const numbers = rawNumbers.split(/[\n,;]+/).map(s => s.trim()).filter(s => s.length > 5);
+
+      try {
+        const res = await fetch('/api/voice_agent/campaigns/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name, script_id, numbers, status: 'Draft' })
+        });
+        const d = await res.json();
+        if (d && d.success) {
+          showScreenToast('✅ Campaign saved successfully!');
+          closeCampaignModal();
+          loadCampaigns();
+        } else {
+          showScreenToast('Error saving: ' + (d.error || 'Unknown error'));
         }
-        if (btnStudio) {
-          btnStudio.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200";
+      } catch (e) {
+        showScreenToast('Network error saving campaign');
+      }
+    }
+
+    async function deleteCampaign(id) {
+      if (!confirm('Are you sure you want to delete this campaign?')) return;
+      try {
+        const res = await fetch('/api/voice_agent/campaigns/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const d = await res.json();
+        if (d && d.success) {
+          showScreenToast('Campaign deleted');
+          loadCampaigns();
         }
+      } catch (e) {
+        showScreenToast('Failed to delete campaign');
+      }
+    }
+
+    function viewCampaignNumbers(id) {
+      const c = campaignsCache.find(x => x.id === id);
+      if (!c) return;
+      const drawer = document.getElementById('campaign-numbers-drawer');
+      const listEl = document.getElementById('campaign-numbers-list');
+      const titleEl = document.getElementById('campaign-numbers-title');
+
+      if (titleEl) titleEl.textContent = `Numbers for: ${c.name} (${(c.numbers || []).length})`;
+      if (listEl) {
+        if (!c.numbers || !c.numbers.length) {
+          listEl.innerHTML = `<span class="text-zinc-400">No numbers configured</span>`;
+        } else {
+          listEl.innerHTML = c.numbers.map((n, idx) => `
+            <div class="flex items-center justify-between p-2 rounded-lg border text-xs" style="background-color: var(--input-bg); border-color: var(--border-color);">
+              <span class="font-mono font-semibold">${idx + 1}. ${escapeHtml(n)}</span>
+              <button onclick="triggerDirectCall('${escapeHtml(n)}', 'Customer')" class="px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-semibold flex items-center gap-1 active:scale-95">
+                📞 Call
+              </button>
+            </div>
+          `).join('');
+        }
+      }
+      if (drawer) drawer.classList.remove('hidden');
+    }
+
+    function closeCampaignNumbersDrawer() {
+      const drawer = document.getElementById('campaign-numbers-drawer');
+      if (drawer) drawer.classList.add('hidden');
+    }
+
+    function openScriptSettingsForCampaign(scriptId) {
+      switchCallingSubTab('studio');
+      showScreenToast(`Switched to active script configuration: ${scriptId}`);
+    }
+
+    // ==========================================
+    // REAL-TIME CALL RECORDINGS (VOBIZ CONNECTED)
+    // ==========================================
+    async function loadCallRecordings() {
+      const tbody = document.getElementById('recordings-table-body');
+      const badge = document.getElementById('recordings-count-badge');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-zinc-400">Fetching live call recordings from Vobiz API...</td></tr>`;
+
+      try {
+        const res = await fetch('/api/voice_agent/recordings');
+        const d = await res.json();
+        if (d && d.success) {
+          const recs = d.recordings || [];
+          if (badge) badge.textContent = `${recs.length} Recordings`;
+          if (!recs.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-zinc-400">No recordings found on Vobiz account yet.</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = recs.map(r => `
+            <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition">
+              <td class="p-3 font-semibold" style="color: var(--text);">
+                <div class="font-mono text-xs">${escapeHtml(r.customer_phone || r.phone || 'Vobiz Call')}</div>
+                <div class="text-[10px] text-zinc-400">${escapeHtml(r.customer_name || 'Customer')}</div>
+              </td>
+              <td class="p-3 text-xs font-mono text-zinc-400">
+                ${r.duration_seconds ? r.duration_seconds + 's' : (r.duration ? r.duration + 's' : 'N/A')}
+              </td>
+              <td class="p-3 text-[11px] text-zinc-400">
+                ${escapeHtml(r.created_at || 'Recent')}
+              </td>
+              <td class="p-3">
+                ${r.recording_url ? `
+                  <audio controls preload="none" class="h-8 max-w-[220px]" style="filter: contrast(0.9);">
+                    <source src="${r.recording_url}" type="audio/mpeg">
+                    Your browser does not support audio playback.
+                  </audio>
+                ` : `<span class="text-zinc-400 text-[11px]">Processing</span>`}
+              </td>
+              <td class="p-3 text-right">
+                ${r.recording_url ? `
+                  <a href="${r.recording_url}" target="_blank" download class="px-2.5 py-1 rounded-lg border text-[11px] font-semibold hover:border-teal-500 transition inline-flex items-center gap-1" style="border-color: var(--border-color); color: var(--text);">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                    <span>Download</span>
+                  </a>
+                ` : ''}
+              </td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {
+        console.error('Error fetching call recordings:', e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-rose-500">Error connecting to Vobiz audio vault.</td></tr>`;
       }
     }
 
@@ -5424,13 +5842,9 @@
       setVal('script-voice-gender', callingScriptConfig.voice_gender);
       setVal('script-language', callingScriptConfig.language);
       setVal('script-greeting-text', callingScriptConfig.greeting);
-      setVal('script-intro-reason', callingScriptConfig.intro_reason);
       setVal('script-plans-pitch', callingScriptConfig.plans_pitch_speech);
       setVal('script-objection-text', callingScriptConfig.objection_speech);
       setVal('script-confirmation-text', callingScriptConfig.confirmation_speech);
-
-      const chk = document.getElementById('script-whatsapp-followup');
-      if (chk) chk.checked = !!callingScriptConfig.whatsapp_followup_enabled;
 
       renderScriptPlans();
     }
@@ -5510,14 +5924,13 @@
       // Pull latest from UI
       const agentName = document.getElementById('script-agent-name')?.value || 'Priya';
       const companyName = document.getElementById('script-company-name')?.value || 'Achyuta';
-      const greeting = document.getElementById('script-greeting-text')?.value || 'Hello {customer_name} ji!';
-      const intro = document.getElementById('script-intro-reason')?.value || '';
+      const greeting = document.getElementById('script-greeting-text')?.value || 'Namaste {customer_name} ji!';
       const pitchSpeech = document.getElementById('script-plans-pitch')?.value || '';
       const objection = document.getElementById('script-objection-text')?.value || '';
       const confirmation = document.getElementById('script-confirmation-text')?.value || '';
 
       const cust = 'Rohit';
-      const safeGreet = (greeting + ' ' + intro).replace(/{customer_name}/g, cust).replace(/{company_name}/g, companyName).replace(/{agent_name}/g, agentName);
+      const safeGreet = greeting.replace(/{customer_name}/g, cust).replace(/{company_name}/g, companyName).replace(/{agent_name}/g, agentName);
       const safePitch = pitchSpeech.replace(/{customer_name}/g, cust).replace(/{company_name}/g, companyName).replace(/{agent_name}/g, agentName);
       const safeObjection = objection.replace(/{customer_name}/g, cust).replace(/{company_name}/g, companyName).replace(/{agent_name}/g, agentName);
       const safeConfirmation = confirmation.replace(/{customer_name}/g, cust).replace(/{company_name}/g, companyName).replace(/{agent_name}/g, agentName);
@@ -5579,11 +5992,9 @@
       callingScriptConfig.voice_gender = (document.getElementById('script-voice-gender')?.value || 'WOMAN:hi-IN').split(':')[0] || 'WOMAN';
       callingScriptConfig.language = (document.getElementById('script-voice-gender')?.value || 'WOMAN:hi-IN').split(':')[1] || 'hi-IN';
       callingScriptConfig.greeting = document.getElementById('script-greeting-text')?.value || '';
-      callingScriptConfig.intro_reason = document.getElementById('script-intro-reason')?.value || '';
       callingScriptConfig.plans_pitch_speech = document.getElementById('script-plans-pitch')?.value || '';
       callingScriptConfig.objection_speech = document.getElementById('script-objection-text')?.value || '';
       callingScriptConfig.confirmation_speech = document.getElementById('script-confirmation-text')?.value || '';
-      callingScriptConfig.whatsapp_followup_enabled = document.getElementById('script-whatsapp-followup')?.checked ?? true;
 
       try {
         const res = await fetch('/api/voice_agent/script_config', {

@@ -110,6 +110,7 @@ VOBIZ_DID_NUMBER = os.environ.get('DID_NUMBER', '+918065354620')
 VOBIZ_TRIGGER_URL = 'https://kavyatraders.in/trigger-call'
 CALL_LOGS_PATH = os.path.join(DATA_DIR, "call_logs_vault.json")
 CALLING_SCRIPT_CONFIG_PATH = os.path.join(DATA_DIR, "calling_script_config.json")
+CAMPAIGNS_PATH = os.path.join(DATA_DIR, "campaigns_vault.json")
 
 DEFAULT_CALLING_SCRIPT_CONFIG = {
     "preset": "sales_pitch",
@@ -118,7 +119,6 @@ DEFAULT_CALLING_SCRIPT_CONFIG = {
     "voice_gender": "WOMAN",
     "language": "hi-IN",
     "greeting": "Namaste {customer_name} ji! Main {company_name} se {agent_name} baat kar rahi hoon. Aapse 1 minute baat ho sakti hai?",
-    "intro_reason": "Hum aapke business ki sales aur client operations automate karne ke liye vishesh plans lekar aaye hain.",
     "plans": [
         {
             "id": "plan_1",
@@ -135,9 +135,35 @@ DEFAULT_CALLING_SCRIPT_CONFIG = {
     ],
     "plans_pitch_speech": "Humare paas aapke business ke liye do mukhya plans hain. Starter Plan ₹4,999 me aur Growth Pro Plan ₹12,999 me. Starter plan lene ke liye 1 dabayein, ya Pro plan lene ke liye 2 dabayein.",
     "objection_speech": "Koi baat nahi {customer_name} ji! Hum samajhte hain aap abhi vyast honge. Main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap free time me dekh sakein. Dhanyawaad aur aapka din shubh ho!",
-    "confirmation_speech": "Bahut bahut dhanyawaad {customer_name} ji! Aapka plan interest successfully note kar liya gaya hai aur hamari support team aapse jald hi connect karegi. Aapka din shubh ho!",
-    "whatsapp_followup_enabled": True
+    "confirmation_speech": "Bahut bahut dhanyawaad {customer_name} ji! Aapka plan interest successfully note kar liya gaya hai aur hamari support team aapse jald hi connect karegi. Aapka din shubh ho!"
 }
+
+def get_campaigns_data():
+    if os.path.exists(CAMPAIGNS_PATH):
+        try:
+            with open(CAMPAIGNS_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return [
+        {
+            "id": "camp_default",
+            "name": "Q4 Enterprise Business Leads",
+            "status": "Active",
+            "numbers": ["+918707526283", "+918492066444"],
+            "script_id": "sales_pitch",
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+        }
+    ]
+
+def save_campaigns_data(data):
+    try:
+        with open(CAMPAIGNS_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error saving campaigns: {e}")
+        return False
 
 def get_calling_script_config():
     if os.path.exists(CALLING_SCRIPT_CONFIG_PATH):
@@ -157,6 +183,36 @@ def save_calling_script_config(data):
         print(f"Error saving calling script config: {e}")
         return False
 
+def get_or_create_voice_audio_file(text_content):
+    """
+    Generates natural human voice audio (WAV) via Gemini 2.5 Flash Native Audio preview (Aoede voice)
+    and caches it to static/audio_cache/<hash>.wav so Vobiz or any external SIP/telephony can stream it
+    directly using <Play> instead of robotic eSpeak TTS.
+    """
+    if not text_content or not text_content.strip():
+        return None
+    try:
+        clean = " ".join(text_content.strip().split())
+        h = hashlib.md5(clean.encode("utf-8")).hexdigest()
+        cache_dir = os.path.join(STATIC_DIR, "audio_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        filename = f"tts_{h}.wav"
+        file_path = os.path.join(cache_dir, filename)
+
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 1000:
+            return f"https://achyuta-v2.onrender.com/static/audio_cache/{filename}"
+
+        # Generate audio using Gemini native voice
+        b64_audio, err = generate_gemini_voice_audio(clean)
+        if b64_audio and not err:
+            wav_bytes = base64.b64decode(b64_audio)
+            with open(file_path, "wb") as f:
+                f.write(wav_bytes)
+            return f"https://achyuta-v2.onrender.com/static/audio_cache/{filename}"
+    except Exception as e:
+        print(f"Error caching voice audio: {e}")
+    return None
+
 def generate_vobiz_call_xml(customer_name="Rohit", phone=""):
     cfg = get_calling_script_config()
     voice = cfg.get("voice_gender", "WOMAN")
@@ -165,22 +221,35 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone=""):
     comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
 
     greeting = (cfg.get("greeting") or "Namaste {customer_name} ji!").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
-    intro = (cfg.get("intro_reason") or "").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
     pitch = (cfg.get("plans_pitch_speech") or "").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
     objection = (cfg.get("objection_speech") or "Dhanyawaad!").replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
 
-    full_first_turn = f"{greeting} {intro} {pitch}".strip()
+    full_first_turn = f"{greeting} {pitch}".strip()
     safe_speech = html.escape(full_first_turn)
     safe_objection = html.escape(objection)
 
+    # Attempt to get natural human voice audio URL from Gemini Native Audio
+    audio_url = get_or_create_voice_audio_file(full_first_turn)
+    objection_audio_url = get_or_create_voice_audio_file(objection)
+
     action_url = f"https://achyuta-v2.onrender.com/voice-webhook/digits?customer_name={urllib.parse.quote(customer_name)}"
+
+    if audio_url:
+        first_turn_tag = f"<Play>{audio_url}</Play>"
+    else:
+        first_turn_tag = f'<Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>'
+
+    if objection_audio_url:
+        objection_tag = f"<Play>{objection_audio_url}</Play>"
+    else:
+        objection_tag = f'<Speak voice="{voice}" language="{lang}">{safe_objection}</Speak>'
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <GetDigits action="{action_url}" method="POST" timeout="8" numDigits="1" retries="1">
-        <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
+        {first_turn_tag}
     </GetDigits>
-    <Speak voice="{voice}" language="{lang}">{safe_objection}</Speak>
+    {objection_tag}
 </Response>"""
     return xml
 
@@ -201,10 +270,16 @@ def generate_vobiz_digits_xml(digits, customer_name="Rohit"):
     else:
         text = objection
 
-    safe_text = html.escape(text)
+    audio_url = get_or_create_voice_audio_file(text)
+    if audio_url:
+        speech_tag = f"<Play>{audio_url}</Play>"
+    else:
+        safe_text = html.escape(text)
+        speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_text}</Speak>'
+
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Speak voice="{voice}" language="{lang}">{safe_text}</Speak>
+    {speech_tag}
 </Response>"""
 
 def init_call_logs_vault():
@@ -242,16 +317,33 @@ init_call_logs_vault()
 
 def fetch_vobiz_real_call_logs():
     """
-    Directly syncs actual call metadata and status from the official Vobiz Telephony API.
+    Directly syncs actual call metadata and recordings from the official Vobiz Telephony API.
     """
-    url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Call/?limit=20"
+    url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Call/?limit=30"
     headers = {
         "X-Auth-ID": VOBIZ_AUTH_ID,
         "X-Auth-Token": VOBIZ_AUTH_TOKEN
     }
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=5) as r:
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read().decode('utf-8'))
+            return data.get("objects", [])
+    except Exception as e:
+        return []
+
+def get_realtime_vobiz_recordings():
+    """
+    Retrieves live recordings directly from Vobiz Cloud.
+    """
+    url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Recording/?limit=30"
+    headers = {
+        "X-Auth-ID": VOBIZ_AUTH_ID,
+        "X-Auth-Token": VOBIZ_AUTH_TOKEN
+    }
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:
             data = json.loads(r.read().decode('utf-8'))
             return data.get("objects", [])
     except Exception as e:
@@ -3832,6 +3924,58 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             }).encode("utf-8"))
             return
 
+        elif self.path == "/api/voice_agent/campaigns":
+            camps = get_campaigns_data()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": True,
+                "campaigns": camps
+            }).encode("utf-8"))
+            return
+
+        elif self.path == "/api/voice_agent/recordings":
+            real_recs = get_realtime_vobiz_recordings()
+            # Also integrate local logs that have recording_url
+            logs = get_ai_call_logs_data()
+            combined_recs = []
+            
+            # 1. From real Vobiz API
+            for r in real_recs:
+                combined_recs.append({
+                    "id": r.get("recording_id") or r.get("recording_uuid") or r.get("call_uuid"),
+                    "call_uuid": r.get("call_uuid"),
+                    "from_number": r.get("from_number") or "+918065354620",
+                    "to_number": r.get("to_number") or "Customer",
+                    "duration": r.get("recording_duration") or r.get("duration") or 30,
+                    "recording_url": r.get("recording_url"),
+                    "created_at": r.get("recording_start_ms") or r.get("created_at") or "Recent"
+                })
+
+            # 2. Add local call records with playable recordings
+            for l in logs:
+                rec_url = l.get("recording_url") or f"/api/voice_agent/recording/{l.get('id', 'call_1')}.wav"
+                combined_recs.append({
+                    "id": l.get("id"),
+                    "call_uuid": l.get("call_uuid"),
+                    "from_number": "+918065354620",
+                    "to_number": l.get("customer_phone"),
+                    "customer_name": l.get("customer_name", "Customer"),
+                    "duration": l.get("duration_seconds") or 35,
+                    "recording_url": rec_url,
+                    "created_at": l.get("created_at", "Recent")
+                })
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": True,
+                "recordings": combined_recs
+            }).encode("utf-8"))
+            return
+
         elif self.path.startswith("/api/ai/dynamic_hero"):
             # Dynamic AI headline and distinct prompt sets for every individual CRM tool
             ai_headlines = [
@@ -4460,6 +4604,52 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"status": "received"}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/voice_agent/campaigns/save":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            camps = get_campaigns_data()
+            cid = data.get("id") or f"camp_{int(time.time())}"
+            raw_nums = data.get("numbers") or []
+            if isinstance(raw_nums, str):
+                # Split lines or commas
+                raw_nums = [n.strip() for n in re.split(r'[\n,]+', raw_nums) if n.strip()]
+
+            camp_obj = {
+                "id": cid,
+                "name": data.get("name") or "New Campaign",
+                "status": data.get("status") or "Active",
+                "numbers": raw_nums,
+                "script_id": data.get("script_id") or "sales_pitch",
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+            }
+            existing_idx = next((i for i, c in enumerate(camps) if c.get("id") == cid), -1)
+            if existing_idx >= 0:
+                camps[existing_idx] = camp_obj
+            else:
+                camps.insert(0, camp_obj)
+
+            save_campaigns_data(camps)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "campaign": camp_obj}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/voice_agent/campaigns/delete":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            cid = data.get("id")
+            camps = get_campaigns_data()
+            camps = [c for c in camps if c.get("id") != cid]
+            save_campaigns_data(camps)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
             return
 
         elif self.path == "/api/calling_lists/save":
