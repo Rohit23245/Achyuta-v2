@@ -4149,6 +4149,17 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 }).encode("utf-8"))
             return
 
+        elif self.path == "/voice-webhook":
+            xml_response = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>Hello, this is a test call from Achyuta AI.</Say>
+</Response>"""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml")
+            self.end_headers()
+            self.wfile.write(xml_response.encode("utf-8"))
+            return
+
         elif self.path == "/api/voice_agent/trigger":
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length).decode('utf-8')
