@@ -3991,6 +3991,8 @@
       const sidebar = document.getElementById('main-sidebar');
       const overlay = document.getElementById('mobile-sidebar-overlay');
       if (sidebar) {
+        // Force full expanded state on mobile drawer open
+        applySidebarState(true);
         sidebar.classList.remove('hidden');
         sidebar.classList.add('flex');
         sidebar.style.display = 'flex';
