@@ -1801,8 +1801,13 @@
                     <option value="direct">Direct Number(s)</option>
                   </select>
                 </div>
+                <!-- Delete Selected List Button (Hidden when 'direct' is selected) -->
+                <button type="button" id="caller-delete-list-btn" onclick="deleteCurrentCallingListDirect()" class="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 text-rose-500 hover:bg-rose-500/10 transition active:scale-95 cursor-pointer hidden" style="border-color: var(--border-color);" title="Delete selected list">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+                  <span>Delete List</span>
+                </button>
                 <!-- Create List Modal / Prompt Button -->
-                <button type="button" onclick="createNewCallingListPrompt()" class="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer" style="border-color: var(--border-color); color: var(--text);" title="Save current numbers as a List">
+                <button type="button" onclick="openCreateCallingListModalDirect()" class="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer" style="border-color: var(--border-color); color: var(--text);" title="Save numbers as a new List">
                   <svg class="w-3.5 h-3.5 text-teal-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                   <span>Create List</span>
                 </button>
@@ -5750,6 +5755,7 @@
 
     function renderCallingListSelect() {
       const select = document.getElementById('caller-list-select');
+      const delBtn = document.getElementById('caller-delete-list-btn');
       if (!select) return;
       const currentVal = select.value;
       select.innerHTML = '';
@@ -5769,22 +5775,45 @@
         });
       }
 
-      // 2. Add locally created lists
+      // 2. Add locally created lists (exclude duplicates)
       Object.keys(_callerLists).forEach(name => {
         if (name !== 'direct') {
-          const opt = document.createElement('option');
-          opt.value = 'local_' + name;
-          opt.textContent = `${name} (${_callerLists[name].length})`;
-          select.appendChild(opt);
+          // If already in server lists with same name, skip to prevent duplicates
+          const existsInServer = (window.allCallingLists || []).some(l => l.name === name);
+          if (!existsInServer) {
+            const opt = document.createElement('option');
+            opt.value = 'local_' + name;
+            opt.textContent = `${name} (${_callerLists[name].length})`;
+            select.appendChild(opt);
+          }
         }
       });
 
-      if (currentVal) {
+      if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
         select.value = currentVal;
+      } else {
+        select.value = 'direct';
+      }
+
+      if (delBtn) {
+        if (select.value && select.value !== 'direct') {
+          delBtn.classList.remove('hidden');
+        } else {
+          delBtn.classList.add('hidden');
+        }
       }
     }
 
     function onCallingListSelected(listVal) {
+      const delBtn = document.getElementById('caller-delete-list-btn');
+      if (delBtn) {
+        if (listVal && listVal !== 'direct') {
+          delBtn.classList.remove('hidden');
+        } else {
+          delBtn.classList.add('hidden');
+        }
+      }
+
       if (!listVal || listVal === 'direct') {
         return;
       }
@@ -5808,41 +5837,72 @@
       }
     }
 
-    async function createNewCallingListPrompt() {
-      const numbers = getEnteredPhoneNumbers();
-      if (!numbers || numbers.length === 0) {
-        showScreenToast('Kripya pehle kam se kam 1 valid phone number daalein');
+    async function deleteCurrentCallingListDirect() {
+      const select = document.getElementById('caller-list-select');
+      const val = select ? select.value : '';
+      if (!val || val === 'direct') {
+        showScreenToast('Please select a custom list to delete');
         return;
       }
-      const listName = prompt('Enter List Name (e.g. VIP Clients, Sales Leads):');
-      if (!listName || !listName.trim()) return;
 
-      const trimmedName = listName.trim();
-      _callerLists[trimmedName] = numbers;
-      saveCallingListsToStorage();
+      let listName = '';
+      if (val.startsWith('server_')) {
+        const id = val.replace('server_', '');
+        const target = (window.allCallingLists || []).find(l => l.id === id);
+        listName = target ? target.name : 'this list';
+        if (!confirm(`Are you sure you want to remove the list "${listName}"?`)) return;
 
-      // Also attempt saving to backend /api/calling_lists/save for permanent persistence
-      try {
-        await fetch('/api/calling_lists/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: trimmedName,
-            contacts: numbers.map((n, idx) => ({ name: `Contact ${idx+1}`, phone: n, status: 'Pending' }))
-          })
-        });
-        if (typeof loadCallingLists === 'function') {
-          await loadCallingLists();
+        try {
+          const res = await fetch('/api/calling_lists/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showScreenToast(`List "${listName}" removed successfully.`);
+          }
+        } catch(e) {
+          console.warn('Error deleting server list:', e);
         }
-      } catch (e) {
-        console.warn('Backend list save warning:', e);
+      } else if (val.startsWith('local_')) {
+        listName = val.replace('local_', '');
+        if (!confirm(`Are you sure you want to remove the list "${listName}"?`)) return;
+        delete _callerLists[listName];
+        saveCallingListsToStorage();
+        showScreenToast(`List "${listName}" removed.`);
       }
 
-      renderCallingListSelect();
-      const select = document.getElementById('caller-list-select');
-      if (select) select.value = 'local_' + trimmedName;
+      // Also clean up local copy if it had same name
+      if (_callerLists[listName]) {
+        delete _callerLists[listName];
+        saveCallingListsToStorage();
+      }
 
-      showScreenToast(`List "${trimmedName}" saved with ${numbers.length} numbers`);
+      if (typeof loadCallingLists === 'function') {
+        await loadCallingLists();
+      }
+      renderCallingListSelect();
+      if (select) {
+        select.value = 'direct';
+        onCallingListSelected('direct');
+      }
+    }
+
+    async function openCreateCallingListModalDirect() {
+      const numbers = getEnteredPhoneNumbers();
+      if (typeof openCreateCallingListModal === 'function') {
+        await openCreateCallingListModal();
+        // Pre-populate staged contacts from currently entered numbers on screen
+        if (numbers.length > 0) {
+          stagedCallingContacts = numbers.map((num, idx) => ({
+            name: `Lead ${idx + 1}`,
+            phone: num,
+            status: 'Pending'
+          }));
+          renderStagedCallingContacts();
+        }
+      }
     }
 
     function getEnteredPhoneNumbers() {
