@@ -3911,6 +3911,41 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
             return
+        elif self.path == "/api/voice_agent/balance":
+            auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
+            auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
+            url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/balance/INR"
+            
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            req = urllib.request.Request(url, headers={
+                "X-Auth-ID": auth_id,
+                "X-Auth-Token": auth_token,
+                "Content-Type": "application/json"
+            })
+            balance_data = {"balance": 0.0, "currency": "INR", "status": "active"}
+            try:
+                with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
+                    res = json.loads(r.read().decode("utf-8"))
+                    balance_data = {
+                        "balance": res.get("balance", res.get("available_balance", 0.0)),
+                        "currency": res.get("currency", "INR"),
+                        "status": res.get("status", "active"),
+                        "low_balance": bool(res.get("balance", 0) < res.get("low_balance_threshold", 50))
+                    }
+            except Exception as e:
+                print(f"Error fetching live Vobiz balance: {e}")
+                balance_data["error"] = str(e)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "data": balance_data}).encode("utf-8"))
+            return
+
         elif self.path == "/api/voice_agent/logs":
             logs = get_ai_call_logs_data()
             self.send_response(200)
