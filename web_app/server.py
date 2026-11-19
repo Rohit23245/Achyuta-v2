@@ -282,29 +282,18 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
 
     # 2. Second Response Intent
     intent_text = str(response_intent or cfg.get("second_response_intent") or "").strip()
-    
-    # If second response / intent is set, play first message, wait 3 seconds to listen to customer, then speak second response
-    if intent_text:
-        # Check if intent is a direct response phrase or general guidance
-        second_speech = intent_text
-        safe_second = html.escape(second_speech)
-        second_audio_url = get_or_create_voice_audio_file(second_speech)
-        if second_audio_url:
-            second_speech_tag = f"<Play>{second_audio_url}</Play>"
-        else:
-            second_speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_second}</Speak>'
+    enc_intent = urllib.parse.quote(intent_text)
+    enc_cust = urllib.parse.quote(str(customer_name))
+    gather_action = f"https://achyuta-v2.onrender.com/voice-webhook/second-response?customer_name={enc_cust}&amp;intent={enc_intent}"
 
-        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+    # Vobiz ASR <Gather>: Speaks opening message, then actively listens for the user's voice in real-time.
+    # It waits while the user speaks and forwards what was said (Speech) to our action webhook.
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    {first_speech_tag}
-    <Wait length="3"/>
-    {second_speech_tag}
-    <Wait length="2"/>
-</Response>"""
-    else:
-        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    {first_speech_tag}
+    <Gather action="{gather_action}" method="POST" inputType="speech" speechModel="default" language="{lang}" executionTimeout="30" speechEndTimeout="auto">
+        {first_speech_tag}
+    </Gather>
+    <Speak voice="{voice}" language="{lang}">Shukriya, aapka din shubh ho!</Speak>
 </Response>"""
     return xml
 
@@ -3201,8 +3190,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             cust_name = parsed_query.get('customer_name', ['Customer'])[0]
             intent = parsed_query.get('intent', [''])[0]
             
-            # Generate smart intent-steered reply
-            reply_text = generate_intelligent_second_response("Ha kahiye", intent)
+            # Use intent directly if set, or formulate intelligent reply
+            if intent:
+                reply_text = intent
+            else:
+                reply_text = generate_intelligent_second_response("Ha kahiye", intent)
+
             safe_text = html.escape(reply_text)
             
             cfg = get_calling_script_config()
@@ -3215,6 +3208,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             xml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     {speech_tag}
+    <Wait length="2"/>
 </Response>"""
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
@@ -4692,9 +4686,22 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             
             cust_name = parsed_query.get('customer_name', ['Customer'])[0]
             intent = parsed_query.get('intent', [''])[0]
-            speech_input = parsed_body.get('SpeechResult', [''])[0] or parsed_body.get('Digits', [''])[0] or "Customer replied"
             
-            reply_text = generate_intelligent_second_response(speech_input, intent)
+            # Vobiz returns transcribed human speech in 'Speech', 'SpeechResult', or 'text'
+            speech_input = (
+                parsed_body.get('Speech', [''])[0] or 
+                parsed_body.get('SpeechResult', [''])[0] or 
+                parsed_body.get('text', [''])[0] or 
+                parsed_body.get('Digits', [''])[0] or 
+                ""
+            ).strip()
+            
+            # Use intent directly if set, or formulate intelligent reply
+            if intent:
+                reply_text = intent
+            else:
+                reply_text = generate_intelligent_second_response(speech_input or "Ha kahiye", intent)
+
             safe_text = html.escape(reply_text)
             
             cfg = get_calling_script_config()
@@ -4707,6 +4714,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             xml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     {speech_tag}
+    <Wait length="2"/>
 </Response>"""
             self.send_response(200)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
