@@ -5881,8 +5881,9 @@ def check_gemini_voice_quota():
         return True, None
 
 def start_server():
-    server = ThreadingHTTPServer(('127.0.0.1', PORT), AchyutaWebHandler)
-    print(f"Achyuta Web App running at http://localhost:{PORT}")
+    port = int(os.environ.get('PORT', PORT))
+    server = ThreadingHTTPServer(('0.0.0.0', port), AchyutaWebHandler)
+    print(f"Achyuta Web App running at http://0.0.0.0:{port}")
     server.serve_forever()
 
 if __name__ == '__main__':
