@@ -3300,6 +3300,73 @@ def calculate_pcm16_rms(pcm_bytes):
     except Exception:
         return 0
 
+def get_pcm24_from_direct_voice(customer_input, step_target, agent_instructions):
+    """
+    Direct Native Voice-to-Voice: Bypasses intermediate LLM text roundtrips.
+    Feeds customer words directly into Gemini 2.5 Flash Native Audio Dialog session
+    and returns 24kHz raw PCM speech directly to stream to caller.
+    """
+    import asyncio, websockets
+    system_instruction = f"""You are a polite female Indian telephone calling executive named Priya.
+Rules:
+1. Speak in natural conversational Hindi directly to the customer in 1 to 2 short sentences.
+2. Directly answer or acknowledge what the customer said (e.g. if they say Hello or Kaun, answer politely and warmly).
+3. Smoothly deliver your conversation step goal: "{step_target}".
+4. Specific Instructions: "{agent_instructions}".
+5. You are a real human executive. Never say you are an AI, computer, or cannot shop.
+6. NEVER explain your thoughts or output meta text. Speak directly to the caller."""
+
+    async def fetch_direct_audio():
+        uri = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key={VOICE_API_KEY}"
+        async with websockets.connect(uri) as ws:
+            setup = {
+                "setup": {
+                    "model": f"models/{GEMINI_TTS_MODEL}",
+                    "generationConfig": {
+                        "responseModalities": ["AUDIO"],
+                        "speechConfig": {
+                            "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Aoede"}}
+                        }
+                    },
+                    "systemInstruction": {
+                        "parts": [{"text": system_instruction}]
+                    }
+                }
+            }
+            await ws.send(json.dumps(setup))
+            await ws.recv()
+
+            prompt_text = f'The customer on the phone said: "{customer_input}". Respond directly to them now:' if customer_input else f'Deliver this step goal directly to the customer: "{step_target}"'
+            await ws.send(json.dumps({
+                "clientContent": {
+                    "turns": [{
+                        "role": "user",
+                        "parts": [{"text": prompt_text}]
+                    }],
+                    "turnComplete": True
+                }
+            }))
+
+            accumulated_pcm = bytearray()
+            while True:
+                msg = await asyncio.wait_for(ws.recv(), timeout=12)
+                data = json.loads(msg)
+                sc = data.get("serverContent", {})
+                turn = sc.get("modelTurn", {})
+                for p in turn.get("parts", []):
+                    inline = p.get("inlineData") or p.get("inline_data")
+                    if inline and inline.get("data"):
+                        accumulated_pcm.extend(base64.b64decode(inline["data"]))
+                if sc.get("turnComplete"):
+                    break
+            return bytes(accumulated_pcm)
+
+    try:
+        return asyncio.run(fetch_direct_audio())
+    except Exception as e:
+        print(f"[Vobiz Stream] Error generating direct voice: {e}", flush=True)
+        return None
+
 def get_pcm24_from_text(text):
     """Generates fresh 24kHz raw PCM bytes directly from Gemini TTS (no stale disk cache)."""
     try:
@@ -3505,9 +3572,12 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         current_step_index += 1
 
                                         caller_input = transcribed_words if transcribed_words else "Ha kahiye"
-                                        reply_text = generate_intelligent_second_response(caller_input, step_target, agent_inst)
-                                        print(f"[Vobiz Stream] Formulated intelligent response: '{reply_text}'", flush=True)
-                                        second_pcm = get_pcm24_from_text(reply_text)
+                                        print(f"[Vobiz Stream] Generating direct voice for caller='{caller_input}', step='{step_target[:30]}'", flush=True)
+                                        second_pcm = get_pcm24_from_direct_voice(caller_input, step_target, agent_inst)
+                                        if not second_pcm:
+                                            reply_text = generate_intelligent_second_response(caller_input, step_target, agent_inst)
+                                            second_pcm = get_pcm24_from_text(reply_text)
+                                        
                                         if second_pcm:
                                             stream_audio_bytes(second_pcm)
                                             # Grace pause for speaker playback to fully deliver
