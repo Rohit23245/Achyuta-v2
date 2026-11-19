@@ -292,14 +292,14 @@
           <span class="sidebar-text brand-title font-bold text-base tracking-tight text-zinc-900 dark:text-zinc-100 truncate">Achyuta</span>
         </div>
 
-        <!-- Desktop Collapse Button (<) -->
+        <!-- Desktop Collapse Button (<) - Hidden on small screen -->
         <button type="button" onclick="handleSidebarToggleOrClose()" id="sidebar-toggle-btn" title="Collapse Sidebar" class="hidden md:flex cursor-pointer sidebar-text w-7 h-7 rounded-lg items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition hover:bg-black/5 dark:hover:bg-white/5 flex-shrink-0 ml-auto">
           <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
           </svg>
         </button>
 
-        <!-- Mobile Drawer Close Button (✕) -->
+        <!-- Mobile Drawer Close Button (Single Cross ✕ Icon) -->
         <button type="button" onclick="closeMobileSidebar()" class="flex md:hidden w-8 h-8 rounded-lg items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-zinc-500 active:scale-95 ml-auto" title="Close Menu">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -450,8 +450,8 @@
 
       </div>
 
-      <!-- ChatGPT-style History Section with Custom Scroll -->
-      <div class="sidebar-text min-h-[140px] flex-1 flex flex-col mt-4 pt-3 border-t border-zinc-200/70 dark:border-zinc-800/70">
+      <!-- ChatGPT-style History Section (No separate inner scroll, flows naturally into sidebar scroll) -->
+      <div class="sidebar-text flex flex-col mt-4 pt-3 border-t border-zinc-200/70 dark:border-zinc-800/70">
         
         <!-- Recents Header -->
         <div class="flex items-center justify-between px-2 mb-2 flex-shrink-0">
@@ -459,8 +459,8 @@
           <button type="button" onclick="clearAllChatSessionsPrompt()" title="Clear all history" class="text-[10px] text-zinc-400 hover:text-rose-500 transition">Clear</button>
         </div>
 
-        <!-- Scrollable List of Chats -->
-        <div id="sidebar-recents-list" class="flex-1 overflow-y-auto custom-scroll space-y-0.5 pr-1">
+        <!-- List of Chats (Flows naturally into entire sidebar scroll) -->
+        <div id="sidebar-recents-list" class="space-y-0.5 pr-0.5">
           <!-- Populated dynamically by renderSidebarRecents() -->
           <div class="text-xs text-zinc-400 py-3 px-2 italic">No chats</div>
         </div>
@@ -512,25 +512,15 @@
 
   <!-- Main View Area -->
   <main class="flex-1 flex flex-col min-h-0 h-full relative overflow-hidden" style="background-color: var(--bg); color: var(--text);">
-    <!-- Mobile Sticky Top Bar (Hamburger + Logo + Title + Quick Chat) -->
+    <!-- Mobile Sticky Top Bar (Only Achyuta Logo on Left, Plus Icon on Right) -->
     <header id="mobile-top-bar" class="w-full h-14 px-3 border-b items-center justify-between flex-shrink-0 z-30 flex md:hidden" style="background-color: var(--sidebar-bg); border-color: var(--border-color);">
-      <div class="flex items-center gap-2.5">
-        <!-- Hamburger Menu Button -->
-        <button type="button" onclick="openMobileSidebar()" class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 transition active:scale-95 border border-zinc-200/50 dark:border-zinc-800/50" title="Open Navigation Menu">
-          <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
-          </svg>
-        </button>
-        <!-- Clickable Brand Logo & Name to Toggle Side Panel -->
-        <div onclick="openMobileSidebar()" class="flex items-center gap-2 cursor-pointer active:opacity-80" role="button" title="Open Navigation Menu">
-          <img src="/static/logo.jpg" alt="Achyuta" class="w-7 h-7 rounded-lg object-cover shadow-xs border border-teal-500/25">
-          <span class="font-bold text-base tracking-tight" style="color: var(--text);">Achyuta</span>
-        </div>
+      <!-- Left: Only Achyuta Logo (Click opens side panel) -->
+      <div onclick="openMobileSidebar()" class="flex items-center cursor-pointer active:scale-95 transition p-1" role="button" title="Open Side Panel">
+        <img src="/static/logo.jpg" alt="Achyuta" class="w-8 h-8 rounded-full object-cover shadow-sm border border-teal-500/30">
       </div>
 
-      <!-- Right Action Items (Tab Status Badge & New Chat Button) -->
-      <div class="flex items-center gap-2">
-        <span id="mobile-top-bar-title" class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 capitalize max-w-[110px] truncate">New chat</span>
+      <!-- Right: Plus Icon Only for New Chat -->
+      <div class="flex items-center">
         <button type="button" onclick="clearChat(); switchTab('agent');" title="New Chat" class="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 transition active:scale-95 border border-zinc-200/40 dark:border-zinc-800/40">
           <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
         </button>
@@ -1978,8 +1968,65 @@
               <p class="text-xs text-zinc-400">Aapka customized AI agent live call par is tarah se customer se baat karega:</p>
 
               <!-- Simulated Transcript Feed -->
-              <div id="script-simulation-feed" class="space-y-3.5 max-h-[500px] overflow-y-auto custom-scroll p-3 rounded-xl border" style="background-color: var(--bg); border-color: var(--border-color);">
-                <!-- Dynamically generated based on live inputs -->
+              <div id="script-simulation-feed" class="space-y-3.5 max-h-[500px] overflow-y-auto custom-scroll p-3.5 rounded-xl border text-xs" style="background-color: var(--bg); border-color: var(--border-color);">
+                
+                <!-- Turn 1: AI Agent Greeting & Pitch -->
+                <div class="flex items-start gap-2.5">
+                  <div class="w-6 h-6 rounded-full bg-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-[10px] flex-shrink-0">AI</div>
+                  <div class="flex-1 space-y-1">
+                    <div class="flex items-center gap-2">
+                      <span id="sim-agent-name-label" class="font-bold text-[11px] text-teal-600 dark:text-teal-400">Priya (Achyuta)</span>
+                      <span class="text-[9px] text-zinc-400">Opening Pitch</span>
+                    </div>
+                    <div id="sim-bubble-greeting" class="p-2.5 rounded-xl rounded-tl-xs border leading-relaxed" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text);">
+                      Namaste Rohit ji! Main Achyuta Enterprise Solutions se Priya baat kar rahi hoon.
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Turn 2: Interactive Plan Choices -->
+                <div class="flex items-start gap-2.5">
+                  <div class="w-6 h-6 rounded-full bg-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-[10px] flex-shrink-0">AI</div>
+                  <div class="flex-1 space-y-1.5">
+                    <div class="text-[9px] text-zinc-400 font-semibold uppercase">Plans & IVR Choices</div>
+                    <div id="sim-bubble-pitch" class="p-2.5 rounded-xl rounded-tl-xs border leading-relaxed" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text);">
+                      Humare paas Starter Plan aur Pro Plan hain.
+                    </div>
+                    <div id="sim-plans-list" class="space-y-1">
+                      <!-- Filled by JS -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Customer Branch Divider -->
+                <div class="relative flex py-1 items-center">
+                  <div class="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                  <span class="flex-shrink mx-2 text-[10px] text-zinc-400 font-mono">Possible Branches</span>
+                  <div class="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                </div>
+
+                <!-- Branch A: Customer Selects Plan (Digits / Agree) -->
+                <div class="p-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 space-y-1.5">
+                  <div class="flex items-center justify-between text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <span>✓ If Customer Selects (Presses 1 or 2)</span>
+                    <span class="font-mono">Confirmation</span>
+                  </div>
+                  <div id="sim-bubble-confirm" class="text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300">
+                    Bahut bahut dhanyawaad Rohit ji! Aapka interest note kar liya gaya hai.
+                  </div>
+                </div>
+
+                <!-- Branch B: Customer Declines / Rejection -->
+                <div class="p-2.5 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-1.5">
+                  <div class="flex items-center justify-between text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                    <span>✕ If Customer Declines / Busy / No Key</span>
+                    <span class="font-mono">Objection Branch</span>
+                  </div>
+                  <div id="sim-bubble-objection" class="text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300">
+                    Koi baat nahi Rohit ji! Main aapko WhatsApp par link bhej rahi hoon.
+                  </div>
+                </div>
+
               </div>
 
               <!-- Quick Test Outbound Call from Studio -->
