@@ -285,7 +285,7 @@
       
       <!-- Top Row: Logo + Brand Title + Close / Collapse Button -->
       <div id="sidebar-top-row" class="flex items-center justify-between w-full pb-3 mb-1 px-1 flex-shrink-0 border-b md:border-b-0 border-zinc-200/50 dark:border-zinc-800/50">
-        <div class="flex items-center gap-2.5 truncate">
+        <div id="sidebar-brand-wrapper" class="flex items-center gap-2.5 min-w-0">
           <button type="button" id="sidebar-logo-btn" onclick="toggleSidebar()" title="Achyuta Monogram" class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition active:scale-95 border border-teal-500/30 shadow-xs flex items-center justify-center p-0">
             <img id="sidebar-logo-img" src="/static/logo.jpg" alt="Achyuta Logo" class="w-full h-full object-cover pointer-events-none">
           </button>
@@ -4091,6 +4091,12 @@
           topRow.classList.add('justify-between');
         }
 
+        const brandWrap = document.getElementById('sidebar-brand-wrapper');
+        if (brandWrap) {
+          brandWrap.classList.remove('w-full', 'justify-center');
+          brandWrap.classList.add('justify-start');
+        }
+
         navBtns.forEach(btn => {
           btn.classList.remove('px-0', 'justify-center');
           btn.classList.add('px-3.5');
@@ -4128,6 +4134,12 @@
         if (topRow) {
           topRow.classList.remove('justify-between');
           topRow.classList.add('justify-center');
+        }
+
+        const brandWrap = document.getElementById('sidebar-brand-wrapper');
+        if (brandWrap) {
+          brandWrap.classList.remove('justify-start');
+          brandWrap.classList.add('w-full', 'justify-center');
         }
 
         navBtns.forEach(btn => {
