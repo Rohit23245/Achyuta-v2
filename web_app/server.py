@@ -301,7 +301,7 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     # 5. Only after caller speaks and completes, agent delivers second response intent
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Stream bidirectional="true" audioTrack="inbound" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">
+    <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">
         {ws_stream_url}
     </Stream>
     <Hangup/>
@@ -3299,10 +3299,15 @@ def handle_vobiz_stream_ws(handler, query_params):
     raw_sock = handler.connection
     raw_sock.settimeout(60.0)
 
-    cust_name = query_params.get("customer_name", ["Customer"])[0]
-    phone = query_params.get("phone", [""])[0]
-    first_msg = query_params.get("custom_message", [""])[0]
-    resp_intent = query_params.get("response_intent", [""])[0]
+    # Clean and extract parameters safely even if XML encoded &amp;
+    def get_param(name, default=""):
+        val = query_params.get(name) or query_params.get(f"amp;{name}")
+        return val[0] if val and val[0] else default
+
+    cust_name = get_param("customer_name", "Customer")
+    phone = get_param("phone", "")
+    first_msg = get_param("custom_message", "")
+    resp_intent = get_param("response_intent", "")
     
     if not first_msg:
         cfg = get_calling_script_config()
@@ -3373,11 +3378,14 @@ def handle_vobiz_stream_ws(handler, query_params):
                     if first_pcm:
                         print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...", flush=True)
                         stream_audio_bytes(first_pcm)
-                        # Send checkpoint to ensure playback finishes before listening
+                        # Grace period for playback to finish before opening ear
+                        time.sleep(0.5)
                         if stream_id:
                             chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "greeting_done"}
                             send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
                     state = "LISTENING_FOR_SPEECH"
+                    speech_energy_count = 0
+                    silence_after_speech_count = 0
                     print("[Vobiz Stream] Now actively listening for caller speech (ignoring line silence)...", flush=True)
 
                 elif event_name == "checkpoint":
@@ -4226,11 +4234,15 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 return
         if self.path == "/" or self.path == "/index.html":
+            file_path = os.path.join(DATA_DIR, "index.html")
+            with open(file_path, "rb") as f:
+                content = f.read()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
             self.end_headers()
-            with open(os.path.join(DATA_DIR, "index.html"), "rb") as f:
-                self.wfile.write(f.read())
+            self.wfile.write(content)
             return
 
         elif self.path == "/api/google/oauth2start":
