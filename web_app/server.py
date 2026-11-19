@@ -282,18 +282,32 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
 
     # 2. Second Response Intent
     intent_text = str(response_intent or cfg.get("second_response_intent") or "").strip()
-    enc_intent = urllib.parse.quote(intent_text)
-    enc_cust = urllib.parse.quote(str(customer_name))
-    gather_action = f"https://achyuta-v2.onrender.com/voice-webhook/second-response?customer_name={enc_cust}&amp;intent={enc_intent}"
+    
+    if intent_text:
+        second_speech = intent_text
+        safe_second = html.escape(second_speech)
+        second_audio_url = get_or_create_voice_audio_file(second_speech)
+        if second_audio_url:
+            second_speech_tag = f"<Play>{second_audio_url}</Play>"
+        else:
+            second_speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_second}</Speak>'
 
-    # Vobiz ASR <Gather>: Speaks opening message, then actively listens for the user's voice in real-time.
-    # It waits while the user speaks and forwards what was said (Speech) to our action webhook.
-    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+        # Natural Conversational Flow:
+        # 1. Agent speaks initial greeting / first message
+        # 2. Agent actively waits for the customer to speak (using silence="true" minSilence="1500" up to 6s)
+        #    As soon as the customer stops speaking, the agent naturally delivers the second response!
+        # 3. Agent speaks second response, waits briefly, and completes the call.
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Gather action="{gather_action}" method="POST" inputType="speech" speechModel="default" language="{lang}" executionTimeout="30" speechEndTimeout="auto">
-        {first_speech_tag}
-    </Gather>
-    <Speak voice="{voice}" language="{lang}">Shukriya, aapka din shubh ho!</Speak>
+    {first_speech_tag}
+    <Wait length="6" silence="true" minSilence="1500"/>
+    {second_speech_tag}
+    <Wait length="2"/>
+</Response>"""
+    else:
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    {first_speech_tag}
 </Response>"""
     return xml
 
