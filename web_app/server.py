@@ -311,7 +311,7 @@ ACCOUNTS_VAULT_PATH = os.path.join(DATA_DIR, "accounts_vault.json")
 SALARY_VAULT_PATH = os.path.join(DATA_DIR, "salary_vault.json")
 MEETINGS_VAULT_PATH = os.path.join(DATA_DIR, "meetings_vault.json")
 INVOICES_VAULT_PATH = os.path.join(DATA_DIR, "invoices_vault.json")
-AI_API_KEY = "AIzaSyDAaTcEKxs5hQHfvUwFKq3Zh30w8VuIdT0"
+AI_API_KEY = os.environ.get('AI_API_KEY', '')
 AI_MODEL = "gemini-3.1-flash-lite"
 
 
@@ -827,7 +827,7 @@ ACCOUNTS_VAULT_PATH = os.path.join(DATA_DIR, "accounts_vault.json")
 SALARY_VAULT_PATH = os.path.join(DATA_DIR, "salary_vault.json")
 MEETINGS_VAULT_PATH = os.path.join(DATA_DIR, "meetings_vault.json")
 INVOICES_VAULT_PATH = os.path.join(DATA_DIR, "invoices_vault.json")
-AI_API_KEY = "AIzaSyDAaTcEKxs5hQHfvUwFKq3Zh30w8VuIdT0"
+AI_API_KEY = os.environ.get('AI_API_KEY', '')
 AI_MODEL = "gemini-3.1-flash-lite"
 
 
@@ -5638,7 +5638,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
 # ---------------------------------------------------------
 # GEMINI NATIVE AUDIO DIALOG ENGINE (2.5 FLASH UNLIMITED LIVE API)
 # ---------------------------------------------------------
-VOICE_API_KEY = "AIzaSyDAaTcEKxs5hQHfvUwFKq3Zh30w8VuIdT0"
+VOICE_API_KEY = os.environ.get('VOICE_API_KEY', '')
 GEMINI_TTS_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 GEMINI_STT_MODEL = "gemini-2.5-flash"
 
