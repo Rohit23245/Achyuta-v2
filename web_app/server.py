@@ -3447,7 +3447,16 @@ def handle_vobiz_stream_ws(handler, query_params):
         print(f"[Vobiz Stream] Stream ended for {cust_name}.", flush=True)
 
 class AchyutaWebHandler(SimpleHTTPRequestHandler):
-    protocol_version = 'HTTP/1.1'
+    protocol_version = 'HTTP/1.0'
+
+    def send_json(self, data, status=200):
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_GET(self):
         # WebSocket Streaming Endpoint: /ws
@@ -6716,7 +6725,7 @@ def generate_gemini_voice_audio(text_content):
                     },
                     "systemInstruction": {
                         "parts": [{
-                            "text": "CRITICAL MANDATE: You are a pure, deterministic text-to-speech (TTS) engine only. The user will send you text enclosed in <SPEAK>...</SPEAK> tags. Your single and ONLY job is to read aloud the EXACT characters and words inside <SPEAK>...</SPEAK> verbatim in natural Hindi/Hinglish accent. DO NOT reply, DO NOT answer questions, DO NOT ask follow-up questions, DO NOT add conversation, DO NOT suggest ideas, and DO NOT hallucinate. Speak ONLY the exact text inside <SPEAK> tags and nothing else."
+                            "text": "You are a text-to-speech speaker. Your only task is to say aloud the text provided by the user in a natural Hindi/Hinglish speaking tone."
                         }]
                     }
                 }
@@ -6728,7 +6737,7 @@ def generate_gemini_voice_audio(text_content):
                 "clientContent": {
                     "turns": [{
                         "role": "user",
-                        "parts": [{"text": f"<SPEAK>{clean_text}</SPEAK>"}]
+                        "parts": [{"text": clean_text}]
                     }],
                     "turnComplete": True
                 }
