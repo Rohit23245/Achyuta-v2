@@ -1,0 +1,6 @@
+> leads managment add leads , edit , delete , search , update status
+> call leads - for promtion , follwups , collection.
+> whatsapp leads - same
+> manage empouyee add , edit , search , status
+> manage task's add , edit , search , status , follwups via calling & whatsapp
+> accounts income , expence , salerys 

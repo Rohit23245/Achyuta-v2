@@ -1,0 +1,1719 @@
+import re
+import json
+import os
+import urllib.request
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import threading
+import time
+from datetime import datetime
+
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+PORT = 5000
+
+# ---------------------------------------------------------
+# VOBIZ AI CALLING AGENT INTEGRATION (EXACT 1:1 REPLICATION)
+# ---------------------------------------------------------
+VOBIZ_AUTH_ID = 'MA_GXPJ6O1C'
+VOBIZ_AUTH_TOKEN = 'UWi7AWe87Eaq1QEdo52FnUBXZKYxz4mczC070F1aHx5pjx8S5brkHSdZNSrFBCM8'
+VOBIZ_TRIGGER_URL = 'https://kavyatraders.in/trigger-call'
+CALL_LOGS_PATH = os.path.join(DATA_DIR, "call_logs_vault.json")
+
+def init_call_logs_vault():
+    if not os.path.exists(CALL_LOGS_PATH):
+        sample_logs = [
+            {
+                "id": "call_101",
+                "call_uuid": "vobiz_req_987621",
+                "customer_phone": "+918707526283",
+                "customer_name": "Rohit",
+                "call_status": "Completed",
+                "duration_seconds": 64,
+                "recording_url": "https://media.vobiz.ai/v1/Account/MA_GXPJ6O1C/Recording/rec_demo.mp3",
+                "created_at": "Today, 11:30 AM",
+                "notes": "Automated qualification call via Vobiz AI Voice Agent."
+            },
+            {
+                "id": "call_102",
+                "call_uuid": "vobiz_req_987622",
+                "customer_phone": "+918492066444",
+                "customer_name": "Rohit Sher",
+                "call_status": "Interested",
+                "duration_seconds": 128,
+                "recording_url": "",
+                "created_at": "Yesterday, 04:15 PM",
+                "notes": "Discussed commercial consultation requirements."
+            }
+        ]
+        try:
+            with open(CALL_LOGS_PATH, "w", encoding="utf-8") as f:
+                json.dump(sample_logs, f, indent=2)
+        except: pass
+
+init_call_logs_vault()
+
+def get_ai_call_logs_data():
+    if os.path.exists(CALL_LOGS_PATH):
+        try:
+            with open(CALL_LOGS_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except: pass
+    return []
+
+def trigger_ai_outbound_call(phone, customer_name="Customer"):
+    clean = re.sub(r'[^0-9]', '', str(phone))
+    if len(clean) == 10:
+        clean = '91' + clean
+
+    payload = {"phone": clean}
+    req_data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(VOBIZ_TRIGGER_URL, data=req_data, headers={"Content-Type": "application/json"})
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            res = json.loads(r.read().decode("utf-8"))
+            
+            logs = get_ai_call_logs_data()
+            new_log = {
+                "id": f"call_{len(logs)+1}_{int(time.time())}",
+                "call_uuid": res.get("api_id") or res.get("request_uuid") or f"vobiz_{int(time.time())}",
+                "customer_phone": f"+{clean}",
+                "customer_name": customer_name,
+                "call_status": "Initiated",
+                "duration_seconds": 0,
+                "recording_url": "",
+                "created_at": "Just now",
+                "notes": "Outbound AI Call initiated via Vobiz Telephony"
+            }
+            logs.insert(0, new_log)
+            with open(CALL_LOGS_PATH, "w", encoding="utf-8") as f:
+                json.dump(logs, f, indent=2)
+
+            return True, "Calling initiated successfully via Vobiz AI", res
+    except urllib.error.HTTPError as e:
+        return False, f"Call trigger error (HTTP {e.code})", None
+    except Exception as e:
+        return False, f"Call trigger exception: {str(e)}", None
+
+
+def normalize_phone(phone_str):
+    if not phone_str:
+        return ""
+    digits = re.sub(r'\D', '', str(phone_str))
+    # Return last 10 digits for standard comparison
+    return digits[-10:] if len(digits) >= 10 else digits
+
+def generate_intelligent_crm_reply(prompt, clients_data, tasks_data, accounts_data):
+    p_lower = prompt.lower()
+
+    # Greetings & Casual
+    if any(w in p_lower for w in ["kya haal", "kaya hal", "kaise ho", "how are you", "kya chal raha", "namaste", "hello", "hi"]):
+        total_leads = len(clients_data)
+        follow_ups = len([c for c in clients_data if 'follow' in (c.get('status') or '').lower()])
+        return f"Main badhiya hoon. Aapka Achyuta enterprise system active hai. Client Vault mein abhi total {total_leads} clients hain aur {follow_ups} leads follow-up ke liye pending hain. Batayein aaj kis operation par kaam karna hai?"
+
+    # Count / Status Queries
+    if ("follow" in p_lower or "due" in p_lower) and any(w in p_lower for w in ["kitne", "count", "list", "batao", "dikhao", "how many"]):
+        follow_ups = [c for c in clients_data if 'follow' in (c.get('status') or '').lower()]
+        names = ", ".join([c.get('name', 'Lead') for c in follow_ups[:4]])
+        return f"Aapke paas total {len(follow_ups)} leads follow-up queue mein hain ({names}...). Aap Dashboard ya Clients tab se unhe direct call ya WhatsApp kar sakte hain."
+
+    if ("lead" in p_lower or "client" in p_lower) and any(w in p_lower for w in ["kitne", "total", "count", "batao"]):
+        new_leads = len([c for c in clients_data if 'new' in (c.get('status') or '').lower()])
+        return f"Client Vault mein total {len(clients_data)} enterprise contacts hain, jinme se {new_leads} New Leads hain."
+
+    if ("revenue" in p_lower or "hisab" in p_lower or "kamai" in p_lower or "balance" in p_lower):
+        total_rev = sum(float(a.get('amount') or 0) for a in accounts_data)
+        return f"Aapka net ledger revenue abhi ₹{int(total_rev):,} hai."
+
+    if ("task" in p_lower or "kaam" in p_lower) and any(w in p_lower for w in ["kitne", "pending", "batao", "status"]):
+        active_tasks = [t for t in tasks_data if (t.get('status') or '').lower() not in ['done', 'completed']]
+        return f"Abhi {len(active_tasks)} operational tasks in-progress hain. Sabhi assignees active hain."
+
+    return "Instruction process ho gayi hai. System operational hai aur live database synchronized hai. Aap naya client add karne, task assign karne ya pipeline check karne ke liye command de sakte hain."
+
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+file_lock = threading.Lock()
+CLIENTS_VAULT_PATH = os.path.join(DATA_DIR, "clients_vault.json")
+AI_API_KEY = "AIzaSyDAaTcEKxs5hQHfvUwFKq3Zh30w8VuIdT0"
+AI_MODEL = "gemini-3.1-flash-lite"
+
+
+def execute_agent_database_operation(prompt):
+    p = prompt.strip()
+    p_lower = p.lower()
+    
+    # Extract phone digits (7 to 15 digits)
+    phone_match = re.search(r'(\+?\d[\d\s\-]{6,}\d)', p)
+    raw_phone = phone_match.group(1).replace(" ", "").replace("-", "") if phone_match else ""
+    norm_phone = normalize_phone(raw_phone)
+
+    # 1. ADD CLIENT / LEAD INTENT (Robust NLP matching across Hindi, Hinglish, English)
+    is_client = bool(re.search(r'\b(client|clinet|lead|leads|grahak|contact)\b', p, re.IGNORECASE))
+    is_add = bool(re.search(r'\b(add|create|insert|save|banao|daalo|daal)\b', p, re.IGNORECASE)) or (bool(re.search(r'\b(karna\s+hai|kar\s+do|rakho)\b', p, re.IGNORECASE)) and not bool(re.search(r'\b(change|update|badal|delete|remove|hata)\b', p, re.IGNORECASE)))
+    is_delete = bool(re.search(r'\b(delete|remove|hatao|hata\s+do|mitao)\b', p, re.IGNORECASE))
+    is_update = bool(re.search(r'\b(update|change|badlo|badal|edit|statsu|status|stsus)\b', p, re.IGNORECASE)) or bool(re.search(r'\b(interested|follow-?up|converted|new\s+lead)\b', p, re.IGNORECASE))
+
+    if is_client and is_add and not is_delete and not is_update:
+        cleaned = p
+        for w in ["hame", "humko", "muje", "mujhe", "ak", "ek", "clinet", "client", "lead", "add", "karna", "hai", "kar", "do", "ko", "save", "create", "insert", "please", "bhi", "banao", "daal", "daalo"]:
+            cleaned = re.sub(rf'\b{w}\b', '', cleaned, flags=re.IGNORECASE)
+        if phone_match:
+            cleaned = cleaned.replace(phone_match.group(1), "")
+        name = re.sub(r'[^a-zA-Z0-9\s]', '', cleaned).strip()
+        name = name.title() if name else "New Lead"
+
+        with file_lock:
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except: pass
+
+            existing = next((c for c in clients if c.get("phone") and normalize_phone(c.get("phone")) == norm_phone), None) if norm_phone else None
+            if existing:
+                return True, f"Client '{existing.get('name')}' ({existing.get('phone')}) is already present in your Client Vault with status '{existing.get('status')}'.", {"action": "client_exists", "client": existing}
+
+            new_client = {
+                "name": name,
+                "phone": raw_phone if raw_phone else "Pending",
+                "status": "New Lead",
+                "last_contact": "Just now"
+            }
+            clients.insert(0, new_client)
+            try:
+                with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                    json.dump(clients, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                return False, f"Failed writing to vault: {e}", None
+
+        return True, f"Client '{new_client['name']}' with phone number '{new_client['phone']}' has been successfully added to your Client Vault as a New Lead.", {"action": "client_added", "client": new_client}
+
+    # 2. DELETE CLIENT
+    elif is_client and is_delete:
+        with file_lock:
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except: pass
+
+            orig_count = len(clients)
+            if norm_phone:
+                clients = [c for c in clients if normalize_phone(c.get("phone", "")) != norm_phone]
+            else:
+                cleaned = p
+                for w in ["delete", "remove", "hata", "hatao", "do", "kar", "client", "clinet", "lead", "ko"]:
+                    cleaned = re.sub(rf'\b{w}\b', '', cleaned, flags=re.IGNORECASE)
+                name_target = re.sub(r'[^a-zA-Z0-9\s]', '', cleaned).strip().lower()
+                if name_target:
+                    clients = [c for c in clients if name_target not in str(c.get("name", "")).lower()]
+
+            if len(clients) < orig_count:
+                try:
+                    with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                        json.dump(clients, f, ensure_ascii=False, indent=2)
+                except: pass
+                return True, "The specified client entry has been permanently deleted from your Client Vault.", {"action": "client_deleted"}
+
+    # 3. UPDATE CLIENT STATUS / DETAILS
+    elif (is_client or norm_phone) and is_update:
+        # Detect desired new status
+        new_status = None
+        if re.search(r'\b(interested|interest|dilchasp)\b', p, re.IGNORECASE):
+            new_status = "Interested"
+        elif re.search(r'\b(follow-?up|follow|pending|call)\b', p, re.IGNORECASE):
+            new_status = "Follow-up"
+        elif re.search(r'\b(converted|won|close|deal|done|client)\b', p, re.IGNORECASE) and not re.search(r'\b(lead)\b', p, re.IGNORECASE):
+            new_status = "Converted"
+        elif re.search(r'\b(new|naya|fresh)\b', p, re.IGNORECASE):
+            new_status = "New Lead"
+
+        cleaned = p
+        for w in ["update", "badal", "change", "kar", "do", "karo", "ko", "se", "number", "phone", "client", "clinet", "lead", "status", "statsu", "stsus"]:
+            cleaned = re.sub(rf'\b{w}\b', '', cleaned, flags=re.IGNORECASE)
+        if phone_match:
+            cleaned = cleaned.replace(phone_match.group(1), "")
+        target_name = re.sub(r'[^a-zA-Z0-9\s]', '', cleaned).strip().lower()
+
+        with file_lock:
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except: pass
+
+            target_client = None
+            for c in clients:
+                c_norm = normalize_phone(c.get("phone", ""))
+                if norm_phone and c_norm == norm_phone:
+                    target_client = c
+                    break
+                elif target_name and target_name in c.get("name", "").lower():
+                    target_client = c
+                    break
+
+            if target_client:
+                # If specific status was provided, update it directly
+                if new_status:
+                    old_st = target_client.get("status", "New Lead")
+                    target_client["status"] = new_status
+                    target_client["last_contact"] = "Just now"
+                    try:
+                        with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                            json.dump(clients, f, ensure_ascii=False, indent=2)
+                    except: pass
+                    return True, f"Client '{target_client.get('name')}' ({target_client.get('phone')}) ka status '{old_st}' se badal kar '{new_status}' kar diya gaya hai.", {"action": "client_updated", "client": target_client}
+                else:
+                    # Next logical progression: New Lead -> Follow-up -> Interested
+                    cur = target_client.get("status", "New Lead")
+                    next_st = "Follow-up" if "new" in cur.lower() else ("Interested" if "follow" in cur.lower() else "Follow-up")
+                    target_client["status"] = next_st
+                    target_client["last_contact"] = "Just now"
+                    try:
+                        with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                            json.dump(clients, f, ensure_ascii=False, indent=2)
+                    except: pass
+                    return True, f"Client '{target_client.get('name')}' ({target_client.get('phone')}) ka status update karke '{next_st}' set kar diya gaya hai.", {"action": "client_updated", "client": target_client}
+
+    # 4. TASKS CRUD
+    is_task = bool(re.search(r'\b(task|tasks|kaam|reminder)\b', p, re.IGNORECASE))
+    if is_task and is_add:
+        cleaned = p
+        for w in ["task", "kaam", "add", "create", "assign", "karna", "hai", "kar", "do", "banao", "please", "ek", "ak"]:
+            cleaned = re.sub(rf'\b{w}\b', '', cleaned, flags=re.IGNORECASE)
+        task_title = re.sub(r'[^a-zA-Z0-9\s]', '', cleaned).strip().title() or "Operational Task"
+
+        tasks_path = os.path.join(DATA_DIR, "tasks_vault.json")
+        with file_lock:
+            tasks = []
+            if os.path.exists(tasks_path):
+                try:
+                    with open(tasks_path, "r", encoding="utf-8") as f:
+                        tasks = json.load(f)
+                except: pass
+
+            new_task = {
+                "id": f"task_{int(time.time()*1000)}",
+                "title": task_title,
+                "status": "In Progress",
+                "priority": "High" if "urgent" in p_lower or "high" in p_lower else "Medium",
+                "due_date": "Tomorrow",
+                "assignee": "Achyuta Core",
+                "client_name": "General"
+            }
+            tasks.insert(0, new_task)
+            try:
+                with open(tasks_path, "w", encoding="utf-8") as f:
+                    json.dump(tasks, f, ensure_ascii=False, indent=2)
+            except: pass
+
+        return True, f"Operational task '{new_task['title']}' has been created with priority '{new_task['priority']}' and added to your Tasks queue.", {"action": "task_added", "task": new_task}
+
+    return False, "", None
+
+def normalize_phone(phone_str):
+    if not phone_str:
+        return ""
+    digits = re.sub(r'\D', '', str(phone_str))
+    # Return last 10 digits for standard comparison
+    return digits[-10:] if len(digits) >= 10 else digits
+
+def generate_intelligent_crm_reply(prompt, clients_data, tasks_data, accounts_data):
+    p_lower = prompt.lower()
+
+    # Greetings & Casual
+    if any(w in p_lower for w in ["kya haal", "kaya hal", "kaise ho", "how are you", "kya chal raha", "namaste", "hello", "hi"]):
+        total_leads = len(clients_data)
+        follow_ups = len([c for c in clients_data if 'follow' in (c.get('status') or '').lower()])
+        return f"Main badhiya hoon. Aapka Achyuta enterprise system active hai. Client Vault mein abhi total {total_leads} clients hain aur {follow_ups} leads follow-up ke liye pending hain. Batayein aaj kis operation par kaam karna hai?"
+
+    # Count / Status Queries
+    if ("follow" in p_lower or "due" in p_lower) and any(w in p_lower for w in ["kitne", "count", "list", "batao", "dikhao", "how many"]):
+        follow_ups = [c for c in clients_data if 'follow' in (c.get('status') or '').lower()]
+        names = ", ".join([c.get('name', 'Lead') for c in follow_ups[:4]])
+        return f"Aapke paas total {len(follow_ups)} leads follow-up queue mein hain ({names}...). Aap Dashboard ya Clients tab se unhe direct call ya WhatsApp kar sakte hain."
+
+    if ("lead" in p_lower or "client" in p_lower) and any(w in p_lower for w in ["kitne", "total", "count", "batao"]):
+        new_leads = len([c for c in clients_data if 'new' in (c.get('status') or '').lower()])
+        return f"Client Vault mein total {len(clients_data)} enterprise contacts hain, jinme se {new_leads} New Leads hain."
+
+    if ("revenue" in p_lower or "hisab" in p_lower or "kamai" in p_lower or "balance" in p_lower):
+        total_rev = sum(float(a.get('amount') or 0) for a in accounts_data)
+        return f"Aapka net ledger revenue abhi ₹{int(total_rev):,} hai."
+
+    if ("task" in p_lower or "kaam" in p_lower) and any(w in p_lower for w in ["kitne", "pending", "batao", "status"]):
+        active_tasks = [t for t in tasks_data if (t.get('status') or '').lower() not in ['done', 'completed']]
+        return f"Abhi {len(active_tasks)} operational tasks in-progress hain. Sabhi assignees active hain."
+
+    return "Instruction process ho gayi hai. System operational hai aur live database synchronized hai. Aap naya client add karne, task assign karne ya pipeline check karne ke liye command de sakte hain."
+
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+file_lock = threading.Lock()
+CLIENTS_VAULT_PATH = os.path.join(DATA_DIR, "clients_vault.json")
+AI_API_KEY = "AIzaSyDAaTcEKxs5hQHfvUwFKq3Zh30w8VuIdT0"
+AI_MODEL = "gemini-3.1-flash-lite"
+
+
+# GEMINI FUNCTION CALLING (CRM TOOLS DEFINITION & RESOLVER)
+# ---------------------------------------------------------
+GEMINI_CRM_TOOLS = [
+    {
+        "function_declarations": [
+            {
+                "name": "search_crm_database",
+                "description": "Searches the live Client Vault for matching clients by name, phone number, or keywords.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "query": {
+                            "type": "STRING",
+                            "description": "The person name, phone digits, or search term (e.g. 'rohit', '9876543210')"
+                        },
+                        "status": {
+                            "type": "STRING",
+                            "description": "Optional filter by client status ('New Lead', 'Follow-up', 'Interested')"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "get_crm_vault_summary",
+                "description": "Returns the exact live count and stats of the Client Vault (total clients, new leads count, follow-ups due, interested).",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {}
+                }
+            },
+            {
+                "name": "get_recent_clients",
+                "description": "Returns the most recently added or updated clients in the CRM vault.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "limit": {
+                            "type": "INTEGER",
+                            "description": "Number of recent clients to return (default: 5)"
+                        }
+                    }
+                }
+            }
+        ]
+    }
+]
+
+def resolve_gemini_tool_call(func_name, func_args):
+    clients = []
+    if os.path.exists(CLIENTS_VAULT_PATH):
+        try:
+            with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                clients = json.load(f)
+        except:
+            clients = []
+
+    if func_name == "search_crm_database":
+        query = (func_args.get("query") or "").strip().lower()
+        status_filter = (func_args.get("status") or "").strip().lower()
+        
+        matches = []
+        for c in clients:
+            c_name = str(c.get("name") or "").lower()
+            c_phone = normalize_phone(c.get("phone") or "")
+            c_status = str(c.get("status") or "").lower()
+            
+            # Check match
+            name_match = query in c_name if query else True
+            phone_match = (query.replace(" ", "") in c_phone) if (query and query.replace(" ", "").isdigit()) else False
+            status_match = (status_filter in c_status) if status_filter else True
+            
+            if (name_match or phone_match) and status_match:
+                matches.append({
+                    "name": c.get("name"),
+                    "phone": c.get("phone"),
+                    "status": c.get("status", "New Lead"),
+                    "last_contact": c.get("last_contact") or c.get("last_followup") or "Pending"
+                })
+
+        return {
+            "search_query": query,
+            "total_matches_found": len(matches),
+            "matched_records": matches[:10]
+        }
+
+    elif func_name == "get_crm_vault_summary":
+        total = len(clients)
+        new_count = len([c for c in clients if "new" in str(c.get("status") or "").lower()])
+        follow_count = len([c for c in clients if "follow" in str(c.get("status") or "").lower()])
+        interested_count = len([c for c in clients if "interest" in str(c.get("status") or "").lower()])
+        return {
+            "total_contacts": total,
+            "new_leads": new_count,
+            "follow_up_due": follow_count,
+            "interested": interested_count
+        }
+
+    elif func_name == "get_recent_clients":
+        limit = int(func_args.get("limit") or 5)
+        return {
+            "recent_records": clients[:limit]
+        }
+
+    return {"error": f"Function {func_name} not recognized"}
+
+SYSTEM_PROMPT = """You are Achyuta, a world-class executive AI business administrator and operational intelligence agent for enterprise CRM.
+
+CRITICAL OPERATIONAL MANDATES:
+1. STRICT ZERO EMOJIS POLICY: Never output any emojis under any circumstance. Maintain an ultra-professional, calm, executive demeanor.
+2. TONE & INTELLECT: Speak with high executive clarity, authority, and structured precision. Be actionable, specific, and proactive.
+3. MULTI-LINGUAL FLUENCY: Communicate naturally in English, Hindi, or conversational Hinglish matching the user's language and vibe.
+4. DIRECT BUSINESS INTEGRATION & LIVE CAPABILITIES:
+   - Client Vault: 819 enterprise contacts synchronized in real-time (794 New Leads, 24 Follow-up Due, 1 Interested). You can analyze leads, find clients, assess pipeline health, and suggest immediate outreach.
+   - WhatsApp Outreach Engine: Prepare and draft personalized client communications, follow-up messages, and campaign queues.
+   - Tasks & Operations Manager: Book callbacks, assign operational tasks to representatives (e.g. Rohit Sharma, Sachin Kain), prioritize schedules, and monitor deadlines.
+   - Financial Ledger & Accounts: Track revenue, invoice clearances, pending receivables, and payment methods (UPI, Bank).
+5. FORMATTING EXCELLENCE:
+   - Format responses cleanly with bold section titles (**Title**), clear bullet points (- Item), and structured paragraphs.
+   - Never output empty numbered lines like '1.' without text. Always pair numbers with bold headlines (e.g. '**1. Client Vault & Pipeline Management**').
+   - When asked what you can do ('Kaya kar sakte ho'), do not give vague generic answers. Deliver an authoritative executive overview of the exact CRM operations, live stats (819 clients), and actionable sample commands the user can give you right now."""
+
+class AchyutaWebHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path.startswith("/static/"):
+            rel_path = self.path[8:].split('?')[0]
+            static_file = os.path.join(DATA_DIR, "static", rel_path)
+            if os.path.exists(static_file) and os.path.isfile(static_file):
+                self.send_response(200)
+                if static_file.endswith(".jpg") or static_file.endswith(".jpeg"):
+                    self.send_header("Content-Type", "image/jpeg")
+                elif static_file.endswith(".png"):
+                    self.send_header("Content-Type", "image/png")
+                elif static_file.endswith(".svg"):
+                    self.send_header("Content-Type", "image/svg+xml")
+                else:
+                    self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                with open(static_file, "rb") as f:
+                    self.wfile.write(f.read())
+                return
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+        if self.path == "/" or self.path == "/index.html":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            with open(os.path.join(DATA_DIR, "index.html"), "rb") as f:
+                self.wfile.write(f.read())
+            return
+        elif self.path == "/api/voice_agent/logs":
+            logs = get_ai_call_logs_data()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": True,
+                "logs": logs,
+                "total_calls": len(logs),
+                "completed_calls": len([l for l in logs if l.get("call_status") == "Completed"])
+            }).encode("utf-8"))
+            return
+
+        elif self.path == "/api/clients":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(clients).encode("utf-8"))
+            return
+        elif self.path == "/api/staff":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            users_path = os.path.join(DATA_DIR, "users_vault.json")
+            users = []
+            if os.path.exists(users_path):
+                try:
+                    with open(users_path, "r", encoding="utf-8") as f:
+                        users = json.load(f)
+                except:
+                    pass
+            # Don't expose passwords in staff list, include salary info
+            sanitized = [{
+                "username": u.get("username", ""),
+                "email": u.get("email", ""),
+                "name": u.get("name", ""),
+                "role": u.get("role", "Staff Member"),
+                "phone": u.get("phone", ""),
+                "designation": u.get("designation", u.get("role", "Staff Member")),
+                "monthly_salary": float(u.get("monthly_salary", 0)),
+                "joining_date": u.get("joining_date", ""),
+                "status": u.get("status", "Active"),
+                "initial": u.get("initial", u.get("name", "U")[0].upper())
+            } for u in users]
+            self.wfile.write(json.dumps(sanitized).encode("utf-8"))
+            return
+        elif self.path == "/api/tasks":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            tasks_path = os.path.join(DATA_DIR, "tasks_vault.json")
+            tasks = []
+            if os.path.exists(tasks_path):
+                try:
+                    with open(tasks_path, "r", encoding="utf-8") as f:
+                        tasks = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(tasks).encode("utf-8"))
+            return
+        elif self.path == "/api/accounts":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            acc_path = os.path.join(DATA_DIR, "accounts_vault.json")
+            txns = []
+            if os.path.exists(acc_path):
+                try:
+                    with open(acc_path, "r", encoding="utf-8") as f:
+                        txns = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(txns).encode("utf-8"))
+            return
+        elif self.path == "/api/salary":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            sal_path = os.path.join(DATA_DIR, "salary_vault.json")
+            salaries = []
+            if os.path.exists(sal_path):
+                try:
+                    with open(sal_path, "r", encoding="utf-8") as f:
+                        salaries = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(salaries).encode("utf-8"))
+            return
+        elif self.path == "/api/attendance":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            fpath = os.path.join(DATA_DIR, "attendance_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(items).encode("utf-8"))
+            return
+        elif self.path == "/api/invoices":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            fpath = os.path.join(DATA_DIR, "invoices_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(items).encode("utf-8"))
+            return
+        elif self.path == "/api/tickets":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            fpath = os.path.join(DATA_DIR, "tickets_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(items).encode("utf-8"))
+            return
+        elif self.path == "/api/meetings":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            fpath = os.path.join(DATA_DIR, "meetings_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(items).encode("utf-8"))
+            return
+        elif self.path == "/api/reminders":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            fpath = os.path.join(DATA_DIR, "reminders_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(items).encode("utf-8"))
+            return
+        elif self.path == "/api/contracts":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            fpath = os.path.join(DATA_DIR, "contracts_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            self.wfile.write(json.dumps(items).encode("utf-8"))
+            return
+        super().do_GET()
+
+    def do_POST(self):
+        if self.path == "/api/login":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            user_id = data.get("id", "").strip().lower()
+            password = data.get("password", "").strip()
+
+            users_path = os.path.join(DATA_DIR, "users_vault.json")
+            users = []
+            if os.path.exists(users_path):
+                try:
+                    with open(users_path, "r", encoding="utf-8") as f:
+                        users = json.load(f)
+                except:
+                    pass
+
+            matched = None
+            for u in users:
+                if (u.get("username", "").lower() == user_id or u.get("email", "").lower() == user_id) and u.get("password") == password:
+                    matched = u
+                    break
+
+            if matched:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "user": {
+                        "name": matched["name"],
+                        "email": matched["email"],
+                        "role": matched.get("role", "Executive"),
+                        "initial": matched.get("initial", matched["name"][0].upper())
+                    }
+                }).encode("utf-8"))
+            else:
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "Access Denied: Invalid ID or Password."
+                }).encode("utf-8"))
+            return
+
+        elif self.path == "/api/voice_agent/trigger":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            phone = data.get("phone", "")
+            name = data.get("customer_name", "Customer")
+            success, msg, resp_data = trigger_ai_outbound_call(phone, name)
+            
+            self.send_response(200 if success else 400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": success,
+                "message": msg,
+                "data": resp_data
+            }).encode("utf-8"))
+            return
+        elif self.path == "/api/clients/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            new_client = json.loads(body)
+            
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except:
+                    pass
+            
+            # Prepend newest lead
+            clients.insert(0, new_client)
+            try:
+                with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                    json.dump(clients, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+                
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "count": len(clients), "client": new_client}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/clients/update":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            phone_target = str(payload.get("original_phone") or payload.get("phone") or "").strip()
+            
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except:
+                    pass
+            
+            updated = False
+            for c in clients:
+                if str(c.get("phone", "")).strip() == phone_target:
+                    if "name" in payload: c["name"] = payload["name"]
+                    if "phone" in payload: c["phone"] = payload["phone"]
+                    if "status" in payload: c["status"] = payload["status"]
+                    if "last_contact" in payload: c["last_contact"] = payload["last_contact"]
+                    updated = True
+                    break
+                    
+            if updated:
+                try:
+                    with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                        json.dump(clients, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": updated}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/clients/delete":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            phone_target = str(payload.get("phone") or "").strip()
+            name_target = str(payload.get("name") or "").strip().lower()
+            
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except:
+                    pass
+            
+            orig_len = len(clients)
+            clients = [c for c in clients if not (str(c.get("phone", "")).strip() == phone_target and (not name_target or str(c.get("name", "")).strip().lower() == name_target))]
+            deleted = len(clients) < orig_len
+            
+            if deleted:
+                try:
+                    with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                        json.dump(clients, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": deleted, "count": len(clients)}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/clients/bulk_upload":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            new_leads = payload.get("clients", [])
+            
+            clients = []
+            if os.path.exists(CLIENTS_VAULT_PATH):
+                try:
+                    with open(CLIENTS_VAULT_PATH, "r", encoding="utf-8") as f:
+                        clients = json.load(f)
+                except:
+                    pass
+            
+            # Prepend all new leads
+            clients = new_leads + clients
+            try:
+                with open(CLIENTS_VAULT_PATH, "w", encoding="utf-8") as f:
+                    json.dump(clients, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "added": len(new_leads), "total": len(clients)}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/staff/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            new_staff = json.loads(body)
+            
+            username = str(new_staff.get("username", "")).strip().lower()
+            password = str(new_staff.get("password", "")).strip()
+            name = str(new_staff.get("name", "")).strip()
+            email = str(new_staff.get("email", "")).strip().lower()
+            role = str(new_staff.get("role", "Staff Member")).strip()
+            phone = str(new_staff.get("phone", "")).strip()
+            monthly_salary = float(new_staff.get("monthly_salary", 0))
+            joining_date = str(new_staff.get("joining_date", "")).strip()
+            
+            if not username or not password or not name:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "Username, name, and password are required."}).encode("utf-8"))
+                return
+
+            users_path = os.path.join(DATA_DIR, "users_vault.json")
+            users = []
+            if os.path.exists(users_path):
+                try:
+                    with open(users_path, "r", encoding="utf-8") as f:
+                        users = json.load(f)
+                except:
+                    pass
+            
+            # Check duplicate username/email
+            for u in users:
+                if u.get("username", "").lower() == username or (email and u.get("email", "").lower() == email):
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": False, "error": "Staff username or email already exists."}).encode("utf-8"))
+                    return
+
+            staff_entry = {
+                "username": username,
+                "email": email or f"{username}@achyuta.ai",
+                "password": password,
+                "name": name,
+                "role": role,
+                "phone": phone,
+                "monthly_salary": monthly_salary,
+                "joining_date": joining_date,
+                "status": "Active",
+                "initial": name[0].upper()
+            }
+            users.append(staff_entry)
+            
+            try:
+                with open(users_path, "w", encoding="utf-8") as f:
+                    json.dump(users, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": True, 
+                "total_staff": len(users),
+                "staff": {
+                    "username": staff_entry["username"],
+                    "name": staff_entry["name"],
+                    "email": staff_entry["email"],
+                    "role": staff_entry["role"],
+                    "initial": staff_entry["initial"]
+                }
+            }).encode("utf-8"))
+            return
+
+        elif self.path == "/api/staff/delete":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            target_user = str(payload.get("username", "")).strip().lower()
+            
+            if target_user == "admin":
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "Cannot delete primary Administrator."}).encode("utf-8"))
+                return
+
+            users_path = os.path.join(DATA_DIR, "users_vault.json")
+            users = []
+            if os.path.exists(users_path):
+                try:
+                    with open(users_path, "r", encoding="utf-8") as f:
+                        users = json.load(f)
+                except:
+                    pass
+            
+            orig_len = len(users)
+            users = [u for u in users if u.get("username", "").lower() != target_user]
+            deleted = len(users) < orig_len
+            
+            if deleted:
+                try:
+                    with open(users_path, "w", encoding="utf-8") as f:
+                        json.dump(users, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": deleted, "total_staff": len(users)}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/tasks/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            
+            tasks_path = os.path.join(DATA_DIR, "tasks_vault.json")
+            tasks = []
+            if os.path.exists(tasks_path):
+                try:
+                    with open(tasks_path, "r", encoding="utf-8") as f:
+                        tasks = json.load(f)
+                except:
+                    pass
+            
+            import time
+            new_task = {
+                "id": payload.get("id") or f"TSK-{int(time.time()) % 10000}",
+                "title": payload.get("title", "New Task").strip(),
+                "client_name": payload.get("client_name", "").strip(),
+                "phone": payload.get("phone", "").strip(),
+                "type": payload.get("type", "Follow-up").strip(),
+                "priority": payload.get("priority", "Normal").strip(),
+                "due_date": payload.get("due_date", "").strip(),
+                "status": payload.get("status", "Pending").strip(),
+                "assigned_to": payload.get("assigned_to", "Unassigned").strip(),
+                "notes": payload.get("notes", "").strip()
+            }
+            
+            tasks.insert(0, new_task)
+            try:
+                with open(tasks_path, "w", encoding="utf-8") as f:
+                    json.dump(tasks, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+                
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "count": len(tasks), "task": new_task}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/tasks/update":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            task_id = str(payload.get("id", "")).strip()
+            
+            tasks_path = os.path.join(DATA_DIR, "tasks_vault.json")
+            tasks = []
+            if os.path.exists(tasks_path):
+                try:
+                    with open(tasks_path, "r", encoding="utf-8") as f:
+                        tasks = json.load(f)
+                except:
+                    pass
+            
+            updated = False
+            for t in tasks:
+                if str(t.get("id")) == task_id:
+                    if "title" in payload:
+                        t["title"] = str(payload.get("title", "")).strip()
+                    if "assigned_to" in payload:
+                        t["assigned_to"] = str(payload.get("assigned_to", "")).strip()
+                    if "priority" in payload:
+                        t["priority"] = str(payload.get("priority", "Normal")).strip()
+                    if "client_name" in payload:
+                        t["client_name"] = str(payload.get("client_name", "")).strip()
+                    if "due_date" in payload:
+                        t["due_date"] = str(payload.get("due_date", "")).strip()
+                    if "notes" in payload:
+                        t["notes"] = str(payload.get("notes", "")).strip()
+                    if "status" in payload:
+                        t["status"] = str(payload.get("status", t.get("status", "Pending"))).strip()
+                    from datetime import datetime
+                    t["updated_at"] = datetime.now().isoformat()
+                    updated = True
+                    break
+                    
+            if updated:
+                try:
+                    with open(tasks_path, "w", encoding="utf-8") as f:
+                        json.dump(tasks, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": updated}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/tasks/update_status":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            task_id = str(payload.get("id", "")).strip()
+            new_status = str(payload.get("status", "Pending")).strip()
+            new_assignee = payload.get("assigned_to")
+            
+            tasks_path = os.path.join(DATA_DIR, "tasks_vault.json")
+            tasks = []
+            if os.path.exists(tasks_path):
+                try:
+                    with open(tasks_path, "r", encoding="utf-8") as f:
+                        tasks = json.load(f)
+                except:
+                    pass
+            
+            updated = False
+            for t in tasks:
+                if str(t.get("id")) == task_id:
+                    t["status"] = new_status
+                    if new_assignee:
+                        t["assigned_to"] = new_assignee.strip()
+                    updated = True
+                    break
+                    
+            if updated:
+                try:
+                    with open(tasks_path, "w", encoding="utf-8") as f:
+                        json.dump(tasks, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": updated}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/tasks/delete":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            task_id = str(payload.get("id", "")).strip()
+            
+            tasks_path = os.path.join(DATA_DIR, "tasks_vault.json")
+            tasks = []
+            if os.path.exists(tasks_path):
+                try:
+                    with open(tasks_path, "r", encoding="utf-8") as f:
+                        tasks = json.load(f)
+                except:
+                    pass
+                    
+            orig_len = len(tasks)
+            tasks = [t for t in tasks if str(t.get("id")) != task_id]
+            deleted = len(tasks) < orig_len
+            
+            if deleted:
+                try:
+                    with open(tasks_path, "w", encoding="utf-8") as f:
+                        json.dump(tasks, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": deleted, "count": len(tasks)}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/accounts/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            
+            acc_path = os.path.join(DATA_DIR, "accounts_vault.json")
+            txns = []
+            if os.path.exists(acc_path):
+                try:
+                    with open(acc_path, "r", encoding="utf-8") as f:
+                        txns = json.load(f)
+                except:
+                    pass
+            
+            import time
+            amount = 0.0
+            try:
+                amount = float(payload.get("amount", 0))
+            except:
+                amount = 0.0
+                
+            new_txn = {
+                "id": payload.get("id") or f"TXN-{int(time.time()) % 10000}",
+                "title": payload.get("title", "Transaction").strip(),
+                "type": payload.get("type", "Income").strip(),
+                "category": payload.get("category", "General").strip(),
+                "amount": amount,
+                "date": payload.get("date") or time.strftime("%Y-%m-%d"),
+                "payment_mode": payload.get("payment_mode", "UPI").strip(),
+                "party": payload.get("party", "").strip(),
+                "status": payload.get("status", "Received").strip(),
+                "notes": payload.get("notes", "").strip()
+            }
+            
+            txns.insert(0, new_txn)
+            try:
+                with open(acc_path, "w", encoding="utf-8") as f:
+                    json.dump(txns, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+                
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "count": len(txns), "transaction": new_txn}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/accounts/delete":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            txn_id = str(payload.get("id", "")).strip()
+            
+            acc_path = os.path.join(DATA_DIR, "accounts_vault.json")
+            txns = []
+            if os.path.exists(acc_path):
+                try:
+                    with open(acc_path, "r", encoding="utf-8") as f:
+                        txns = json.load(f)
+                except:
+                    pass
+                    
+            orig_len = len(txns)
+            txns = [t for t in txns if str(t.get("id")) != txn_id]
+            deleted = len(txns) < orig_len
+            
+            if deleted:
+                try:
+                    with open(acc_path, "w", encoding="utf-8") as f:
+                        json.dump(txns, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": deleted, "count": len(txns)}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/salary/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            
+            sal_path = os.path.join(DATA_DIR, "salary_vault.json")
+            salaries = []
+            if os.path.exists(sal_path):
+                try:
+                    with open(sal_path, "r", encoding="utf-8") as f:
+                        salaries = json.load(f)
+                except:
+                    pass
+            
+            import time
+            base = float(payload.get("base_salary") or 0)
+            bonus = float(payload.get("bonus") or 0)
+            deductions = float(payload.get("deductions") or 0)
+            net_amt = base + bonus - deductions
+            
+            new_sal = {
+                "id": payload.get("id") or f"SAL-{int(time.time()) % 10000}",
+                "staff_name": payload.get("staff_name", "Staff Member").strip(),
+                "role": payload.get("role", "Staff").strip(),
+                "month": payload.get("month", time.strftime("%B %Y")).strip(),
+                "base_salary": base,
+                "bonus": bonus,
+                "deductions": deductions,
+                "net_amount": net_amt,
+                "payment_mode": payload.get("payment_mode", "Bank Transfer").strip(),
+                "payment_date": payload.get("payment_date") or time.strftime("%Y-%m-%d"),
+                "status": payload.get("status", "Paid").strip(),
+                "notes": payload.get("notes", "").strip()
+            }
+            
+            salaries.insert(0, new_sal)
+            try:
+                with open(sal_path, "w", encoding="utf-8") as f:
+                    json.dump(salaries, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+                
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "count": len(salaries), "salary": new_sal}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/salary/update_status":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            sal_id = str(payload.get("id", "")).strip()
+            new_status = str(payload.get("status", "Paid")).strip()
+            
+            sal_path = os.path.join(DATA_DIR, "salary_vault.json")
+            salaries = []
+            if os.path.exists(sal_path):
+                try:
+                    with open(sal_path, "r", encoding="utf-8") as f:
+                        salaries = json.load(f)
+                except:
+                    pass
+            
+            updated = False
+            for s in salaries:
+                if str(s.get("id")) == sal_id:
+                    s["status"] = new_status
+                    updated = True
+                    break
+                    
+            if updated:
+                try:
+                    with open(sal_path, "w", encoding="utf-8") as f:
+                        json.dump(salaries, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": updated}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/salary/delete":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            payload = json.loads(body)
+            sal_id = str(payload.get("id", "")).strip()
+            
+            sal_path = os.path.join(DATA_DIR, "salary_vault.json")
+            salaries = []
+            if os.path.exists(sal_path):
+                try:
+                    with open(sal_path, "r", encoding="utf-8") as f:
+                        salaries = json.load(f)
+                except:
+                    pass
+                    
+            orig_len = len(salaries)
+            salaries = [s for s in salaries if str(s.get("id")) != sal_id]
+            deleted = len(salaries) < orig_len
+            
+            if deleted:
+                try:
+                    with open(sal_path, "w", encoding="utf-8") as f:
+                        json.dump(salaries, f, ensure_ascii=False, indent=2)
+                except:
+                    pass
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": deleted, "count": len(salaries)}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/attendance/punch":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            rec = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "attendance_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            rec["id"] = "ATT-" + str(int(time.time()))[-4:]
+            items.insert(0, rec)
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "record": rec}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/invoices/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            rec = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "invoices_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            prefix = "INV-" if rec.get("type") == "Invoice" else "QUO-"
+            rec["id"] = prefix + str(int(time.time()))[-4:]
+            items.insert(0, rec)
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "invoice": rec}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/tickets/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            rec = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "tickets_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            rec["id"] = "TCK-" + str(int(time.time()))[-4:]
+            rec["ticket_no"] = rec["id"]
+            items.insert(0, rec)
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "ticket": rec}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/tickets/update_status":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "tickets_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            for t in items:
+                if str(t.get("id")) == str(data.get("id")):
+                    t["status"] = data.get("status", t.get("status"))
+                    if data.get("resolution_notes"):
+                        t["resolution_notes"] = data.get("resolution_notes")
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/meetings/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            rec = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "meetings_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            import time as _time_mod
+            rec["id"] = "MTG-" + str(int(_time_mod.time()))[-4:]
+            items.insert(0, rec)
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "meeting": rec}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/reminders/add":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            rec = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "reminders_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            import time as _time_mod
+            rec["id"] = "REM-" + str(int(_time_mod.time()))[-4:]
+            items.insert(0, rec)
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "reminder": rec}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/reminders/toggle":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "reminders_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            for r in items:
+                if str(r.get("id")) == str(data.get("id")):
+                    r["is_completed"] = not r.get("is_completed", False)
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/contracts/sign":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            fpath = os.path.join(DATA_DIR, "contracts_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            for c in items:
+                if str(c.get("id")) == str(data.get("id")):
+                    c["status"] = "Signed"
+                    c["signer_name"] = data.get("signer_name", "Authorized Signer")
+                    import time as _time_mod
+                    c["signed_date"] = _time_mod.strftime("%Y-%m-%d %I:%M %p")
+                    c["signature_hash"] = "SHA256:" + str(int(_time_mod.time())) + "x9b"
+            try:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(items, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/chat":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            prompt = data.get("prompt", "")
+            history = data.get("history", [])
+
+            # First, check if user requested a real CRUD operation
+            executed, confirmation, action_meta = execute_agent_database_operation(prompt)
+            if executed:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "reply": confirmation,
+                    "action_executed": True,
+                    "action_meta": action_meta
+                }).encode("utf-8"))
+                return
+
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={AI_API_KEY}"
+            contents = [{"role": "user", "parts": [{"text": SYSTEM_PROMPT}]}]
+            for msg in history[-6:]:
+                contents.append({"role": msg["role"], "parts": [{"text": msg["text"]}]})
+            contents.append({"role": "user", "parts": [{"text": prompt}]})
+
+            payload = {
+                "contents": contents,
+                "tools": GEMINI_CRM_TOOLS
+            }
+            req_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
+
+            try:
+                with urllib.request.urlopen(req, timeout=25) as response:
+                    res = json.loads(response.read().decode("utf-8"))
+                    cand = res["candidates"][0]["content"]
+
+                # Check if Gemini requested a function call against local CRM
+                parts = cand.get("parts", [])
+                func_calls = [p["functionCall"] for p in parts if "functionCall" in p]
+
+                if func_calls:
+                    # Model requested local CRM lookup
+                    model_content = cand
+                    f_call = func_calls[0]
+                    f_name = f_call.get("name")
+                    f_args = f_call.get("args", {})
+                    
+                    # Execute locally against clients_vault.json
+                    tool_output = resolve_gemini_tool_call(f_name, f_args)
+
+                    # Step 2: Feed tool output back to Gemini with candidate content
+                    tool_round_contents = list(contents)
+                    tool_round_contents.append(model_content)
+                    tool_round_contents.append({
+                        "role": "function",
+                        "parts": [
+                            {
+                                "functionResponse": {
+                                    "name": f_name,
+                                    "response": tool_output
+                                }
+                            }
+                        ]
+                    })
+
+                    round2_payload = {
+                        "contents": tool_round_contents,
+                        "tools": GEMINI_CRM_TOOLS
+                    }
+                    req2_data = json.dumps(round2_payload).encode("utf-8")
+                    req2 = urllib.request.Request(url, data=req2_data, headers={"Content-Type": "application/json"})
+                    
+                    with urllib.request.urlopen(req2, timeout=25) as response2:
+                        res2 = json.loads(response2.read().decode("utf-8"))
+                        r2_parts = res2.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                        reply = ""
+                        for p in r2_parts:
+                            if "text" in p:
+                                reply = p["text"]
+                                break
+                        if not reply:
+                            reply = "CRM database lookup completed."
+                else:
+                    reply = ""
+                    for p in parts:
+                        if "text" in p:
+                            reply = p["text"]
+                            break
+                    if not reply:
+                        reply = "Query acknowledged. Live database synchronized." 
+            except urllib.error.HTTPError as e:
+                err_text = ""
+                try:
+                    err_text = e.read().decode("utf-8")
+                except: pass
+
+                if e.code == 429 or "RESOURCE_EXHAUSTED" in err_text:
+                    retry_time = "kuch der"
+                    m = re.search(r'retry in\s+([0-9a-zA-Z\.\s]+)', err_text, re.IGNORECASE)
+                    if m:
+                        raw = m.group(1).strip().split('.')[0]
+                        h_match = re.search(r'(\d+)\s*h', raw)
+                        m_match = re.search(r'(\d+)\s*m', raw)
+                        parts = []
+                        if h_match: parts.append(f"{h_match.group(1)}h")
+                        if m_match: parts.append(f"{m_match.group(1)}m")
+                        if parts:
+                            retry_time = " ".join(parts)
+                        else:
+                            retry_time = raw
+
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "error_type": "quota_limit",
+                        "retry_time": retry_time,
+                        "reply": f"You've reached your usage limit. Resets in {retry_time}."
+                    }).encode("utf-8"))
+                    return
+                else:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "error_type": "system_error",
+                        "reply": "Unable to process request right now. Please try again shortly."
+                    }).encode("utf-8"))
+                    return
+
+            except Exception as e:
+                print(f"[CHAT EXCEPTION]: {type(e).__name__}: {e}")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "error_type": "system_error",
+                    "reply": "Connection issue. Please verify network."
+                }).encode("utf-8"))
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"reply": reply}).encode("utf-8"))
+            return
+
+def start_server():
+    server = ThreadingHTTPServer(('127.0.0.1', PORT), AchyutaWebHandler)
+    print(f"Achyuta Web App running at http://localhost:{PORT}")
+    server.serve_forever()
+
+if __name__ == '__main__':
+    start_server()
