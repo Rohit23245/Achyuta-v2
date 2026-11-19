@@ -1771,16 +1771,28 @@
             </div>
           </div>
 
-          <!-- Real Vobiz Live Credits / Balance Pill -->
-          <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border shadow-xs" style="background-color: var(--card-bg); border-color: var(--border-color);">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <div class="text-xs font-semibold flex items-center gap-1" style="color: var(--text);">
-              <span class="text-zinc-400 text-[11px]">Vobiz Credits:</span>
-              <span id="vobiz-credits-display" class="font-mono font-bold text-teal-600 dark:text-teal-400">Loading...</span>
-            </div>
-            <button type="button" onclick="loadVobizLiveBalance()" title="Refresh Balance" class="text-zinc-400 hover:text-zinc-200 transition p-0.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+          <!-- Top Right Controls: Settings Button + Live Credits Badge -->
+          <div class="flex items-center gap-2.5">
+            <!-- Settings Modal Trigger Button -->
+            <button type="button" onclick="openAgentSettingsModal()" class="h-9 px-3 rounded-xl border flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition active:scale-95 cursor-pointer shadow-xs" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text);" title="Agent Settings & Custom Instructions">
+              <svg class="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              <span class="text-xs font-bold">Settings</span>
             </button>
+
+            <!-- Real Live Credits / Balance Pill -->
+            <div class="flex items-center gap-2 px-3.5 py-1.5 h-9 rounded-xl border shadow-xs" style="background-color: var(--card-bg); border-color: var(--border-color);">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <div class="text-xs font-semibold flex items-center gap-1" style="color: var(--text);">
+                <span class="text-zinc-400 text-[11px]">Credits:</span>
+                <span id="vobiz-credits-display" class="font-mono font-bold text-teal-600 dark:text-teal-400">Loading...</span>
+              </div>
+              <button type="button" onclick="loadVobizLiveBalance()" title="Refresh Balance" class="text-zinc-400 hover:text-zinc-200 transition p-0.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1883,18 +1895,11 @@
             </div>
           </div>
 
-          <!-- 4. Trigger Call CTA Button & Floating Settings Trigger -->
-          <div class="pt-1 flex items-center gap-3">
-            <button type="button" id="btn-simple-call-trigger" onclick="triggerSimpleDirectCall()" class="flex-1 h-12 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2.5 bg-teal-600 hover:bg-teal-500 transition active:scale-[0.98] shadow-md cursor-pointer">
+          <!-- 4. Trigger Call CTA Button (Full Width) -->
+          <div class="pt-1">
+            <button type="button" id="btn-simple-call-trigger" onclick="triggerSimpleDirectCall()" class="w-full h-12 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2.5 bg-teal-600 hover:bg-teal-500 transition active:scale-[0.98] shadow-md cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
               <span id="btn-simple-call-label">Call Now</span>
-            </button>
-            <button type="button" onclick="openAgentSettingsModal()" class="h-12 px-4 rounded-xl border flex items-center justify-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition active:scale-95 cursor-pointer flex-shrink-0" style="border-color: var(--border-color); color: var(--text);" title="Agent Settings & Instructions">
-              <svg class="w-5 h-5 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-              <span class="text-xs font-bold">Settings</span>
             </button>
           </div>
           <p class="text-[11px] text-zinc-400 text-center mt-2.5">Call connect hote hi agent first message bolega, fir customer ki baat sunkar second response intent ke anusaar reply karega.</p>
