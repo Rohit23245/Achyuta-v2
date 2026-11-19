@@ -1944,7 +1944,7 @@
 
             <!-- Floating Action Bar for Studio -->
             <div class="flex items-center justify-between pt-2 gap-3">
-              <button type="button" onclick="saveCallingScriptConfig()" class="flex-1 py-3 px-4 rounded-xl font-semibold text-xs sm:text-sm bg-teal-600 hover:bg-teal-500 text-white transition active:scale-95 shadow-md flex items-center justify-center gap-2">
+              <button type="button" id="btn-save-script-config" onclick="saveCallingScriptConfig()" class="flex-1 py-3 px-4 rounded-xl font-semibold text-xs sm:text-sm bg-teal-600 hover:bg-teal-500 text-white transition active:scale-95 shadow-md flex items-center justify-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                 <span>Save Campaign Script</span>
               </button>
@@ -5409,11 +5409,11 @@
       setVal('script-language', callingScriptConfig.language);
       setVal('script-greeting-text', callingScriptConfig.greeting);
       setVal('script-intro-reason', callingScriptConfig.intro_reason);
-      setVal('script-plans-speech', callingScriptConfig.plans_pitch_speech);
-      setVal('script-objection-speech', callingScriptConfig.objection_speech);
-      setVal('script-confirmation-speech', callingScriptConfig.confirmation_speech);
+      setVal('script-plans-pitch', callingScriptConfig.plans_pitch_speech);
+      setVal('script-objection-text', callingScriptConfig.objection_speech);
+      setVal('script-confirmation-text', callingScriptConfig.confirmation_speech);
 
-      const chk = document.getElementById('script-whatsapp-toggle');
+      const chk = document.getElementById('script-whatsapp-followup');
       if (chk) chk.checked = !!callingScriptConfig.whatsapp_followup_enabled;
 
       renderScriptPlans();
@@ -5496,9 +5496,9 @@
       const companyName = document.getElementById('script-company-name')?.value || 'Achyuta';
       const greeting = document.getElementById('script-greeting-text')?.value || 'Hello {customer_name} ji!';
       const intro = document.getElementById('script-intro-reason')?.value || '';
-      const pitchSpeech = document.getElementById('script-plans-speech')?.value || '';
-      const objection = document.getElementById('script-objection-speech')?.value || '';
-      const confirmation = document.getElementById('script-confirmation-speech')?.value || '';
+      const pitchSpeech = document.getElementById('script-plans-pitch')?.value || '';
+      const objection = document.getElementById('script-objection-text')?.value || '';
+      const confirmation = document.getElementById('script-confirmation-text')?.value || '';
 
       const cust = 'Rohit';
       const safeGreet = (greeting + ' ' + intro).replace(/{customer_name}/g, cust).replace(/{company_name}/g, companyName).replace(/{agent_name}/g, agentName);
@@ -5560,14 +5560,14 @@
 
       callingScriptConfig.agent_name = document.getElementById('script-agent-name')?.value || 'Priya';
       callingScriptConfig.company_name = document.getElementById('script-company-name')?.value || 'Achyuta';
-      callingScriptConfig.voice_gender = document.getElementById('script-voice-gender')?.value || 'WOMAN';
-      callingScriptConfig.language = document.getElementById('script-language')?.value || 'hi-IN';
+      callingScriptConfig.voice_gender = (document.getElementById('script-voice-gender')?.value || 'WOMAN:hi-IN').split(':')[0] || 'WOMAN';
+      callingScriptConfig.language = (document.getElementById('script-voice-gender')?.value || 'WOMAN:hi-IN').split(':')[1] || 'hi-IN';
       callingScriptConfig.greeting = document.getElementById('script-greeting-text')?.value || '';
       callingScriptConfig.intro_reason = document.getElementById('script-intro-reason')?.value || '';
-      callingScriptConfig.plans_pitch_speech = document.getElementById('script-plans-speech')?.value || '';
-      callingScriptConfig.objection_speech = document.getElementById('script-objection-speech')?.value || '';
-      callingScriptConfig.confirmation_speech = document.getElementById('script-confirmation-speech')?.value || '';
-      callingScriptConfig.whatsapp_followup_enabled = document.getElementById('script-whatsapp-toggle')?.checked ?? true;
+      callingScriptConfig.plans_pitch_speech = document.getElementById('script-plans-pitch')?.value || '';
+      callingScriptConfig.objection_speech = document.getElementById('script-objection-text')?.value || '';
+      callingScriptConfig.confirmation_speech = document.getElementById('script-confirmation-text')?.value || '';
+      callingScriptConfig.whatsapp_followup_enabled = document.getElementById('script-whatsapp-followup')?.checked ?? true;
 
       try {
         const res = await fetch('/api/voice_agent/script_config', {
@@ -5577,6 +5577,7 @@
         });
         const d = await res.json();
         if (d && d.success) {
+          updateScriptSimulation();
           showScreenToast('✅ Calling Script & Flow Saved Successfully!');
         } else {
           showScreenToast('Error saving script: ' + (d.error || 'Server error'));
