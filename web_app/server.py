@@ -5854,7 +5854,7 @@ VOICE_API_KEY = load_voice_api_key()
 print(f"DEBUG: Using Voice API Key: {VOICE_API_KEY[:5]}...")
 
 GEMINI_TTS_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
-GEMINI_STT_MODEL = "gemini-3.5-transcribe"
+GEMINI_STT_MODEL = "gemini-2.5-flash"
 
 def generate_gemini_voice_audio(text_content):
     """
@@ -5997,49 +5997,57 @@ def transcribe_gemini_voice_audio(audio_base64, mime_type="audio/webm;codecs=opu
     elif "mp4" in mime_type or "m4a" in mime_type:
         clean_mime = "audio/mp4"
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_STT_MODEL}:generateContent?key={VOICE_API_KEY}"
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "inlineData": {
-                            "mimeType": clean_mime,
-                            "data": audio_base64
+    candidate_models = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-flash-latest"]
+    for model_name in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={VOICE_API_KEY}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "inlineData": {
+                                "mimeType": clean_mime,
+                                "data": audio_base64
+                            }
+                        },
+                        {
+                            "text": "You are an expert speech recognizer for Hindi, Hinglish, and English. Transcribe exactly what the user spoke. If there is no speech, background noise, or silence, return the word SILENCE. Output ONLY the exact transcription without quotes or markdown formatting."
                         }
-                    },
-                    {
-                        "text": "You are an expert speech recognizer for Hindi, Hinglish, and English. Transcribe exactly what the user spoke. If there is no speech, background noise, or silence, return the word SILENCE. Output ONLY the exact transcription without quotes or markdown formatting."
-                    }
-                ]
-            }
-        ]
-    }
+                    ]
+                }
+            ]
+        }
 
-    req_data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
+        req_data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
 
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                text_parts = [p.get("text", "") for p in parts if "text" in p]
-                result = " ".join(text_parts).strip()
-                if result.upper() == "SILENCE" or "SILENCE" in result.upper() and len(result) <= 10:
-                    return "", None
-                return result, None
-            return "", "No candidate returned"
-    except urllib.error.HTTPError as e:
-        err_msg = ""
-        try: err_msg = e.read().decode("utf-8")
-        except: pass
-        if e.code == 429 or "RESOURCE_EXHAUSTED" in err_msg:
-            return None, {"error_type": "quota_limit"}
-        return None, f"HTTP_{e.code}: {err_msg[:200]}"
-    except Exception as ex:
-        return None, str(ex)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    text_parts = [p.get("text", "") for p in parts if "text" in p]
+                    result = " ".join(text_parts).strip()
+                    if result.upper() == "SILENCE" or "SILENCE" in result.upper() and len(result) <= 10:
+                        return "", None
+                    return result, None
+                return "", "No candidate returned"
+        except urllib.error.HTTPError as e:
+            err_msg = ""
+            try: err_msg = e.read().decode("utf-8")
+            except: pass
+            if e.code == 429 or "RESOURCE_EXHAUSTED" in err_msg:
+                return None, {"error_type": "quota_limit"}
+            if e.code in (503, 404):
+                print(f"[STT RETRY]: Model {model_name} HTTP {e.code}, trying next model...")
+                continue
+            return None, f"HTTP_{e.code}: {err_msg[:200]}"
+        except Exception as ex:
+            print(f"[STT RETRY]: Model {model_name} error {ex}, trying next...")
+            continue
+
+    return "", None
 
 def check_gemini_voice_quota():
     """
