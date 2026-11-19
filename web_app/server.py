@@ -284,30 +284,28 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     intent_text = str(response_intent or cfg.get("second_response_intent") or "").strip()
     
     if intent_text:
-        second_speech = intent_text
-        safe_second = html.escape(second_speech)
-        second_audio_url = get_or_create_voice_audio_file(second_speech)
-        if second_audio_url:
-            second_speech_tag = f"<Play>{second_audio_url}</Play>"
-        else:
-            second_speech_tag = f'<Speak voice="{voice}" language="{lang}">{safe_second}</Speak>'
-
-        # Natural Conversational Flow:
-        # 1. Agent speaks initial greeting / first message
-        # 2. Agent actively waits for the customer to speak (using silence="true" minSilence="1500" up to 6s)
-        #    As soon as the customer stops speaking, the agent naturally delivers the second response!
-        # 3. Agent speaks second response, waits briefly, and completes the call.
+        enc_intent = urllib.parse.quote(intent_text)
+        enc_cust = urllib.parse.quote(str(customer_name))
+        gather_action = f"https://achyuta-v2.onrender.com/voice-webhook/second-response?customer_name={enc_cust}&amp;intent={enc_intent}"
+        
+        # Safe fallback speak tag in case caller does not respond within 15 seconds
+        safe_fallback = html.escape(intent_text)
+        
+        # Real-time Speech Recognition Gather:
+        # Plays initial greeting prompt, then activates ASR speech recognition (hi-IN)
+        # Ignores initial line silence/blank audio and waits up to 15s for caller speech.
+        # Once human speech is spoken and finished, Vobiz submits to gather_action immediately!
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    {first_speech_tag}
-    <Wait length="6" silence="true" minSilence="1500"/>
-    {second_speech_tag}
-    <Wait length="2"/>
+    <Gather action="{gather_action}" method="POST" inputType="speech" language="{lang}" executionTimeout="15">
+        <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
+    </Gather>
+    <Speak voice="{voice}" language="{lang}">{safe_fallback}</Speak>
 </Response>"""
     else:
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    {first_speech_tag}
+    <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
 </Response>"""
     return xml
 
