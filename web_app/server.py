@@ -3334,13 +3334,31 @@ def handle_vobiz_stream_ws(handler, query_params):
     first_msg = get_param("custom_message", "")
     resp_intent = get_param("response_intent", "")
     agent_inst = get_param("agent_instructions", "")
-    
+
+    # Parse full dynamic step sequence (e.g. from JSON or step-separated delimiter)
+    steps_list = []
+    if resp_intent:
+        if resp_intent.startswith("[") and resp_intent.endswith("]"):
+            try:
+                steps_list = json.loads(resp_intent)
+            except Exception:
+                pass
+        if not steps_list and " | " in resp_intent:
+            raw_parts = resp_intent.split(" | ")
+            for p in raw_parts:
+                cleaned_p = re.sub(r'^Step \d+:\s*', '', p).strip()
+                if cleaned_p:
+                    steps_list.append(cleaned_p)
+        elif not steps_list and resp_intent.strip():
+            steps_list.append(resp_intent.strip())
+
     if not first_msg:
         cfg = get_calling_script_config()
         first_msg = (cfg.get("greeting") or f"Namaste {cust_name} ji! Main Achyuta Enterprise se baat kar raha hoon.").replace("{customer_name}", cust_name)
-    if not resp_intent:
-        cfg = get_calling_script_config()
-        resp_intent = cfg.get("second_response_intent", "")
+
+    current_step_index = 0
+    total_steps = len(steps_list)
+    print(f"[Vobiz Stream] Initialized multi-turn flow for {phone}: First msg + {total_steps} response steps.", flush=True)
 
     stream_id = None
     call_id = None
@@ -3421,8 +3439,19 @@ def handle_vobiz_stream_ws(handler, query_params):
 
                 elif event_name == "checkpoint":
                     chk_name = event.get("name")
-                    if chk_name == "second_response_done":
-                        print("[Vobiz Stream] Second response finished playing. Concluding call...", flush=True)
+                    if chk_name == "step_response_done":
+                        if current_step_index >= total_steps:
+                            print(f"[Vobiz Stream] All {total_steps} dynamic steps completed. Concluding call safely...", flush=True)
+                            time.sleep(1.0)
+                            break
+                        else:
+                            # Re-enter listening state for next caller turn!
+                            print(f"[Vobiz Stream] Step {current_step_index}/{total_steps} delivered. Listening for caller turn {current_step_index + 1}...", flush=True)
+                            state = "LISTENING_FOR_SPEECH"
+                            speech_detected = False
+                            speech_energy_count = 0
+                            silence_after_speech_count = 0
+                    elif chk_name == "second_response_done":
                         time.sleep(1.0)
                         break
 
@@ -3445,23 +3474,34 @@ def handle_vobiz_stream_ws(handler, query_params):
                             else:
                                 if speech_detected:
                                     silence_after_speech_count += 1
-                                    # ~1.2s of silence indicates caller has finished speaking words
-                                    if silence_after_speech_count >= 24:
-                                        print("[Vobiz Stream] Caller finished speaking words. Delivering second response...", flush=True)
-                                        state = "DELIVERING_SECOND_RESPONSE"
-                                        
-                                        reply_text = generate_intelligent_second_response("Ha kahiye", resp_intent, agent_inst)
+                                    # ~1.0s of silence indicates caller has finished speaking words
+                                    if silence_after_speech_count >= 20:
+                                        print(f"[Vobiz Stream] Caller finished speaking. Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
+                                        state = "DELIVERING_RESPONSE"
+
+                                        # Pick current step target direction
+                                        step_target = steps_list[current_step_index] if current_step_index < len(steps_list) else ""
+                                        current_step_index += 1
+
+                                        reply_text = generate_intelligent_second_response("Ha kahiye", step_target, agent_inst)
                                         second_pcm = get_pcm24_from_text(reply_text)
                                         if second_pcm:
                                             stream_audio_bytes(second_pcm)
                                             if stream_id:
-                                                chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "second_response_done"}
+                                                chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "step_response_done"}
                                                 send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
                                         else:
-                                            time.sleep(2.0)
-                                            break
-                        except Exception:
-                            pass
+                                            # If audio generation failed or last step, finish
+                                            if current_step_index >= total_steps:
+                                                time.sleep(1.5)
+                                                break
+                                            else:
+                                                state = "LISTENING_FOR_SPEECH"
+                                                speech_detected = False
+                                                speech_energy_count = 0
+                                                silence_after_speech_count = 0
+                        except Exception as ex:
+                            print(f"[Vobiz Stream] Media processing error: {ex}", flush=True)
 
                 elif event_name == "stop":
                     print("[Vobiz Stream] Received 'stop' event from Vobiz.", flush=True)
