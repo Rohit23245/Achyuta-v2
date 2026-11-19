@@ -281,25 +281,18 @@
   <aside id="main-sidebar" class="hidden md:flex fixed md:static inset-y-0 left-0 w-72 border-r flex-col py-4 px-3 z-50 flex-shrink-0 select-none cursor-default transition-all duration-300 overflow-y-auto custom-scroll shadow-2xl md:shadow-none" style="background-color: var(--sidebar-bg); border-color: var(--border-color);">
     
     <!-- Top Area: Brand Header + Main Navigation Items -->
-    <div class="flex flex-col gap-1 w-full min-h-0">
+    <div class="flex flex-col gap-1 w-full min-h-0 flex-1 overflow-y-auto custom-scroll pr-1">
       
-      <!-- Top Row: Logo + Brand Title + Close / Collapse Button -->
+      <!-- Top Row: Logo + Brand Title (Clicking Achyuta logo/title toggles sidebar on large screen) -->
       <div id="sidebar-top-row" class="flex items-center justify-between w-full pb-3 mb-1 px-1 flex-shrink-0 border-b md:border-b-0 border-zinc-200/50 dark:border-zinc-800/50">
-        <div id="sidebar-brand-wrapper" class="flex items-center gap-2.5 min-w-0">
-          <button type="button" id="sidebar-logo-btn" onclick="toggleSidebar()" title="Achyuta Monogram" class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition active:scale-95 border border-teal-500/30 shadow-xs flex items-center justify-center p-0">
+        <div id="sidebar-brand-wrapper" onclick="toggleSidebar()" class="flex items-center gap-2.5 min-w-0 cursor-pointer select-none group" role="button" title="Toggle Sidebar">
+          <button type="button" id="sidebar-logo-btn" title="Achyuta Monogram" class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 cursor-pointer group-hover:opacity-90 transition active:scale-95 border border-teal-500/30 shadow-xs flex items-center justify-center p-0 pointer-events-none">
             <img id="sidebar-logo-img" src="/static/logo.jpg" alt="Achyuta Logo" class="w-full h-full object-cover pointer-events-none">
           </button>
-          <span class="sidebar-text brand-title font-bold text-base tracking-tight text-zinc-900 dark:text-zinc-100 truncate">Achyuta</span>
+          <span class="sidebar-text brand-title font-bold text-base tracking-tight text-zinc-900 dark:text-zinc-100 truncate group-hover:text-teal-600 transition">Achyuta</span>
         </div>
 
-        <!-- Desktop Collapse Button (<) - Hidden on small screen -->
-        <button type="button" onclick="handleSidebarToggleOrClose()" id="sidebar-toggle-btn" title="Collapse Sidebar" class="hidden md:flex cursor-pointer sidebar-text w-7 h-7 rounded-lg items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition hover:bg-black/5 dark:hover:bg-white/5 flex-shrink-0 ml-auto">
-          <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
-          </svg>
-        </button>
-
-        <!-- Mobile Drawer Close Button (Single Cross ✕ Icon) -->
+        <!-- Mobile Drawer Close Button (Single Cross ✕ Icon, Only on Mobile) -->
         <button type="button" onclick="closeMobileSidebar()" class="flex md:hidden w-8 h-8 rounded-lg items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-zinc-500 active:scale-95 ml-auto" title="Close Menu">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -469,8 +462,8 @@
 
     </div>
 
-    <!-- Bottom Controls: User Profile, Theme Toggle & Quick Settings -->
-    <div id="sidebar-bottom-controls" class="flex flex-col gap-1 w-full pt-2.5 mt-auto border-t border-zinc-200/70 dark:border-zinc-800/70">
+    <!-- Bottom Controls: User Profile, Theme Toggle & Quick Settings (Fixed bottom footer, never overlaps with chats) -->
+    <div id="sidebar-bottom-controls" class="flex flex-col gap-1 w-full pt-2.5 mt-auto border-t border-zinc-200/70 dark:border-zinc-800/70 flex-shrink-0 z-10" style="background-color: var(--sidebar-bg);">
       
       <!-- Theme Toggle Button (Exact aligned padding with user profile button) -->
       <button type="button" id="sidebar-theme-toggle-btn" onclick="toggleTheme()" title="Switch Light / Dark Theme" class="has-rail-tooltip relative flex items-center gap-2.5 p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 active:scale-95 w-full">
@@ -4102,11 +4095,6 @@
           btn.classList.add('px-3.5');
         });
 
-        if (toggleBtn) {
-          toggleBtn.classList.remove('hidden');
-          toggleBtn.classList.add('flex');
-        }
-
         if (bottomControls) {
           bottomControls.classList.remove('justify-center');
           bottomControls.classList.add('justify-between');
@@ -4147,10 +4135,26 @@
           btn.classList.add('px-0', 'justify-center');
         });
 
-        if (toggleBtn) {
-          toggleBtn.classList.add('hidden');
-          toggleBtn.classList.remove('flex');
+        if (bottomControls) {
+          bottomControls.classList.remove('justify-between');
+          bottomControls.classList.add('justify-center');
         }
+        if (userBtn) {
+          userBtn.classList.add('justify-center');
+        }
+
+        // Hide text labels
+        textElements.forEach(el => el.classList.add('hidden'));
+
+        // Center button contents
+        btnInners.forEach(el => {
+          el.classList.remove('justify-start');
+          el.classList.add('justify-center');
+        });
+
+        // Re-enable floating tooltips in collapsed mode
+        tooltips.forEach(t => t.style.display = '');
+      }
 
         if (bottomControls) {
           bottomControls.classList.remove('justify-between');
