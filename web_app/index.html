@@ -4129,37 +4129,37 @@
       const badge = document.getElementById('universal-dock-badge');
       const input = document.getElementById('universal-prompt-input');
       const btn = document.getElementById('universal-dock-btn');
+      const micBtn = document.getElementById('dock-mic-btn');
       if (!dock) return;
 
       const heroVisible = document.getElementById('hero-section') && !document.getElementById('hero-section').classList.contains('hidden');
       if (tab === 'agent') {
-        // When in agent screen:
-        // If hero section is visible (no messages yet), we can keep the dock hidden or subtle, or if user is chatting, dock is full width (max-w-[720px])
         if (heroVisible) {
-          // Hero has its own big center input, so hide floating dock to prevent double input
           dock.classList.add('hidden');
         } else {
-          // Active chat: Show full width dock aligned with conversation
+          // Active chat: Full width responsive dock
           dock.classList.remove('hidden');
-          dock.className = 'absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-[720px] px-4 z-50 pointer-events-none transition-all duration-300';
-          if (form) form.className = 'pointer-events-auto w-full h-[52px] rounded-full px-4 flex items-center gap-3 shadow-2xl border backdrop-blur-md transition-all hover:border-teal-500/50 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20';
-          if (badge) badge.className = 'w-7 h-7 rounded-full overflow-hidden border border-teal-500/30 flex items-center justify-center flex-shrink-0 transition-all p-0';
+          dock.className = 'absolute bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 w-full max-w-[720px] px-2 sm:px-4 z-40 pointer-events-none transition-all duration-300';
+          if (form) form.className = 'pointer-events-auto w-full h-[46px] sm:h-[52px] rounded-full px-2 sm:px-4 flex items-center gap-1.5 sm:gap-3 shadow-2xl border backdrop-blur-md transition-all hover:border-teal-500/50 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20';
+          if (badge) badge.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-full overflow-hidden border border-teal-500/30 flex items-center justify-center flex-shrink-0 transition-all p-0';
           if (input) {
-            input.className = 'flex-1 bg-transparent text-[14px] focus:outline-none px-2 transition-all';
+            input.className = 'flex-1 min-w-0 bg-transparent text-[13px] sm:text-[14px] focus:outline-none px-1.5 sm:px-2 transition-all';
             input.placeholder = 'Ask Achyuta...';
           }
-          if (btn) btn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 active:scale-90';
+          if (micBtn) micBtn.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 hover:bg-black/5 dark:hover:bg-white/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 active:scale-95 relative';
+          if (btn) btn.className = 'w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 active:scale-90';
         }
       } else {
-        // Other screens (Clients, Tasks, Accounts, Salary, Staff, Invoices, etc.): Compact Pill (max-w-[390px])
+        // Other screens (Calling, Clients, Tasks, Accounts, etc.): Compact Pill
         dock.classList.remove('hidden');
-        dock.className = 'absolute bottom-3.5 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-3 z-50 pointer-events-none transition-all duration-300';
-        if (form) form.className = 'pointer-events-auto w-full h-[38px] rounded-full px-3 flex items-center gap-2 shadow-2xl border backdrop-blur-md transition-all hover:border-teal-500/50 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20';
+        dock.className = 'absolute bottom-2.5 sm:bottom-3.5 left-1/2 -translate-x-1/2 w-full max-w-[390px] px-2 sm:px-3 z-40 pointer-events-none transition-all duration-300';
+        if (form) form.className = 'pointer-events-auto w-full h-[38px] rounded-full px-2.5 flex items-center gap-1.5 shadow-2xl border backdrop-blur-md transition-all hover:border-teal-500/50 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20';
         if (badge) badge.className = 'w-5 h-5 rounded-full overflow-hidden border border-teal-500/30 flex items-center justify-center flex-shrink-0 transition-all p-0';
         if (input) {
-          input.className = 'flex-1 bg-transparent text-[12px] focus:outline-none px-1 transition-all';
+          input.className = 'flex-1 min-w-0 bg-transparent text-[12px] focus:outline-none px-1 transition-all';
           input.placeholder = "Ask or execute (e.g. 'filter new', 'create task')...";
         }
+        if (micBtn) micBtn.className = 'w-6 h-6 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 hover:bg-black/5 dark:hover:bg-white/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 active:scale-95 relative';
         if (btn) btn.className = 'w-6 h-6 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 active:scale-90';
       }
     }
