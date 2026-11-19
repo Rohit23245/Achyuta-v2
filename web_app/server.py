@@ -3366,6 +3366,7 @@ def handle_vobiz_stream_ws(handler, query_params):
     speech_detected = False
     speech_energy_count = 0
     silence_after_speech_count = 0
+    accumulated_caller_pcm = bytearray()
     start_time = time.time()
     
     clean_phone = re.sub(r'[^0-9]', '', str(phone))
@@ -3471,25 +3472,50 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
                                     speech_detected = True
                                     silence_after_speech_count = 0
+                                    accumulated_caller_pcm.extend(pcm_in)
                             else:
                                 if speech_detected:
                                     silence_after_speech_count += 1
-                                    # ~1.0s of silence indicates caller has finished speaking words
-                                    if silence_after_speech_count >= 20:
-                                        print(f"[Vobiz Stream] Caller finished speaking. Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
+                                    accumulated_caller_pcm.extend(pcm_in)
+                                    # ~0.8s of silence indicates caller has finished speaking words
+                                    if silence_after_speech_count >= 16:
+                                        print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
                                         state = "DELIVERING_RESPONSE"
+
+                                        # Transcribe real caller audio so AI listens accurately to caller's words/questions
+                                        transcribed_words = ""
+                                        if len(accumulated_caller_pcm) > 3200:
+                                            try:
+                                                bio = io.BytesIO()
+                                                with wave.open(bio, 'wb') as wf:
+                                                    wf.setnchannels(1)
+                                                    wf.setsampwidth(2)
+                                                    wf.setframerate(16000)
+                                                    wf.writeframes(accumulated_caller_pcm)
+                                                wav_b64 = base64.b64encode(bio.getvalue()).decode('ascii')
+                                                spoken_text, _ = transcribe_gemini_voice_audio(wav_b64, "audio/wav")
+                                                if spoken_text:
+                                                    transcribed_words = spoken_text.strip()
+                                                    print(f"[Vobiz Stream] Transcribed caller speech: '{transcribed_words}'", flush=True)
+                                            except Exception as tx_err:
+                                                print(f"[Vobiz Stream] STT error: {tx_err}", flush=True)
 
                                         # Pick current step target direction
                                         step_target = steps_list[current_step_index] if current_step_index < len(steps_list) else ""
                                         current_step_index += 1
 
-                                        reply_text = generate_intelligent_second_response("Ha kahiye", step_target, agent_inst)
+                                        caller_input = transcribed_words if transcribed_words else "Ha kahiye"
+                                        reply_text = generate_intelligent_second_response(caller_input, step_target, agent_inst)
+                                        print(f"[Vobiz Stream] Formulated intelligent response: '{reply_text}'", flush=True)
                                         second_pcm = get_pcm24_from_text(reply_text)
                                         if second_pcm:
                                             stream_audio_bytes(second_pcm)
                                             # Grace pause for speaker playback to fully deliver
                                             time.sleep(0.4)
                                         
+                                        # Reset audio accumulator for next turn
+                                        accumulated_caller_pcm.clear()
+
                                         # Check if we finished all configured flow steps
                                         if current_step_index >= total_steps:
                                             print(f"[Vobiz Stream] Final step {current_step_index}/{total_steps} finished playing. Concluding call safely...", flush=True)
@@ -6731,14 +6757,14 @@ def load_voice_api_key():
             if os.path.exists(key_file):
                 with open(key_file, "r", encoding="utf-8") as f:
                     local_keys = json.load(f)
-                    val = local_keys.get('voice_api_key') or local_keys.get('gemini_api_key') or ''
+                    val = local_keys.get('gemini_api_key') or local_keys.get('voice_api_key') or ''
                     if val:
                         return val
         except Exception as e:
             print(f"Error loading voice key from file: {e}")
         # Default fallback key for production voice synthesis
         try:
-            return base64.b64decode("QVEuQWI4Uk42SjZtYktGT0R6Nmc5ZlhRTnREWmRXY2RBUk0xMTlXMWtrNzBmX1E5bWtBZHc=").decode("utf-8")
+            return base64.b64decode("QUl6YVN5QTdoT2xpNDVBQzRBNlYtaXo5MXBtQzRGZTlMZ0Z0RUsw").decode("utf-8")
         except:
             pass
     return k
