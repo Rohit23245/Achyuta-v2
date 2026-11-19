@@ -425,10 +425,13 @@ def get_ai_call_logs_data():
             continue
         seen_uuids.add(uuid)
         
-        # Calculate real duration & cost
+        # Real duration & cost calculation
+        # Vobiz account operates in INR (as confirmed by live balance API returning balance in INR)
         bill_dur = int(c.get("bill_duration") or 0)
         cost_val = float(c.get("cost") or 0.0)
-        cost_inr = round(cost_val * 85.0, 2)
+        
+        # When currency is INR or balance is maintained in INR, cost_val is the actual rupee deduction (e.g. ₹0.38 per call pulse)
+        cost_inr = round(cost_val, 3)
         hangup = c.get("hangup_cause_name") or c.get("hangup_cause") or "Completed"
         status = "Connected" if bill_dur > 0 else ("Busy" if "busy" in hangup.lower() else ("No Answer" if not c.get("answer_time") else hangup))
         
@@ -452,9 +455,8 @@ def get_ai_call_logs_data():
             "call_status": status,
             "duration_seconds": bill_dur,
             "cost": cost_val,
-            "cost_usd": f"${cost_val:.3f}",
-            "cost_inr": f"₹{cost_inr:.2f}",
-            "currency": c.get("currency", "USD"),
+            "cost_inr": f"₹{cost_inr:.3f}",
+            "currency": "INR",
             "initiated_at": raw_time,
             "created_at": display_time,
             "notes": notes
@@ -472,7 +474,6 @@ def get_ai_call_logs_data():
                 "call_status": l.get("call_status", "Initiated"),
                 "duration_seconds": l.get("duration_seconds", 0),
                 "cost": 0.0,
-                "cost_usd": "$0.000",
                 "cost_inr": "₹0.00",
                 "currency": "INR",
                 "initiated_at": l.get("initiated_at") or "Just now",

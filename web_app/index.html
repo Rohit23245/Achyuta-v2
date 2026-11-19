@@ -4507,7 +4507,7 @@
         const custName = l.customer_name || 'Direct Call';
         const phone = l.customer_phone || '--';
         const dur = l.duration_seconds ? `${l.duration_seconds}s` : (isInitiated ? 'Calling...' : '0s');
-        const costStr = l.cost_inr ? `${l.cost_inr} <span class="text-[10px] text-zinc-400 font-normal">(${l.cost_usd || '$0.00'})</span>` : (isCompleted ? '₹32.30' : '₹0.00');
+        const costStr = l.cost_inr || (isCompleted ? '₹0.380' : '₹0.00');
         const timeStr = l.created_at || 'Just now';
 
         const statusBadge = isCompleted 
