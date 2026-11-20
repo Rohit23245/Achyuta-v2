@@ -619,9 +619,9 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
             print(f"[Outbound Step Pre-gen] Error: {ex}", flush=True)
     threading.Thread(target=_pregen_steps, daemon=True).start()
 
-    auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
-    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
-    did_number = os.environ.get('DID_NUMBER', VOBIZ_DID_NUMBER)
+    auth_id = VOBIZ_AUTH_ID
+    auth_token = VOBIZ_AUTH_TOKEN
+    did_number = VOBIZ_DID_NUMBER
     
     import ssl
     ctx = ssl.create_default_context()
