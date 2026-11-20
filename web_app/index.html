@@ -4129,11 +4129,11 @@
         applyUserSession();
         closeLoginModal();
         if (passInput) passInput.value = '';
-        // Direct redirect to Calling Agent portal immediately upon login
+        // Direct redirect to Achyuta Dashboard immediately upon login
         try {
-          switchTab('calling');
+          switchTab('dashboard');
         } catch (e) {
-          console.warn('Redirect to calling tab failed:', e);
+          console.warn('Redirect to dashboard tab failed:', e);
         }
       } else {
         if (errBox) errBox.classList.remove('hidden');
