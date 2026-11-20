@@ -3677,12 +3677,12 @@ def handle_vobiz_stream_ws(handler, query_params):
                             rms = calculate_pcm16_rms(pcm_in)
                             
                             # Industry-standard Voice Activity Detection:
-                            # Background line hiss & breath is RMS ~100-500
-                            # Clear human speech into phone mic is RMS > 1000
-                            if rms > 1000:
+                            # Background line hiss & breath is RMS ~100-800
+                            # Real human speech into phone mic is RMS > 1600
+                            if rms > 1600:
                                 speech_energy_count += 1
-                                # Fast speech lock: 4 consecutive speech frames (~160-200ms of real voice phonemes)
-                                if speech_energy_count >= 4:
+                                # Confirmed speech lock: requires at least 8 consecutive speech frames (~400ms of real voice phonemes)
+                                if speech_energy_count >= 8:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller real speech confirmed! RMS={rms}", flush=True)
                                     speech_detected = True
@@ -3692,10 +3692,10 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # Fast natural turn end: ~0.35s (7 frames) of silence indicates caller finished sentence
-                                    if silence_after_speech_count >= 7:
-                                        # Trigger if we collected at least ~0.3s of real voice PCM (~9600 bytes at 16kHz 16-bit)
-                                        if len(accumulated_caller_pcm) < 9600:
+                                    # Fast natural turn end: ~0.45s (9 frames) of silence indicates caller finished sentence
+                                    if silence_after_speech_count >= 9:
+                                        # Trigger only if we collected at least ~0.5s of real voice PCM (~16000 bytes at 16kHz 16-bit)
+                                        if len(accumulated_caller_pcm) < 16000:
                                             # Discard cough, phone click, or breath noise spike
                                             print(f"[Vobiz Stream] Discarding brief line click/noise spike ({len(accumulated_caller_pcm)} bytes). Waiting for real words...", flush=True)
                                             speech_detected = False

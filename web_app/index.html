@@ -4483,10 +4483,12 @@
       if (!dock) return;
 
       const heroVisible = document.getElementById('hero-section') && !document.getElementById('hero-section').classList.contains('hidden');
+      if (tab === 'calling') {
+        dock.classList.add('hidden');
+        return;
+      }
       if (tab === 'agent') {
         if (heroVisible) {
-          dock.classList.add('hidden');
-        } else if (tab === 'calling') {
           dock.classList.add('hidden');
         } else {
           // Active chat: Full width responsive dock
