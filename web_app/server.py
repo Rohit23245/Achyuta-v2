@@ -576,6 +576,9 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
                 if clean.startswith("91") and len(clean) == 12:
                     _OUTBOUND_PRECOMPUTED_PCM[clean[2:]] = pcm
                 _OUTBOUND_PRECOMPUTED_PCM[f"+{clean}"] = pcm
+                _OUTBOUND_PRECOMPUTED_PCM[phone] = pcm
+                _OUTBOUND_PRECOMPUTED_PCM[str(phone).strip()] = pcm
+                _OUTBOUND_PRECOMPUTED_PCM["latest"] = pcm
                 print(f"[Outbound Pre-gen] Pre-computed {len(pcm)} bytes PCM for {clean} ('{msg_to_speak[:25]}...')", flush=True)
         except Exception as e:
             print(f"[Outbound Pre-gen] Error: {e}", flush=True)
@@ -3551,13 +3554,15 @@ def handle_vobiz_stream_ws(handler, query_params):
     start_time = time.time()
     
     clean_phone = re.sub(r'[^0-9]', '', str(phone))
-    first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(clean_phone, None)
+    first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get(clean_phone) or _OUTBOUND_PRECOMPUTED_PCM.get(str(phone).strip())
     if not first_pcm and clean_phone.startswith("91") and len(clean_phone) == 12:
-        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(clean_phone[2:], None)
+        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get(clean_phone[2:])
     if not first_pcm and len(clean_phone) == 10:
-        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop("91" + clean_phone, None)
+        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get("91" + clean_phone)
     if not first_pcm:
-        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(f"+{clean_phone}", None)
+        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get(f"+{clean_phone}")
+    if not first_pcm:
+        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get("latest")
 
     if not first_pcm:
         print(f"[Vobiz Stream] Fast fetching PCM for '{first_msg[:25]}'...", flush=True)
