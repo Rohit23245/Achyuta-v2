@@ -117,9 +117,9 @@ PORT = 5000
 # ---------------------------------------------------------
 # VOBIZ AI CALLING AGENT INTEGRATION (EXACT 1:1 REPLICATION)
 # ---------------------------------------------------------
-VOBIZ_AUTH_ID = os.environ.get('VOBIZ_AUTH_ID', 'MA_02TGXRN3')
-VOBIZ_AUTH_TOKEN = os.environ.get('VOBIZ_AUTH_TOKEN', 'bZXmXWFGlSTOGrBCbT5CSdJ253tHzrSHoiLabx6UKsTVrPQ53iCsrrwv8ZeUgEe8')
-VOBIZ_DID_NUMBER = os.environ.get('DID_NUMBER', '+918065354620')
+VOBIZ_AUTH_ID = 'MA_02TGXRN3'
+VOBIZ_AUTH_TOKEN = 'bZXmXWFGlSTOGrBCbT5CSdJ253tHzrSHoiLabx6UKsTVrPQ53iCsrrwv8ZeUgEe8'
+VOBIZ_DID_NUMBER = '+918065354620'
 VOBIZ_TRIGGER_URL = 'https://kavyatraders.in/trigger-call'
 CALL_LOGS_PATH = os.path.join(DATA_DIR, "call_logs_vault.json")
 CALLING_SCRIPT_CONFIG_PATH = os.path.join(DATA_DIR, "calling_script_config.json")
@@ -4731,8 +4731,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
             return
         elif self.path == "/api/voice_agent/balance":
-            auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
-            auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
+            auth_id = VOBIZ_AUTH_ID
+            auth_token = VOBIZ_AUTH_TOKEN
             url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/balance/INR"
             
             import ssl
