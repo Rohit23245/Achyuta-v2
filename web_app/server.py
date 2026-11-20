@@ -3746,7 +3746,7 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     # Natural turn end: ~0.4s (8 frames) of silence indicates caller finished sentence
                                     if silence_after_speech_count >= 8:
                                         # Trigger when caller speaks at least ~0.3s of real speech (>9600 bytes)
-                                        if len(accumulated_caller_pcm) < 9600:
+                                        if len(accumulated_caller_pcm) < 3000:
                                             # Discard brief line click / cough
                                             speech_detected = False
                                             speech_energy_count = 0
@@ -3790,18 +3790,13 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         if step_pcm:
                                             stream_audio_bytes(step_pcm)
                                         accumulated_caller_pcm.clear()
-                                        if current_step_index >= total_steps:
-                                            print(f"[Vobiz Stream] Final step {current_step_index}/{total_steps} finished playing. Concluding call safely...", flush=True)
-                                            time.sleep(1.5)
-                                            break
-                                        else:
-                                            # Automatically unlock ear and listen for caller's next reply!
-                                            print(f"[Vobiz Stream] Step {current_step_index}/{total_steps} delivered. Automatically listening for caller turn {current_step_index + 1}...", flush=True)
-                                            state = "LISTENING_FOR_SPEECH"
-                                            speech_detected = False
-                                            speech_energy_count = 0
-                                            silence_after_speech_count = 0
-                                            accumulated_caller_pcm.clear()
+                                        # Always keep ear open for continuous conversation (no premature hangup or deaf state)
+                                        state = "LISTENING_FOR_SPEECH"
+                                        speech_detected = False
+                                        speech_energy_count = 0
+                                        silence_after_speech_count = 0
+                                        accumulated_caller_pcm.clear()
+                                        print(f"[Vobiz Stream] Turn delivered. Ear unlocked: Actively listening for caller's next reply...", flush=True)
                         except Exception as ex:
                             print(f"[Vobiz Stream] Media processing error: {ex}", flush=True)
 
