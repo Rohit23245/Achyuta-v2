@@ -1755,186 +1755,323 @@
 
     <!-- CALLING TAB (ACHYUTA TELEPHONY & CALLING) -->
     <div id="view-calling" class="flex-1 overflow-y-auto custom-scroll p-3.5 sm:p-6 pb-28 hidden">
-      <div class="w-full space-y-6 pt-2">
+      <div class="w-full space-y-6 pt-1 max-w-7xl mx-auto">
         
-        <!-- Minimal Header with Real Live Balance Badge -->
+        <!-- Luxury Suite Header: Title & Real Live Balance Badge -->
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-500/20 to-emerald-500/10 border border-teal-500/30 flex items-center justify-center text-teal-600 dark:text-teal-400 shadow-xs">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
               </svg>
             </div>
             <div>
-              <h2 class="text-lg sm:text-xl font-bold tracking-tight" style="color: var(--text);">Calling Agent</h2>
+              <h2 class="text-xl sm:text-2xl font-bold tracking-tight" style="color: var(--text);">Calling Agent</h2>
             </div>
           </div>
 
-          <!-- Top Right Controls: Agent Flow + Settings + Live Credits Badge -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <!-- Agent Flow Modal Trigger Button -->
-            <button type="button" onclick="openAgentFlowModal()" class="h-9 px-3 rounded-xl border flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition active:scale-95 cursor-pointer shadow-xs" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text);" title="Agent Conversation Flow">
-              <svg class="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
-              </svg>
-              <span class="text-xs font-bold">Agent Flow</span>
-              <span id="speech-steps-header-count" class="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">2</span>
-            </button>
-
-            <!-- Settings Modal Trigger Button -->
-            <button type="button" onclick="openAgentSettingsModal()" class="h-9 px-3 rounded-xl border flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition active:scale-95 cursor-pointer shadow-xs" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text);" title="Agent Settings & Custom Instructions">
-              <svg class="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-              <span class="text-xs font-bold">Settings</span>
-            </button>
-
-            <!-- Real Live Credits / Balance Pill -->
+          <!-- Real Live Credits / Balance Pill & Quick Actions -->
+          <div class="flex items-center gap-2.5 flex-wrap">
             <div class="flex items-center gap-2 px-3.5 py-1.5 h-9 rounded-xl border shadow-xs" style="background-color: var(--card-bg); border-color: var(--border-color);">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <div class="text-xs font-semibold flex items-center gap-1" style="color: var(--text);">
-                <span class="text-zinc-400 text-[11px]">Credits:</span>
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <div class="text-xs font-semibold flex items-center gap-1.5" style="color: var(--text);">
+                <span class="text-zinc-400 text-[11px] font-medium">Credits:</span>
                 <span id="vobiz-credits-display" class="font-mono font-bold text-teal-600 dark:text-teal-400">Loading...</span>
               </div>
-              <button type="button" onclick="loadVobizLiveBalance()" title="Refresh Balance" class="text-zinc-400 hover:text-zinc-200 transition p-0.5">
+              <button type="button" onclick="loadVobizLiveBalance()" title="Refresh Balance" class="text-zinc-400 hover:text-zinc-200 transition p-0.5 cursor-pointer">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Super Simple Card: Full Width Number & Settings Setup -->
-        <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-5" style="background-color: var(--card-bg); border-color: var(--border-color);">
+        <!-- Calling Agent Separate Portal Layout: Sleek Side/Top Navigation Bar + Content Area -->
+        <div class="flex flex-col md:flex-row gap-5 items-start">
           
-          <!-- 1. Phone Numbers & List Management Header -->
-          <div>
-            <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-              <div class="flex items-center gap-2">
-                <label class="block text-xs font-bold" style="color: var(--text);">Phone Numbers</label>
-                <span id="caller-number-count-badge" class="text-[10px] px-2 py-0.5 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">1 Number</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <!-- Calling List Selector -->
-                <div class="relative">
-                  <select id="caller-list-select" onchange="onCallingListSelected(this.value)" class="h-8 pl-2.5 pr-7 text-xs rounded-lg border font-medium focus:outline-none focus:border-teal-500 cursor-pointer" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">
-                    <option value="direct">Direct Number(s)</option>
-                  </select>
-                </div>
-                <!-- Delete Selected List Button (Hidden when 'direct' is selected) -->
-                <button type="button" id="caller-delete-list-btn" onclick="deleteCurrentCallingListDirect()" class="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 text-rose-500 hover:bg-rose-500/10 transition active:scale-95 cursor-pointer hidden" style="border-color: var(--border-color);" title="Delete selected list">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
-                  <span>Delete List</span>
-                </button>
-                <!-- Create List Modal / Prompt Button -->
-                <button type="button" onclick="openCreateCallingListModalDirect()" class="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer" style="border-color: var(--border-color); color: var(--text);" title="Save numbers as a new List">
-                  <svg class="w-3.5 h-3.5 text-teal-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                  <span>Create List</span>
-                </button>
-                <!-- Add Number Row Button -->
-                <button type="button" onclick="addCallingNumberRow('')" class="h-8 px-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold flex items-center gap-1 transition active:scale-95 cursor-pointer shadow-xs" title="Add another phone number">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                  <span>Add Number</span>
-                </button>
-              </div>
+          <!-- Dedicated Calling Suite Navigation Panel (Sidebar on desktop, horizontal scroll on mobile) -->
+          <div class="w-full md:w-64 flex-shrink-0 rounded-2xl border p-2 sm:p-2.5 shadow-sm space-y-1 md:sticky md:top-2" style="background-color: var(--card-bg); border-color: var(--border-color);">
+            <div class="hidden md:flex items-center justify-between px-3 py-2 border-b mb-1" style="border-color: var(--border-color);">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Portal Modules</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">Suite v2.0</span>
             </div>
 
-            <!-- Dynamic Phone Numbers Container -->
-            <div id="calling-numbers-container" class="space-y-2">
-              <div class="calling-number-row flex items-center gap-2">
-                <div class="relative flex-1">
-                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
-                    <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
-                    </svg>
-                  </span>
-                  <input type="text" value="+918707526283" placeholder="e.g. +919876543210" class="calling-phone-input w-full h-10 pl-9 pr-3 rounded-xl border text-sm font-mono focus:outline-none focus:border-teal-500 font-semibold" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">
-                </div>
-                <button type="button" onclick="addCallingNumberRow('')" class="w-10 h-10 rounded-xl border flex items-center justify-center text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 transition active:scale-95 cursor-pointer flex-shrink-0" title="Add number (+)" style="border-color: var(--border-color);">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 4. Trigger Call CTA Button (Full Width) -->
-          <div class="pt-1">
-            <button type="button" id="btn-simple-call-trigger" onclick="triggerSimpleDirectCall()" class="w-full h-12 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2.5 bg-teal-600 hover:bg-teal-500 transition active:scale-[0.98] shadow-md cursor-pointer">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
-              <span id="btn-simple-call-label">Call Now</span>
-            </button>
-          </div>
-          <p class="text-[11px] text-zinc-400 text-center mt-2.5">Call connect hote hi agent first message bolega, fir customer ki baat sunkar second response intent ke anusaar reply karega.</p>
-
-        </div>
-
-        <!-- Live Call Active Status Banner -->
-        <!-- Active Live Call Real-Time Status Banner -->
-        <div id="calling-live-banner" class="rounded-2xl border p-4 shadow-md hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
-          <div class="flex items-center justify-between flex-wrap gap-3">
-            <div class="flex items-center gap-3">
-              <span id="calling-banner-dot" class="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0"></span>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span id="calling-banner-title" class="text-xs font-bold" style="color: var(--text);">Calling...</span>
-                  <span id="calling-banner-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/30">Dialing</span>
-                </div>
-                <div class="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
-                  <span id="calling-live-phone" class="font-mono font-semibold"></span>
-                  <span>•</span>
-                  <span id="calling-banner-sub">Connecting carrier network...</span>
-                  <span id="calling-timer-wrapper" class="hidden items-center gap-1.5">
-                    <span>•</span>
-                    <span id="calling-live-timer" class="font-mono font-bold text-emerald-500">00:00</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-            <button type="button" id="calling-end-btn" onclick="endLiveCallNow(true)" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition active:scale-95 shadow-sm">
-              End Call
-            </button>
-          </div>
-        </div>
-
-        <!-- Real Call History & Cost Breakdown Table -->
-        <div class="rounded-2xl border shadow-sm overflow-hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
-          <div class="p-4 sm:p-5 border-b flex items-center justify-between flex-wrap gap-2" style="border-color: var(--border-color);">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-sm">
-                <svg class="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <!-- Tab Buttons (Responsive: flex-row wrap/scroll on mobile, vertical stack on desktop) -->
+            <div class="flex flex-row md:flex-col gap-1 overflow-x-auto custom-scroll w-full py-0.5">
+              <!-- Tab 1: Dialer & Initiator -->
+              <button type="button" onclick="switchCallingPortalTab('dialer')" id="cportal-tab-dialer" class="cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-start gap-2.5 transition cursor-pointer bg-teal-500/15 text-teal-600 dark:text-teal-300 border border-teal-500/30 shadow-xs whitespace-nowrap">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
                 </svg>
-              </div>
-              <div>
-                <h3 class="text-sm sm:text-base font-bold" style="color: var(--text);">Calls History & Cost Details</h3>
-                <p class="text-[11px] text-zinc-400">Har call ki timing, duration aur actual kharch</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <span id="calling-table-count" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-bold text-teal-600 dark:text-teal-400" style="background-color: var(--input-bg); border-color: var(--border-color);">Total: 0 Calls</span>
-              <span id="calling-table-spent" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-bold text-emerald-600 dark:text-emerald-400" style="background-color: var(--input-bg); border-color: var(--border-color);">Spent: ₹0.00</span>
-              <button type="button" onclick="loadCallingAgentData(); loadVobizLiveBalance();" title="Refresh Calls & Balance" class="px-2.5 py-1 text-xs rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1 font-semibold cursor-pointer" style="border-color: var(--border-color); color: var(--text);">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
-                <span>Refresh</span>
+                <span class="truncate">Initiate Call</span>
+              </button>
+
+              <!-- Tab 2: Agent Flow -->
+              <button type="button" onclick="switchCallingPortalTab('flow')" id="cportal-tab-flow" class="cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-between gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+                  </svg>
+                  <span class="truncate">Agent Flow</span>
+                </div>
+                <span id="speech-steps-header-count" class="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">2</span>
+              </button>
+
+              <!-- Tab 3: Agent Settings -->
+              <button type="button" onclick="switchCallingPortalTab('settings')" id="cportal-tab-settings" class="cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-start gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span class="truncate">Settings & Tone</span>
+              </button>
+
+              <!-- Tab 4: Call History -->
+              <button type="button" onclick="switchCallingPortalTab('history')" id="cportal-tab-history" class="cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-start gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="truncate">Call History</span>
               </button>
             </div>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr class="border-b text-[11px] uppercase tracking-wider font-semibold text-zinc-400" style="background-color: rgba(0,0,0,0.02); border-color: var(--border-color);">
-                  <th class="py-3 px-3.5 sm:px-4">Phone / Party</th>
-                  <th class="py-3 px-3">Status</th>
-                  <th class="py-3 px-3">Duration</th>
-                  <th class="py-3 px-3">Cost (Kharch)</th>
-                  <th class="py-3 px-3 text-right">Time</th>
-                </tr>
-              </thead>
-              <tbody id="calling-logs-tbody" class="divide-y" style="border-color: var(--border-color);">
-                <tr><td colspan="5" class="text-center py-6 text-zinc-400">Loading call records...</td></tr>
-              </tbody>
-            </table>
+          <!-- Dynamic Portal Content Area (Controlled by switchCallingPortalTab) -->
+          <div class="flex-1 w-full min-w-0 space-y-5">
+            
+            <!-- SUB-PANEL 1: INITIATE CALL (DIALER & NUMBER LISTS) -->
+            <div id="cportal-panel-dialer" class="cportal-subpanel space-y-5">
+              
+              <!-- Quick Call Initiator Card -->
+              <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-5" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                <div>
+                  <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                      <label class="block text-xs font-bold" style="color: var(--text);">Phone Numbers</label>
+                      <span id="caller-number-count-badge" class="text-[10px] px-2 py-0.5 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">1 Number</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <!-- Calling List Selector -->
+                      <div class="relative">
+                        <select id="caller-list-select" onchange="onCallingListSelected(this.value)" class="h-8 pl-2.5 pr-7 text-xs rounded-lg border font-medium focus:outline-none focus:border-teal-500 cursor-pointer" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">
+                          <option value="direct">Direct Number(s)</option>
+                        </select>
+                      </div>
+                      <!-- Delete Selected List Button -->
+                      <button type="button" id="caller-delete-list-btn" onclick="deleteCurrentCallingListDirect()" class="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 text-rose-500 hover:bg-rose-500/10 transition active:scale-95 cursor-pointer hidden" style="border-color: var(--border-color);" title="Delete selected list">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+                        <span>Delete List</span>
+                      </button>
+                      <!-- Create List Modal / Prompt Button -->
+                      <button type="button" onclick="openCreateCallingListModalDirect()" class="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer" style="border-color: var(--border-color); color: var(--text);" title="Save numbers as a new List">
+                        <svg class="w-3.5 h-3.5 text-teal-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                        <span>Create List</span>
+                      </button>
+                      <!-- Add Number Row Button -->
+                      <button type="button" onclick="addCallingNumberRow('')" class="h-8 px-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold flex items-center gap-1 transition active:scale-95 cursor-pointer shadow-xs" title="Add another phone number">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                        <span>Add Number</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Dynamic Phone Numbers Container -->
+                  <div id="calling-numbers-container" class="space-y-2">
+                    <div class="calling-number-row flex items-center gap-2">
+                      <div class="relative flex-1">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
+                          <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
+                          </svg>
+                        </span>
+                        <input type="text" value="+918707526283" placeholder="e.g. +919876543210" class="calling-phone-input w-full h-10 pl-9 pr-3 rounded-xl border text-sm font-mono focus:outline-none focus:border-teal-500 font-semibold" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">
+                      </div>
+                      <button type="button" onclick="addCallingNumberRow('')" class="w-10 h-10 rounded-xl border flex items-center justify-center text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 transition active:scale-95 cursor-pointer flex-shrink-0" title="Add number (+)" style="border-color: var(--border-color);">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Trigger Call CTA Button (Full Width) -->
+                <div class="pt-1">
+                  <button type="button" id="btn-simple-call-trigger" onclick="triggerSimpleDirectCall()" class="w-full h-12 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 transition active:scale-[0.98] shadow-md cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
+                    <span id="btn-simple-call-label">Call Now</span>
+                  </button>
+                </div>
+                <p class="text-[11px] text-zinc-400 text-center">Call connect hote hi agent first message bolega, fir customer ki baat sunkar second response intent ke anusaar reply karega.</p>
+              </div>
+
+              <!-- Active Live Call Real-Time Status Banner -->
+              <div id="calling-live-banner" class="rounded-2xl border p-4 shadow-md hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                  <div class="flex items-center gap-3">
+                    <span id="calling-banner-dot" class="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0"></span>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span id="calling-banner-title" class="text-xs font-bold" style="color: var(--text);">Calling...</span>
+                        <span id="calling-banner-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/30">Dialing</span>
+                      </div>
+                      <div class="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
+                        <span id="calling-live-phone" class="font-mono font-semibold"></span>
+                        <span>•</span>
+                        <span id="calling-banner-sub">Connecting carrier network...</span>
+                        <span id="calling-timer-wrapper" class="hidden items-center gap-1.5">
+                          <span>•</span>
+                          <span id="calling-live-timer" class="font-mono font-bold text-emerald-500">00:00</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" id="calling-end-btn" onclick="endLiveCallNow(true)" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition active:scale-95 shadow-sm cursor-pointer">
+                    End Call
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- SUB-PANEL 2: AGENT FLOW (CONVERSATION STEPS INLINE) -->
+            <div id="cportal-panel-flow" class="cportal-subpanel space-y-4 hidden">
+              <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-4" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                <div class="flex items-center justify-between pb-3 border-b flex-wrap gap-2" style="border-color: var(--border-color);">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h3 class="text-base font-bold tracking-tight" style="color: var(--text);">Agent Conversation Flow</h3>
+                        <span id="speech-steps-count-badge" class="text-[10px] px-2 py-0.5 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">2 Steps</span>
+                      </div>
+                      <p class="text-[11px] text-zinc-400">Configure sequential phone messages and intent responses</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="addSpeechStepRow()" class="h-8 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer" style="border-color: var(--border-color); color: var(--text);">
+                      <svg class="w-3.5 h-3.5 text-teal-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                      <span>Add Step</span>
+                    </button>
+                    <button type="button" onclick="saveSpeechStepsExplicitly()" class="h-8 px-4 text-xs font-bold rounded-xl bg-teal-600 hover:bg-teal-500 text-white transition shadow-sm cursor-pointer flex items-center gap-1.5">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                      <span>Save Flow</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Flow Steps Container -->
+                <div id="speech-steps-container" class="space-y-3">
+                  <!-- Step 1: First Message -->
+                  <div class="speech-step-card rounded-xl border p-3.5 relative" style="background-color: var(--input-bg); border-color: var(--border-color);" data-step-index="1">
+                    <div class="flex items-center justify-between mb-1.5">
+                      <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
+                        <span class="step-dot w-2 h-2 rounded-full bg-teal-500"></span>
+                        <span class="step-title">1. First Message (Initial Speech)</span>
+                      </label>
+                      <span class="step-badge text-[10px] text-zinc-400">Call connect hote hi</span>
+                    </div>
+                    <textarea rows="2" placeholder="Call connect hote hi agent exact ye initial message bolega..." class="speech-step-textarea w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">Namaste! Main Achyuta Enterprise Solutions se Priya baat kar rahi hoon. Hum aapke business sales aur operations ko automate karne ke liye vishesh AI plans lekar aaye hain. Kya aapse 1 minute baat ho sakti hai?</textarea>
+                  </div>
+
+                  <!-- Step 2: Second Response -->
+                  <div class="speech-step-card rounded-xl border p-3.5 relative" style="background-color: var(--input-bg); border-color: var(--border-color);" data-step-index="2">
+                    <div class="flex items-center justify-between mb-1.5">
+                      <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
+                        <span class="step-dot w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span class="step-title">2. Second Response Intent (Sunkar Reply)</span>
+                      </label>
+                      <div class="flex items-center gap-2">
+                        <span class="step-badge text-[10px] text-zinc-400">Direction / Goal</span>
+                        <button type="button" onclick="removeSpeechStepRow(this)" class="w-5 h-5 rounded-md hover:bg-rose-500/10 text-rose-500 flex items-center justify-center transition" title="Remove step">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                    <textarea rows="2" placeholder="Customer ki baat sunkar agent ko kis direction me reply dena hai..." class="speech-step-textarea w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">Customer ki baat ko sunkar aur samajhkar politely samjhao ki hum AI voice agent aur CRM automate karte hain jisse unka time bachta hai, aur unhe bolo ki main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap dekh sakein.</textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUB-PANEL 3: AGENT SETTINGS & INSTRUCTIONS INLINE -->
+            <div id="cportal-panel-settings" class="cportal-subpanel space-y-4 hidden">
+              <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-4" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                <div class="flex items-center justify-between pb-3 border-b flex-wrap gap-2" style="border-color: var(--border-color);">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="text-base font-bold tracking-tight" style="color: var(--text);">Agent Instructions & Tone Mandate</h3>
+                      <p class="text-[11px] text-zinc-400">Configure how the agent behaves and sounds during live phone calls</p>
+                    </div>
+                  </div>
+                  <button type="button" onclick="saveAgentSettingsModal()" class="h-8 px-4 text-xs font-bold rounded-xl bg-teal-600 hover:bg-teal-500 text-white transition shadow-sm cursor-pointer flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                    <span>Save Instructions</span>
+                  </button>
+                </div>
+
+                <div class="space-y-4 pt-1">
+                  <div>
+                    <label class="block text-xs font-bold mb-1.5" style="color: var(--text);">Agent Instructions (Prompt & Tone Mandate):</label>
+                    <textarea id="simple-call-instructions" rows="6" placeholder="e.g. Idhar udhar ki baat bilkul na kare, customer ki baat ko dhyan se sunkar short and direct response de, hamesha respectful professional tone me baat kare..." class="w-full p-3.5 rounded-xl border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--input-bg); border-color: var(--input-border); color: var(--text);">Idhar udhar ki baat bilkul na kare, customer ki baat ko dhyan se sunkar short and direct response de, hamesha respectful professional tone me baat kare.</textarea>
+                    <p class="text-[11px] text-zinc-400 mt-1.5">Ye instructions AI agent ke live voice conversation ke dauraan real-time enforce hoti hain.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUB-PANEL 4: CALL HISTORY & BILLING INLINE -->
+            <div id="cportal-panel-history" class="cportal-subpanel space-y-5 hidden">
+              <!-- Real Call History & Cost Breakdown Table -->
+              <div class="rounded-2xl border shadow-sm overflow-hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                <div class="p-4 sm:p-5 border-b flex items-center justify-between flex-wrap gap-2" style="border-color: var(--border-color);">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-sm">
+                      <svg class="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="text-sm sm:text-base font-bold" style="color: var(--text);">Calls History & Cost Details</h3>
+                      <p class="text-[11px] text-zinc-400">Har call ki timing, duration aur actual kharch</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span id="calling-table-count" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-bold text-teal-600 dark:text-teal-400" style="background-color: var(--input-bg); border-color: var(--border-color);">Total: 0 Calls</span>
+                    <span id="calling-table-spent" class="text-xs font-mono px-2.5 py-1 rounded-lg border font-bold text-emerald-600 dark:text-emerald-400" style="background-color: var(--input-bg); border-color: var(--border-color);">Spent: ₹0.00</span>
+                    <button type="button" onclick="loadCallingAgentData(); loadVobizLiveBalance();" title="Refresh Calls & Balance" class="px-2.5 py-1 text-xs rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1 font-semibold cursor-pointer" style="border-color: var(--border-color); color: var(--text);">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                      <span>Refresh</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr class="border-b text-[11px] uppercase tracking-wider font-semibold text-zinc-400" style="background-color: rgba(0,0,0,0.02); border-color: var(--border-color);">
+                        <th class="py-3 px-3.5 sm:px-4">Phone / Party</th>
+                        <th class="py-3 px-3">Status</th>
+                        <th class="py-3 px-3">Duration</th>
+                        <th class="py-3 px-3">Cost (Kharch)</th>
+                        <th class="py-3 px-3 text-right">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody id="calling-logs-tbody" class="divide-y" style="border-color: var(--border-color);">
+                      <tr><td colspan="5" class="text-center py-6 text-zinc-400">Loading call records...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -5801,6 +5938,38 @@
       } catch (e) {
         console.warn('Balance fetch error:', e);
         if (el) el.textContent = 'Offline';
+      }
+    }
+
+    
+    /* ========================================================================
+       CALLING AGENT DEDICATED PORTAL NAVIGATION
+       ======================================================================== */
+    function switchCallingPortalTab(tabKey) {
+      const tabs = ['dialer', 'flow', 'settings', 'history'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`cportal-tab-${t}`);
+        const panel = document.getElementById(`cportal-panel-${t}`);
+        if (btn) {
+          if (t === tabKey) {
+            btn.className = "cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-start gap-2.5 transition cursor-pointer bg-teal-500/15 text-teal-600 dark:text-teal-300 border border-teal-500/30 shadow-xs whitespace-nowrap";
+          } else {
+            btn.className = "cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-start gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-zinc-200 whitespace-nowrap";
+          }
+        }
+        if (panel) {
+          if (t === tabKey) {
+            panel.classList.remove('hidden');
+          } else {
+            panel.classList.add('hidden');
+          }
+        }
+      });
+      // Specific tab refresh triggers
+      if (tabKey === 'history') {
+        if (typeof loadCallingAgentData === 'function') loadCallingAgentData();
+      } else if (tabKey === 'settings') {
+        if (typeof loadCallingScriptConfig === 'function') loadCallingScriptConfig();
       }
     }
 
