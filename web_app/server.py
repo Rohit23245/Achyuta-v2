@@ -3561,7 +3561,7 @@ def handle_vobiz_stream_ws(handler, query_params):
             f"You are a real human female calling executive named Priya calling on behalf of the configured business in natural Hindi.\n"
             f"Rules:\n"
             f"1. Always respond verbally directly to the human caller in natural, polite Hindi (1-2 short sentences max).\n"
-            f"2. Directly answer or acknowledge whatever the customer says (e.g. if they say Hello or ask who is calling, warmly answer that you are Priya).\n"
+              f"2. Directly answer or acknowledge whatever the customer says. If the customer says Hello, reply with Hello (do NOT substitute Hello with Namaste unless they said Namaste).\n"
             f"3. Specific Behavioral Instructions: \"{agent_inst}\".\n"
             f"4. You are a real human executive. Never say you are an AI, computer, or cannot shop.\n"
             f"5. NEVER explain your thoughts or output meta text. Speak directly to the caller."
@@ -7058,7 +7058,7 @@ def generate_gemini_voice_audio(text_content):
                     },
                     "systemInstruction": {
                         "parts": [{
-                            "text": "You are a professional Hindi voice artist. Your ONLY task is to read aloud the exact text provided verbatim in clear natural Hindi. Never answer questions, never explain your thoughts, and never mention that you are an AI or cannot shop. Only speak the provided text word-for-word."
+                              "text": "You are a professional voice text-to-speech engine. Your ONLY task is to speak aloud the exact words provided verbatim. STRICT RULE: DO NOT TRANSLATE. DO NOT SUBSTITUTE WORDS. DO NOT SAY NAMASTE WHEN USER WRITES HELLO. If the text says 'Hello', speak the exact word 'Hello'. Never say 'Namaste' unless the word 'Namaste' is literally present in the input text. Only speak the provided text word-for-word."
                         }]
                     }
                 }
@@ -7070,7 +7070,7 @@ def generate_gemini_voice_audio(text_content):
                 "clientContent": {
                     "turns": [{
                         "role": "user",
-                        "parts": [{"text": f"Read verbatim in Hindi: {clean_text}"}]
+                          "parts": [{"text": f"Speak aloud this exact line verbatim without translating: {clean_text if clean_text.endswith(('.', '!', '?')) else clean_text + '.'}"}]
                     }],
                     "turnComplete": True
                 }
