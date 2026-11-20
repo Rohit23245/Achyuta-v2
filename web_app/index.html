@@ -5053,15 +5053,17 @@
     }
 
     function renderCallingLogs(logs) {
-      const tbody = document.getElementById('calling-logs-tbody');
-      if (!tbody) return;
+      const tbodies = document.querySelectorAll('#calling-logs-tbody');
+      if (!tbodies || tbodies.length === 0) return;
 
       if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-zinc-400">No call records found yet. Trigger an AI call above.</td></tr>';
+        tbodies.forEach(tb => {
+          tb.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-zinc-400">No call records found yet. Trigger an AI call above.</td></tr>';
+        });
         return;
       }
 
-      tbody.innerHTML = logs.map((l, idx) => {
+      const rowsHtml = logs.map((l, idx) => {
         const rawStatus = (l.call_status || '').toLowerCase();
         const isConnected = rawStatus === 'connected' || rawStatus === 'completed';
         const isInitiated = rawStatus === 'initiated' || rawStatus === 'queued';
@@ -5111,6 +5113,7 @@
           </tr>
         `;
       }).join('');
+      tbodies.forEach(tb => { tb.innerHTML = rowsHtml; });
     }
 
     async function handleTriggerOutboundCall(e) {
