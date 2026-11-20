@@ -1754,11 +1754,11 @@
     </div>
 
     <!-- CALLING TAB (ACHYUTA TELEPHONY & CALLING) -->
-    <div id="view-calling" class="flex-1 overflow-y-auto custom-scroll p-3.5 sm:p-6 pb-28">
-      <div class="w-full space-y-6 pt-1 max-w-7xl mx-auto">
+    <div id="view-calling" class="flex-1 overflow-y-auto custom-scroll p-3 sm:p-5 pb-16 flex flex-col min-h-screen">
+      <div class="w-full flex-1 flex flex-col space-y-4 max-w-7xl mx-auto">
         
         <!-- Luxury Suite Header: Title, Mobile Menu Trigger & Real Live Balance Badge -->
-        <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
           <div class="flex items-center gap-2.5 sm:gap-3">
             <!-- Dedicated Mobile Side Panel Menu Toggle Button (Visible on Small Screens) -->
             <button type="button" onclick="openCallingPortalMenu()" class="flex md:hidden h-10 px-3 rounded-2xl border items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition active:scale-95 cursor-pointer shadow-xs" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text);" title="Open Calling Suite Menu">
@@ -1793,10 +1793,10 @@
         </div>
 
         <!-- Calling Agent Separate Portal Layout: Sleek Side/Top Navigation Bar + Content Area -->
-        <div class="flex flex-col md:flex-row gap-5 items-stretch min-h-[calc(100vh-140px)]">
+        <div class="flex-1 flex flex-col md:flex-row gap-5 items-stretch min-h-[calc(100vh-100px)]">
           
           <!-- Dedicated Calling Suite Navigation Panel (Sidebar on desktop, hidden on mobile in favor of dedicated slide-over panel) -->
-          <div class="hidden md:flex w-full md:w-64 flex-shrink-0 rounded-2xl border p-2.5 sm:p-3 shadow-sm flex-col justify-between self-stretch md:sticky md:top-2 h-[calc(100vh-140px)]" style="background-color: var(--card-bg); border-color: var(--border-color);">
+          <div class="hidden md:flex w-full md:w-64 flex-shrink-0 rounded-2xl border p-2.5 sm:p-3 shadow-sm flex-col justify-between self-stretch md:sticky md:top-2 h-[calc(100vh-100px)] min-h-[640px]" style="background-color: var(--card-bg); border-color: var(--border-color);">
             <div class="space-y-1">
               <div class="flex items-center justify-between px-3 py-2 border-b mb-1" style="border-color: var(--border-color);">
                 <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Menu</span>
