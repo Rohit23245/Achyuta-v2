@@ -6721,7 +6721,9 @@
     }
 
     function getEnteredSpeechSteps() {
-      const textareas = document.querySelectorAll('.speech-step-textarea');
+      // Always query from the active cportal-panel-flow container first to avoid duplicate modal inputs
+      const activeContainer = document.querySelector('#cportal-panel-flow #speech-steps-container') || document.querySelector('#speech-steps-container');
+      const textareas = activeContainer ? activeContainer.querySelectorAll('.speech-step-textarea') : document.querySelectorAll('.speech-step-textarea');
       const steps = [];
       textareas.forEach(t => {
         steps.push(t.value.trim());
@@ -6740,9 +6742,11 @@
 
     function renderSpeechStepsCards(steps) {
       if (!Array.isArray(steps) || steps.length === 0) return;
-      const container = document.getElementById('speech-steps-container');
-      if (!container) return;
-      container.innerHTML = '';
+      const containers = document.querySelectorAll('#speech-steps-container');
+      if (!containers || containers.length === 0) return;
+      containers.forEach(container => {
+        container.innerHTML = '';
+      });
       steps.forEach((stepText, idx) => {
         const nextIdx = idx + 1;
         const defaultLabel = nextIdx <= _stepLabels.length ? _stepLabels[nextIdx - 1] : `${nextIdx}. Step ${nextIdx} Response Intent`;
@@ -6769,7 +6773,9 @@
           </div>
           <textarea rows="2" placeholder="Message content..." class="speech-step-textarea w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">${stepText}</textarea>
         `;
-        container.appendChild(card);
+        containers.forEach(c => {
+          c.appendChild(card.cloneNode(true));
+        });
       });
       updateSpeechStepBadges();
     }
