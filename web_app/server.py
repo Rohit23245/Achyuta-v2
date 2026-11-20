@@ -224,7 +224,10 @@ def get_or_create_voice_audio_file(text_content):
         filename = f"tts_{h}.wav"
         file_path = os.path.join(cache_dir, filename)
 
-        # Force fresh audio generation (no stale cache re-use)
+        # Instant disk cache check (<2ms)
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 1000:
+            return f"https://achyuta-v2.onrender.com/static/audio_cache/{filename}"
+
         b64_audio, err = generate_gemini_voice_audio(clean)
         if b64_audio and not err:
             wav_bytes = base64.b64decode(b64_audio)
@@ -566,23 +569,21 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
         msg_to_speak = (cfg.get("greeting") or "Namaste! Main Achyuta se baat kar raha hoon.").strip()
     msg_to_speak = msg_to_speak.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
 
-    # Pre-generate greeting PCM immediately in background thread under ALL phone variations
-    # so that phone answer has ZERO latency (<100ms) from RAM
-    def _pregen():
-        try:
-            pcm = get_pcm24_from_text(msg_to_speak)
-            if pcm:
-                _OUTBOUND_PRECOMPUTED_PCM[clean] = pcm
-                if clean.startswith("91") and len(clean) == 12:
-                    _OUTBOUND_PRECOMPUTED_PCM[clean[2:]] = pcm
-                _OUTBOUND_PRECOMPUTED_PCM[f"+{clean}"] = pcm
-                _OUTBOUND_PRECOMPUTED_PCM[phone] = pcm
-                _OUTBOUND_PRECOMPUTED_PCM[str(phone).strip()] = pcm
-                _OUTBOUND_PRECOMPUTED_PCM["latest"] = pcm
-                print(f"[Outbound Pre-gen] Pre-computed {len(pcm)} bytes PCM for {clean} ('{msg_to_speak[:25]}...')", flush=True)
-        except Exception as e:
-            print(f"[Outbound Pre-gen] Error: {e}", flush=True)
-    threading.Thread(target=_pregen, daemon=True).start()
+    # Pre-generate greeting PCM synchronously from fast disk cache or Gemini
+    # so that phone answer has GUARANTEED ZERO latency (<100ms) from RAM
+    try:
+        pcm = get_pcm24_from_text(msg_to_speak)
+        if pcm:
+            _OUTBOUND_PRECOMPUTED_PCM[clean] = pcm
+            if clean.startswith("91") and len(clean) == 12:
+                _OUTBOUND_PRECOMPUTED_PCM[clean[2:]] = pcm
+            _OUTBOUND_PRECOMPUTED_PCM[f"+{clean}"] = pcm
+            _OUTBOUND_PRECOMPUTED_PCM[phone] = pcm
+            _OUTBOUND_PRECOMPUTED_PCM[str(phone).strip()] = pcm
+            _OUTBOUND_PRECOMPUTED_PCM["latest"] = pcm
+            print(f"[Outbound Pre-gen] Instant pre-computed {len(pcm)} bytes PCM ready for {clean} ('{msg_to_speak[:25]}...')", flush=True)
+    except Exception as e:
+        print(f"[Outbound Pre-gen] Error: {e}", flush=True)
 
     auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
     auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
