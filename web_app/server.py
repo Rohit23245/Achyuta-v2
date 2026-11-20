@@ -407,11 +407,18 @@ def format_indian_call_time(raw_str):
         return 'Just now'
     raw_str = str(raw_str).strip()
     try:
-        base = raw_str.split('+')[0].split('.')[0].strip()
-        dt = datetime.strptime(base, '%Y-%m-%d %H:%M:%S')
-        return dt.strftime('%d %b, %I:%M %p')
+        ist = timezone(timedelta(hours=5, minutes=30))
+        # ISO format parse
+        dt = datetime.fromisoformat(raw_str)
+        dt_ist = dt.astimezone(ist)
+        return dt_ist.strftime('%d %b, %I:%M %p')
     except Exception:
-        return raw_str
+        try:
+            base = raw_str.split('+')[0].split('.')[0].strip()
+            dt = datetime.strptime(base, '%Y-%m-%d %H:%M:%S')
+            return dt.strftime('%d %b, %I:%M %p')
+        except Exception:
+            return raw_str
 
 def get_ai_call_logs_data():
     """
@@ -450,8 +457,21 @@ def get_ai_call_logs_data():
         
         # When currency is INR or balance is maintained in INR, cost_val is the actual rupee deduction (e.g. ₹0.38 per call pulse)
         cost_inr = round(cost_val, 3)
-        hangup = c.get("hangup_cause_name") or c.get("hangup_cause") or "Completed"
-        status = "Connected" if bill_dur > 0 else ("Busy" if "busy" in hangup.lower() else ("No Answer" if not c.get("answer_time") else hangup))
+        hangup = str(c.get("hangup_cause_name") or c.get("hangup_cause") or "").strip()
+        ans = c.get("answer_time")
+
+        if bill_dur > 0 or ans:
+            status = "Connected"
+        elif "busy" in hangup.lower():
+            status = "Busy"
+        elif "reject" in hangup.lower() or "refuse" in hangup.lower():
+            status = "Rejected"
+        elif any(k in hangup.lower() for k in ["no_answer", "no answer", "no_user_response", "timeout"]):
+            status = "No Answer"
+        elif hangup:
+            status = hangup
+        else:
+            status = "Failed"
         
         to_num = c.get("to_number") or ""
         if to_num and not to_num.startswith("+"):
@@ -3343,13 +3363,13 @@ class LiveGeminiBidiSession:
         await self.ws.recv()
         print("[LiveGeminiBidi] Persistent WebSocket session established successfully!", flush=True)
 
-    def stream_speech_turn(self, caller_speech, step_target, on_pcm_chunk):
+    def stream_speech_turn(self, caller_pcm_16k, step_target, on_pcm_chunk):
         """
-        Sends speech prompt on the active session and yields 24kHz audio chunks as they arrive.
+        Sends raw caller PCM audio or prompt on the active session and yields 24kHz audio chunks as they arrive with ultra-low latency.
         """
         try:
             future = asyncio.run_coroutine_threadsafe(
-                self._turn_streaming(caller_speech, step_target, on_pcm_chunk), 
+                self._turn_streaming(caller_pcm_16k, step_target, on_pcm_chunk), 
                 self.loop
             )
             return future.result(timeout=14)
@@ -3357,15 +3377,30 @@ class LiveGeminiBidiSession:
             print(f"[LiveGeminiBidi] Error in speech turn: {e}", flush=True)
             return False
 
-    async def _turn_streaming(self, caller_speech, step_target, on_pcm_chunk):
-        prompt = (
-            f'The caller on phone said: "{caller_speech}". Reply directly in natural Hindi in 1-2 short sentences, and deliver this goal: "{step_target}"'
-            if caller_speech and caller_speech != "Ha kahiye"
-            else f'Speak directly to the caller in natural Hindi in 1-2 short sentences to deliver: "{step_target}"'
+    async def _turn_streaming(self, caller_pcm_16k, step_target, on_pcm_chunk):
+        # 1. If real caller PCM audio bytes are available, send raw audio chunks via realtimeInput
+        if caller_pcm_16k and len(caller_pcm_16k) > 1600:
+            chunk_size = 3200  # 100ms at 16kHz 16-bit mono
+            for i in range(0, len(caller_pcm_16k), chunk_size):
+                chunk = caller_pcm_16k[i:i + chunk_size]
+                b64_data = base64.b64encode(chunk).decode('ascii')
+                await self.ws.send(json.dumps({
+                    "realtimeInput": {
+                        "mediaChunks": [{
+                            "mimeType": "audio/pcm;rate=16000",
+                            "data": b64_data
+                        }]
+                    }
+                }))
+
+        # 2. Complete turn with the target objective direction (no STT roundtrip required!)
+        instruction_text = (
+            f'Respond directly to the caller in 1-2 short sentences in natural Hindi to achieve: "{step_target}"'
+            if step_target else 'Acknowledge the caller politely in 1 short sentence in natural Hindi.'
         )
         await self.ws.send(json.dumps({
             "clientContent": {
-                "turns": [{"role": "user", "parts": [{"text": prompt}]}],
+                "turns": [{"role": "user", "parts": [{"text": instruction_text}]}],
                 "turnComplete": True
             }
         }))
@@ -3568,12 +3603,13 @@ def handle_vobiz_stream_ws(handler, query_params):
                             pcm_in = base64.b64decode(payload_b64)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Speech detection threshold (background noise is ~100-300; vocal speech is >600)
-                            if rms > 600:
+                            # Speech detection threshold (background noise is ~100-400; vocal speech is >850)
+                            if rms > 850:
                                 speech_energy_count += 1
-                                if speech_energy_count >= 3:
+                                # Require at least 5 frames (~0.25s) of sustained vocal energy to avoid breath/rustle triggering
+                                if speech_energy_count >= 5:
                                     if not speech_detected:
-                                        print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
+                                        print(f"[Vobiz Stream] Caller real speech confirmed! RMS={rms}", flush=True)
                                     speech_detected = True
                                     silence_after_speech_count = 0
                                     accumulated_caller_pcm.extend(pcm_in)
@@ -3581,50 +3617,41 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # ~0.6s of silence indicates caller has finished speaking words
-                                    if silence_after_speech_count >= 12:
+                                    # ~0.5s of silence after real speech indicates caller has finished speaking
+                                    if silence_after_speech_count >= 10:
+                                        # Only trigger if we collected at least ~0.35s of real voice PCM
+                                        if len(accumulated_caller_pcm) < 11200:
+                                            # Discard noise blip
+                                            print(f"[Vobiz Stream] Discarding short noise spike ({len(accumulated_caller_pcm)} bytes).", flush=True)
+                                            speech_detected = False
+                                            speech_energy_count = 0
+                                            silence_after_speech_count = 0
+                                            accumulated_caller_pcm.clear()
+                                            continue
+
                                         print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
                                         state = "DELIVERING_RESPONSE"
-
-                                        # Transcribe real caller audio so AI listens accurately to caller's words/questions
-                                        transcribed_words = ""
-                                        if len(accumulated_caller_pcm) > 3200:
-                                            try:
-                                                bio = io.BytesIO()
-                                                with wave.open(bio, 'wb') as wf:
-                                                    wf.setnchannels(1)
-                                                    wf.setsampwidth(2)
-                                                    wf.setframerate(16000)
-                                                    wf.writeframes(accumulated_caller_pcm)
-                                                wav_b64 = base64.b64encode(bio.getvalue()).decode('ascii')
-                                                spoken_text, _ = transcribe_gemini_voice_audio(wav_b64, "audio/wav")
-                                                if spoken_text:
-                                                    transcribed_words = spoken_text.strip()
-                                                    print(f"[Vobiz Stream] Transcribed caller speech: '{transcribed_words}'", flush=True)
-                                            except Exception as tx_err:
-                                                print(f"[Vobiz Stream] STT error: {tx_err}", flush=True)
 
                                         # Pick current step target direction
                                         step_target = steps_list[current_step_index] if current_step_index < len(steps_list) else ""
                                         current_step_index += 1
 
-                                        caller_input = transcribed_words if transcribed_words else "Hello"
-                                        print(f"[Vobiz Stream] Streaming Gemini Live Native Audio for caller='{caller_input}', step='{step_target[:30]}'", flush=True)
+                                        print(f"[Vobiz Stream] Streaming Gemini Live Native Audio directly (ZERO STT DELAY) for step='{step_target[:35]}'", flush=True)
                                         
                                         # Stream directly on the persistent Gemini Live WebSocket session chunk-by-chunk!
                                         delivered = bidi_session.stream_speech_turn(
-                                            caller_input, 
+                                            bytes(accumulated_caller_pcm), 
                                             step_target, 
                                             lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
                                         )
                                         if not delivered:
                                             # Fallback if session dropped
-                                            reply_text = generate_intelligent_second_response(caller_input, step_target, agent_inst)
+                                            reply_text = generate_intelligent_second_response("Hello", step_target, agent_inst)
                                             second_pcm = get_pcm24_from_text(reply_text)
                                             if second_pcm:
                                                 stream_audio_bytes(second_pcm)
                                         
-                                        time.sleep(0.4)
+                                        time.sleep(0.3)
                                         
                                         # Reset audio accumulator for next turn
                                         accumulated_caller_pcm.clear()
