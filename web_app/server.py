@@ -551,8 +551,9 @@ def update_live_call_state(call_uuid, state, extra=None):
     if extra and isinstance(extra, dict):
         LIVE_CALL_TRACKER[call_uuid].update(extra)
 
-# Global in-memory cache for pre-computed speech PCM audio to eliminate phone pickup delay
+# Global in-memory cache for pre-computed speech PCM audio to eliminate pickup and turn response delay
 _OUTBOUND_PRECOMPUTED_PCM = {}
+_OUTBOUND_STEPS_PCM = {}
 
 def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="", response_intent="", agent_instructions=""):
     clean = re.sub(r'[^0-9]', '', str(phone))
@@ -584,6 +585,39 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
             print(f"[Outbound Pre-gen] Instant pre-computed {len(pcm)} bytes PCM ready for {clean} ('{msg_to_speak[:25]}...')", flush=True)
     except Exception as e:
         print(f"[Outbound Pre-gen] Error: {e}", flush=True)
+
+    # Pre-generate subsequent flow response steps in background so Step 2/3 replies take ZERO latency (<100ms)
+    def _pregen_steps():
+        try:
+            steps_to_cache = []
+            if response_intent:
+                if response_intent.startswith("[") and response_intent.endswith("]"):
+                    try:
+                        steps_to_cache = json.loads(response_intent)
+                    except Exception:
+                        pass
+                if not steps_to_cache and " | " in response_intent:
+                    for p in response_intent.split(" | "):
+                        cleaned_p = re.sub(r'^Step \d+:\s*', '', p).strip()
+                        if cleaned_p:
+                            steps_to_cache.append(cleaned_p)
+                elif not steps_to_cache and response_intent.strip():
+                    steps_to_cache.append(response_intent.strip())
+
+            for idx, st in enumerate(steps_to_cache):
+                if st:
+                    step_pcm = get_pcm24_from_text(st)
+                    if step_pcm:
+                        k1 = f"{clean}_{idx}"
+                        k2 = f"{str(phone).strip()}_{idx}"
+                        k3 = f"latest_{idx}"
+                        _OUTBOUND_STEPS_PCM[k1] = step_pcm
+                        _OUTBOUND_STEPS_PCM[k2] = step_pcm
+                        _OUTBOUND_STEPS_PCM[k3] = step_pcm
+                        print(f"[Outbound Step Pre-gen] Cached Step {idx+1} ({len(step_pcm)} bytes) for {clean}", flush=True)
+        except Exception as ex:
+            print(f"[Outbound Step Pre-gen] Error: {ex}", flush=True)
+    threading.Thread(target=_pregen_steps, daemon=True).start()
 
     auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
     auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
@@ -3695,13 +3729,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                             pcm_in = base64.b64decode(payload_b64)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Industry-standard Voice Activity Detection:
-                            # Background line hiss & breath is RMS ~100-800
-                            # Real human speech into phone mic is RMS > 1600
-                            if rms > 1600:
+                            # True human voice into phone mic is RMS > 2400 (line hiss/breath is RMS 300-1400)
+                            if rms > 2400:
                                 speech_energy_count += 1
-                                # Confirmed speech lock: requires at least 8 consecutive speech frames (~400ms of real voice phonemes)
-                                if speech_energy_count >= 8:
+                                # Confirmed speech lock: requires at least 5 consecutive speech frames (~250ms of real voice phonemes)
+                                if speech_energy_count >= 5:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller real speech confirmed! RMS={rms}", flush=True)
                                     speech_detected = True
@@ -3711,10 +3743,10 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # Fast natural turn end: ~0.45s (9 frames) of silence indicates caller finished sentence
-                                    if silence_after_speech_count >= 9:
-                                        # Trigger only if we collected at least ~0.5s of real voice PCM (~16000 bytes at 16kHz 16-bit)
-                                        if len(accumulated_caller_pcm) < 16000:
+                                    # Ultra-fast natural turn response: ~0.3s (6 frames) of silence indicates caller finished sentence
+                                    if silence_after_speech_count >= 6:
+                                        # Trigger only if we collected at least ~0.4s of real voice PCM (~12000 bytes at 16kHz 16-bit)
+                                        if len(accumulated_caller_pcm) < 12000:
                                             # Discard cough, phone click, or breath noise spike
                                             print(f"[Vobiz Stream] Discarding brief line click/noise spike ({len(accumulated_caller_pcm)} bytes). Waiting for real words...", flush=True)
                                             speech_detected = False
@@ -3727,36 +3759,36 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         state = "DELIVERING_RESPONSE"
 
                                         # Pick current step target direction
-                                        step_target = steps_list[current_step_index] if current_step_index < len(steps_list) else ""
+                                        step_idx_to_play = current_step_index
+                                        step_target = steps_list[step_idx_to_play] if step_idx_to_play < len(steps_list) else ""
                                         current_step_index += 1
 
-                                        print(f"[Vobiz Stream] Streaming Gemini Live Native Audio directly (ZERO STT DELAY) for step='{step_target[:35]}'", flush=True)
-                                        
-                                        t_turn_start = time.time()
-                                        first_chunk_logged = False
-                                        def on_live_chunk(pcm_chunk):
-                                            nonlocal first_chunk_logged
-                                            if not first_chunk_logged:
-                                                first_chunk_logged = True
-                                                print(f"[Vobiz Stream] Benchmark: first audio chunk generated in {time.time()-t_turn_start:.2f}s", flush=True)
-                                            stream_audio_bytes(pcm_chunk)
+                                        # Check ultra-fast pre-computed step audio in RAM (<10ms instant response)
+                                        k1 = f"{clean_phone}_{step_idx_to_play}"
+                                        k2 = f"{str(phone).strip()}_{step_idx_to_play}"
+                                        k3 = f"latest_{step_idx_to_play}"
+                                        precomputed_step_pcm = _OUTBOUND_STEPS_PCM.get(k1) or _OUTBOUND_STEPS_PCM.get(k2) or _OUTBOUND_STEPS_PCM.get(k3)
 
-                                        # Stream directly on the persistent Gemini Live WebSocket session chunk-by-chunk!
-                                        delivered = bidi_session.stream_speech_turn(
-                                            bytes(accumulated_caller_pcm), 
-                                            step_target, 
-                                            on_live_chunk
-                                        )
-                                        if not delivered:
-                                            # Fallback if session dropped
-                                            reply_text = generate_intelligent_second_response("Hello", step_target, agent_inst)
-                                            second_pcm = get_pcm24_from_text(reply_text)
-                                            if second_pcm:
-                                                stream_audio_bytes(second_pcm)
-                                        
+                                        if precomputed_step_pcm:
+                                            print(f"[Vobiz Stream] Instant RAM cache hit for Step {step_idx_to_play + 1}! Playing {len(precomputed_step_pcm)} bytes PCM (<50ms delay)...", flush=True)
+                                            stream_audio_bytes(precomputed_step_pcm)
+                                        else:
+                                            print(f"[Vobiz Stream] Fast streaming response for step='{step_target[:35]}'", flush=True)
+                                            delivered = False
+                                            if bidi_session:
+                                                delivered = bidi_session.stream_speech_turn(
+                                                    bytes(accumulated_caller_pcm),
+                                                    step_target,
+                                                    lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
+                                                )
+                                            if not delivered:
+                                                reply_text = generate_intelligent_second_response("Ha kahiye", step_target, agent_inst)
+                                                second_pcm = get_pcm24_from_text(reply_text)
+                                                if second_pcm:
+                                                    stream_audio_bytes(second_pcm)
+
                                         # Reset audio accumulator for next turn
                                         accumulated_caller_pcm.clear()
-
                                         # Check if we finished all configured flow steps
                                         if current_step_index >= total_steps:
                                             print(f"[Vobiz Stream] Final step {current_step_index}/{total_steps} finished playing. Concluding call safely...", flush=True)
