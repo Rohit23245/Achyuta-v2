@@ -6153,6 +6153,11 @@
           populateScriptConfigUI();
           if (callingScriptConfig.preset) highlightPresetButton(callingScriptConfig.preset);
           updateScriptSimulation();
+          // Sync Agent Instructions in Settings tab
+          if (callingScriptConfig.agent_instructions) {
+            const instInputs = document.querySelectorAll('#simple-call-instructions');
+            instInputs.forEach(i => { if (i) i.value = callingScriptConfig.agent_instructions; });
+          }
         }
       } catch (e) {
         console.warn('Could not load calling script config, using default', e);
@@ -6321,24 +6326,19 @@
     }
 
     async function saveAgentSettingsModal() {
-      const instInput = document.getElementById('simple-call-instructions');
-      const instructions = instInput ? instInput.value.trim() : '';
-      const msgInput = document.getElementById('simple-call-message');
-      const intentInput = document.getElementById('simple-call-intent');
+      const instInputs = document.querySelectorAll('#simple-call-instructions');
+      let instructions = '';
+      instInputs.forEach(i => { if (i && i.value.trim()) instructions = i.value.trim(); });
 
       try {
         await fetch('/api/voice_agent/script_config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            greeting: msgInput ? msgInput.value.trim() : '',
-            second_response_intent: intentInput ? intentInput.value.trim() : '',
-            agent_instructions: instructions,
-            plans_pitch_speech: '',
-            objection_speech: 'Aapka dhanyawaad!'
+            agent_instructions: instructions
           })
         });
-        showScreenToast('Agent instructions & settings saved successfully!');
+        showScreenToast('Agent instructions saved permanently to JSON config!');
       } catch (e) {
         showScreenToast('Settings save karne me issue aaya');
       }
@@ -6742,49 +6742,86 @@
       }
     }
 
-    function loadSpeechStepsFromStorage() {
+    function renderSpeechStepsCards(steps) {
+      if (!Array.isArray(steps) || steps.length === 0) return;
+      const container = document.getElementById('speech-steps-container');
+      if (!container) return;
+      container.innerHTML = '';
+      steps.forEach((stepText, idx) => {
+        const nextIdx = idx + 1;
+        const defaultLabel = nextIdx <= _stepLabels.length ? _stepLabels[nextIdx - 1] : `${nextIdx}. Step ${nextIdx} Response Intent`;
+        const defaultBadge = nextIdx <= _stepBadges.length ? _stepBadges[nextIdx - 1] : 'Direction / Goal';
+        const removeBtn = nextIdx > 1 
+          ? `<button type="button" onclick="removeSpeechStepRow(this)" class="w-5 h-5 rounded-md hover:bg-rose-500/10 text-rose-500 flex items-center justify-center transition" title="Remove step"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15"/></svg></button>`
+          : '';
+
+        const card = document.createElement('div');
+        card.className = 'speech-step-card rounded-xl border p-3 relative';
+        card.style.backgroundColor = 'var(--input-bg)';
+        card.style.borderColor = 'var(--border-color)';
+        card.setAttribute('data-step-index', nextIdx);
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
+              <span class="step-dot w-2 h-2 rounded-full ${nextIdx === 1 ? 'bg-teal-500' : 'bg-emerald-500'}"></span>
+              <span class="step-title">${defaultLabel}</span>
+            </label>
+            <div class="flex items-center gap-2">
+              <span class="step-badge text-[10px] text-zinc-400">${defaultBadge}</span>
+              ${removeBtn}
+            </div>
+          </div>
+          <textarea rows="2" placeholder="Message content..." class="speech-step-textarea w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">${stepText}</textarea>
+        `;
+        container.appendChild(card);
+      });
+      updateSpeechStepBadges();
+    }
+
+    async function loadSpeechStepsFromStorage() {
+      // 1. First attempt to load from server JSON config so new browsers / devices get persisted flow
+      try {
+        const res = await fetch('/api/voice_agent/script_config');
+        const d = await res.json();
+        if (d && d.success && d.config) {
+          const cfg = d.config;
+          // Sync instructions
+          if (cfg.agent_instructions) {
+            const instInputs = document.querySelectorAll('#simple-call-instructions');
+            instInputs.forEach(i => { if (i) i.value = cfg.agent_instructions; });
+          }
+          // Sync flow steps
+          if (Array.isArray(cfg.speech_steps) && cfg.speech_steps.length > 0) {
+            renderSpeechStepsCards(cfg.speech_steps);
+            try { localStorage.setItem('achyuta_speech_steps', JSON.stringify(cfg.speech_steps)); } catch(e){}
+            return;
+          } else if (cfg.greeting) {
+            const reconstructed = [cfg.greeting];
+            if (cfg.second_response_intent) {
+              const parts = cfg.second_response_intent.split(' | ').map(p => p.replace(/^Step \d+:\s*/, '').trim()).filter(Boolean);
+              if (parts.length > 0) reconstructed.push(...parts);
+              else reconstructed.push(cfg.second_response_intent);
+            }
+            renderSpeechStepsCards(reconstructed);
+            try { localStorage.setItem('achyuta_speech_steps', JSON.stringify(reconstructed)); } catch(e){}
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load steps from server json, falling back to local storage:', e);
+      }
+
+      // 2. Fallback to localStorage
       try {
         const saved = localStorage.getItem('achyuta_speech_steps');
         if (saved) {
           const steps = JSON.parse(saved);
           if (Array.isArray(steps) && steps.length > 0) {
-            const container = document.getElementById('speech-steps-container');
-            if (container) {
-              container.innerHTML = '';
-              steps.forEach((stepText, idx) => {
-                const nextIdx = idx + 1;
-                const defaultLabel = nextIdx <= _stepLabels.length ? _stepLabels[nextIdx - 1] : `${nextIdx}. Step ${nextIdx} Response Intent`;
-                const defaultBadge = nextIdx <= _stepBadges.length ? _stepBadges[nextIdx - 1] : 'Direction / Goal';
-                const removeBtn = nextIdx > 1 
-                  ? `<button type="button" onclick="removeSpeechStepRow(this)" class="w-5 h-5 rounded-md hover:bg-rose-500/10 text-rose-500 flex items-center justify-center transition" title="Remove step"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15"/></svg></button>`
-                  : '';
-
-                const card = document.createElement('div');
-                card.className = 'speech-step-card rounded-xl border p-3 relative';
-                card.style.backgroundColor = 'var(--input-bg)';
-                card.style.borderColor = 'var(--border-color)';
-                card.setAttribute('data-step-index', nextIdx);
-                card.innerHTML = `
-                  <div class="flex items-center justify-between mb-1">
-                    <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
-                      <span class="step-dot w-2 h-2 rounded-full ${nextIdx === 1 ? 'bg-teal-500' : 'bg-emerald-500'}"></span>
-                      <span class="step-title">${defaultLabel}</span>
-                    </label>
-                    <div class="flex items-center gap-2">
-                      <span class="step-badge text-[10px] text-zinc-400">${defaultBadge}</span>
-                      ${removeBtn}
-                    </div>
-                  </div>
-                  <textarea rows="2" placeholder="Message content..." class="speech-step-textarea w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">${stepText}</textarea>
-                `;
-                container.appendChild(card);
-              });
-              updateSpeechStepBadges();
-            }
+            renderSpeechStepsCards(steps);
           }
         }
       } catch (e) {
-        console.warn('Error loading speech steps:', e);
+        console.warn('Error loading speech steps from storage:', e);
       }
     }
 
@@ -6808,13 +6845,14 @@
             greeting: message,
             second_response_intent: intent,
             agent_instructions: instructions,
+            speech_steps: steps,
             plans_pitch_speech: '',
             objection_speech: 'Aapka dhanyawaad!'
           })
         });
-        showScreenToast('Messages & responses saved successfully!');
+        showScreenToast('Messages & responses saved permanently to JSON config!');
       } catch (e) {
-        showScreenToast('Failed to save to server, saved locally');
+        showScreenToast('Saved locally in browser');
       }
     }
 

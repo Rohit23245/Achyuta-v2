@@ -6,6 +6,7 @@ import hashlib
 import base64
 import struct
 import math
+import copy
 import wave
 import io
 import asyncio
@@ -147,7 +148,13 @@ DEFAULT_CALLING_SCRIPT_CONFIG = {
     ],
     "plans_pitch_speech": "Humare paas aapke business ke liye do mukhya plans hain. Starter Plan ₹4,999 me aur Growth Pro Plan ₹12,999 me. Starter plan lene ke liye 1 dabayein, ya Pro plan lene ke liye 2 dabayein.",
     "objection_speech": "Koi baat nahi {customer_name} ji! Hum samajhte hain aap abhi vyast honge. Main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap free time me dekh sakein. Dhanyawaad aur aapka din shubh ho!",
-    "confirmation_speech": "Bahut bahut dhanyawaad {customer_name} ji! Aapka plan interest successfully note kar liya gaya hai aur hamari support team aapse jald hi connect karegi. Aapka din shubh ho!"
+    "confirmation_speech": "Bahut bahut dhanyawaad {customer_name} ji! Aapka plan interest successfully note kar liya gaya hai aur hamari support team aapse jald hi connect karegi. Aapka din shubh ho!",
+    "second_response_intent": "Customer ki baat ko sunkar aur samajhkar politely samjhao ki hum AI voice agent aur CRM automate karte hain jisse unka time bachta hai, aur unhe bolo ki main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap dekh sakein.",
+    "agent_instructions": "Do not deviate from the topic. Listen attentively to the customer, provide concise and direct responses, and always maintain a polite, respectful, and professional tone.",
+    "speech_steps": [
+        "Namaste! Main Achyuta Enterprise Solutions se Priya baat kar rahi hoon. Hum aapke business sales aur operations ko automate karne ke liye vishesh AI plans lekar aaye hain. Kya aapse 1 minute baat ho sakti hai?",
+        "Customer ki baat ko sunkar aur samajhkar politely samjhao ki hum AI voice agent aur CRM automate karte hain jisse unka time bachta hai, aur unhe bolo ki main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap dekh sakein."
+    ]
 }
 
 def get_campaigns_data():
@@ -178,18 +185,24 @@ def save_campaigns_data(data):
         return False
 
 def get_calling_script_config():
+    cfg = copy.deepcopy(DEFAULT_CALLING_SCRIPT_CONFIG)
     if os.path.exists(CALLING_SCRIPT_CONFIG_PATH):
         try:
             with open(CALLING_SCRIPT_CONFIG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                saved = json.load(f)
+                if isinstance(saved, dict):
+                    cfg.update(saved)
         except Exception:
             pass
-    return DEFAULT_CALLING_SCRIPT_CONFIG
+    return cfg
 
 def save_calling_script_config(data):
     try:
+        current = get_calling_script_config()
+        if isinstance(data, dict):
+            current.update(data)
         with open(CALLING_SCRIPT_CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            json.dump(current, f, indent=2, ensure_ascii=False)
         return True
     except Exception as e:
         print(f"Error saving calling script config: {e}")
