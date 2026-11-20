@@ -3391,15 +3391,15 @@ class LiveGeminiBidiSession:
                 self._turn_streaming(caller_pcm_16k, step_target, on_pcm_chunk), 
                 self.loop
             )
-            return future.result(timeout=14)
+            return future.result(timeout=7)
         except Exception as e:
             print(f"[LiveGeminiBidi] Error in speech turn: {e}", flush=True)
             return False
 
     async def _turn_streaming(self, caller_pcm_16k, step_target, on_pcm_chunk):
-        # 1. If real caller PCM audio bytes are available, send raw audio chunks via realtimeInput
+        # 1. If real caller PCM audio bytes are available, send raw audio chunks efficiently in 500ms (16000 bytes) blocks
         if caller_pcm_16k and len(caller_pcm_16k) > 1600:
-            chunk_size = 3200  # 100ms at 16kHz 16-bit mono
+            chunk_size = 16000  # 500ms at 16kHz 16-bit mono for minimal WebSocket frame overhead
             for i in range(0, len(caller_pcm_16k), chunk_size):
                 chunk = caller_pcm_16k[i:i + chunk_size]
                 b64_data = base64.b64encode(chunk).decode('ascii')
@@ -3414,7 +3414,7 @@ class LiveGeminiBidiSession:
 
         # 2. Complete turn with the target objective direction (no STT roundtrip required!)
         instruction_text = (
-            f'Respond directly to the caller in 1-2 short sentences in natural Hindi to achieve: "{step_target}"'
+            f'Respond directly to the caller in 1 short sentence in natural Hindi to achieve: "{step_target}"'
             if step_target else 'Acknowledge the caller politely in 1 short sentence in natural Hindi.'
         )
         await self.ws.send(json.dumps({
@@ -3678,11 +3678,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                             
                             # Industry-standard Voice Activity Detection:
                             # Background line hiss & breath is RMS ~100-500
-                            # Clear human speech into phone mic is RMS > 1200
-                            if rms > 1200:
+                            # Clear human speech into phone mic is RMS > 1000
+                            if rms > 1000:
                                 speech_energy_count += 1
-                                # Require at least 7 consecutive speech frames (~350ms of real voice phonemes)
-                                if speech_energy_count >= 7:
+                                # Fast speech lock: 4 consecutive speech frames (~160-200ms of real voice phonemes)
+                                if speech_energy_count >= 4:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller real speech confirmed! RMS={rms}", flush=True)
                                     speech_detected = True
@@ -3692,10 +3692,10 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # ~0.65s (13 frames of 50ms) of silence after real speech indicates caller has finished sentence
-                                    if silence_after_speech_count >= 13:
-                                        # Only trigger if we collected at least ~0.6s of real voice PCM (~19200 bytes at 16kHz 16-bit)
-                                        if len(accumulated_caller_pcm) < 19200:
+                                    # Fast natural turn end: ~0.35s (7 frames) of silence indicates caller finished sentence
+                                    if silence_after_speech_count >= 7:
+                                        # Trigger if we collected at least ~0.3s of real voice PCM (~9600 bytes at 16kHz 16-bit)
+                                        if len(accumulated_caller_pcm) < 9600:
                                             # Discard cough, phone click, or breath noise spike
                                             print(f"[Vobiz Stream] Discarding brief line click/noise spike ({len(accumulated_caller_pcm)} bytes). Waiting for real words...", flush=True)
                                             speech_detected = False
@@ -3713,11 +3713,20 @@ def handle_vobiz_stream_ws(handler, query_params):
 
                                         print(f"[Vobiz Stream] Streaming Gemini Live Native Audio directly (ZERO STT DELAY) for step='{step_target[:35]}'", flush=True)
                                         
+                                        t_turn_start = time.time()
+                                        first_chunk_logged = False
+                                        def on_live_chunk(pcm_chunk):
+                                            nonlocal first_chunk_logged
+                                            if not first_chunk_logged:
+                                                first_chunk_logged = True
+                                                print(f"[Vobiz Stream] Benchmark: first audio chunk generated in {time.time()-t_turn_start:.2f}s", flush=True)
+                                            stream_audio_bytes(pcm_chunk)
+
                                         # Stream directly on the persistent Gemini Live WebSocket session chunk-by-chunk!
                                         delivered = bidi_session.stream_speech_turn(
                                             bytes(accumulated_caller_pcm), 
                                             step_target, 
-                                            lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
+                                            on_live_chunk
                                         )
                                         if not delivered:
                                             # Fallback if session dropped
@@ -3725,8 +3734,6 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             second_pcm = get_pcm24_from_text(reply_text)
                                             if second_pcm:
                                                 stream_audio_bytes(second_pcm)
-                                        
-                                        time.sleep(0.3)
                                         
                                         # Reset audio accumulator for next turn
                                         accumulated_caller_pcm.clear()
