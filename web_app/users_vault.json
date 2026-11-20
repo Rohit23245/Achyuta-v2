@@ -1,0 +1,96 @@
+[
+  {
+    "username": "admin",
+    "email": "admin@achyuta.ai",
+    "password": "achyuta@2026",
+    "name": "Administrator",
+    "role": "Super Admin",
+    "phone": "+91 98765 00000",
+    "monthly_salary": 75000.0,
+    "joining_date": "2026-01-01",
+    "status": "Active",
+    "initial": "A"
+  },
+  {
+    "username": "rohit",
+    "email": "rohit@gmail.com",
+    "password": "123",
+    "name": "Rohit Sharma",
+    "role": "Developer",
+    "phone": "8707526283",
+    "monthly_salary": 10000.0,
+    "joining_date": "2026-11-15",
+    "status": "Active",
+    "initial": "R"
+  },
+  {
+    "username": "mohan",
+    "email": "mohan@achyuta.ai",
+    "password": "mohan123",
+    "name": "Mohan",
+    "role": "Staff Member",
+    "phone": "1234567890",
+    "monthly_salary": 0.0,
+    "joining_date": "2026-11-17",
+    "status": "Active",
+    "initial": "M"
+  },
+  {
+    "username": "mohan1",
+    "email": "mohan1@achyuta.ai",
+    "password": "mohan1123",
+    "name": "Mohan",
+    "role": "Staff Member",
+    "phone": "1234567890",
+    "monthly_salary": 0.0,
+    "joining_date": "2026-11-17",
+    "status": "Active",
+    "initial": "M"
+  },
+  {
+    "username": "mohan2",
+    "email": "mohan2@achyuta.ai",
+    "password": "mohan2123",
+    "name": "Mohan",
+    "role": "Staff Member",
+    "phone": "4561239879",
+    "monthly_salary": 0.0,
+    "joining_date": "2026-11-17",
+    "status": "Active",
+    "initial": "M"
+  },
+  {
+    "username": "mohan3",
+    "email": "mohan3@achyuta.ai",
+    "password": "mohan3123",
+    "name": "Mohan",
+    "role": "Staff Member",
+    "phone": "4561239879",
+    "monthly_salary": 0.0,
+    "joining_date": "2026-11-17",
+    "status": "Active",
+    "initial": "M"
+  },
+  {
+    "username": "mohan4",
+    "email": "mohan4@achyuta.ai",
+    "password": "mohan4123",
+    "name": "Mohan",
+    "role": "Staff Member",
+    "phone": "123456789",
+    "monthly_salary": 0.0,
+    "joining_date": "2026-11-17",
+    "status": "Active",
+    "initial": "M"
+  },
+  {
+    "id": "STAFF-9837",
+    "name": "Priya",
+    "phone": "7896543216",
+    "role": "Staff Member",
+    "monthly_salary": 0.0,
+    "email": "priya@company.com",
+    "department": "Operations",
+    "status": "Active"
+  }
+]
