@@ -372,8 +372,8 @@ def fetch_vobiz_real_call_logs():
     """
     Directly syncs actual call metadata, cost, and recordings from the official Vobiz Telephony API.
     """
-    auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
-    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
+    auth_id = VOBIZ_AUTH_ID
+    auth_token = VOBIZ_AUTH_TOKEN
     url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/?limit=40"
     
     import ssl
@@ -397,8 +397,8 @@ def get_realtime_vobiz_recordings():
     """
     Retrieves live recordings directly from Vobiz Cloud.
     """
-    auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
-    auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
+    auth_id = VOBIZ_AUTH_ID
+    auth_token = VOBIZ_AUTH_TOKEN
     url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Recording/?limit=30"
     
     import ssl
