@@ -3762,23 +3762,26 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         step_target = steps_list[step_idx_to_play] if step_idx_to_play < len(steps_list) else ""
                                         current_step_index += 1
 
-                                        # 1. First priority: Check ultra-fast pre-computed step audio in RAM (<10ms instant response)
-                                        k1 = f"{clean_phone}_{step_idx_to_play}"
-                                        k2 = f"{str(phone).strip()}_{step_idx_to_play}"
-                                        k3 = f"latest_{step_idx_to_play}"
-                                        precomputed_step_pcm = _OUTBOUND_STEPS_PCM.get(k1) or _OUTBOUND_STEPS_PCM.get(k2) or _OUTBOUND_STEPS_PCM.get(k3)
-
-                                        if precomputed_step_pcm:
-                                            print(f"[Vobiz Stream] Instant RAM cache hit for Step {step_idx_to_play + 1}! Playing {len(precomputed_step_pcm)} bytes PCM (<50ms delay)...", flush=True)
-                                            stream_audio_bytes(precomputed_step_pcm)
-                                        else:
-                                            # 2. Fast direct fallback: immediate Gemini TTS generation
-                                            print(f"[Vobiz Stream] Delivering step response: '{step_target[:35]}'", flush=True)
-                                            reply_text = step_target if step_target else generate_intelligent_second_response("Ha kahiye", step_target, agent_inst)
+                                        # Intelligent Conversational Response via Gemini Multimodal Live Audio:
+                                        # Passes caller's real words + step direction goal to LLM (ZERO fixed robotic repetition)
+                                        print(f"[Vobiz Stream] Generating dynamic LLM reply for step='{step_target[:35]}'...", flush=True)
+                                        delivered = False
+                                        if bidi_session:
+                                            prompt_inst = (
+                                                f'Customer ne jo pucha ya bola hai uska pehle swabhavik Hindi me seedha uttar do, aur fir bat ko aage badhakar is goal ko achieve karo: "{step_target}". Ek ya do chote natural sentences me bolo.'
+                                                if step_target else 'Customer ki baat ka dhyan se sunkar natural Hindi me direct aur polite response do.'
+                                            )
+                                            delivered = bidi_session.stream_speech_turn(
+                                                bytes(accumulated_caller_pcm),
+                                                prompt_inst,
+                                                lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
+                                            )
+                                        if not delivered:
+                                            # Robust dynamic fallback: formulate intelligent Hindi reply
+                                            reply_text = generate_intelligent_second_response("Haan kahiye", step_target, agent_inst)
                                             step_pcm = get_pcm24_from_text(reply_text)
                                             if step_pcm:
                                                 stream_audio_bytes(step_pcm)
-
                                         # Reset audio accumulator for next turn
                                         accumulated_caller_pcm.clear()
                                         if current_step_index >= total_steps:
