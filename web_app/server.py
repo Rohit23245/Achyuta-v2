@@ -3746,7 +3746,7 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     # Natural turn end: ~0.4s (8 frames) of silence indicates caller finished sentence
                                     if silence_after_speech_count >= 8:
                                         # Trigger when caller speaks at least ~0.3s of real speech (>9600 bytes)
-                                        if len(accumulated_caller_pcm) < 3000:
+                                        if len(accumulated_caller_pcm) < 9600:
                                             # Discard brief line click / cough
                                             speech_detected = False
                                             speech_energy_count = 0
@@ -3762,41 +3762,37 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         step_target = steps_list[step_idx_to_play] if step_idx_to_play < len(steps_list) else ""
                                         current_step_index += 1
 
-                                        # Intelligent Conversational Response via Gemini Multimodal Live Audio:
-                                        # High-Speed Intelligent Conversational Turn:
-                                        # 1. Transcribe caller words via ultra-fast multimodal API
-                                        # 2. Formulate intelligent natural Hindi response steered to step_target
-                                        # 3. Stream Priya's natural voice (zero freeze, 100% reliable)
-                                        print(f"[Vobiz Stream] Processing caller speech ({len(accumulated_caller_pcm)} bytes)...", flush=True)
-                                        caller_speech = ""
-                                        try:
-                                            # Convert raw 16kHz PCM to standard WAV base64
-                                            wav_io = io.BytesIO()
-                                            with wave.open(wav_io, "wb") as wf:
-                                                wf.setnchannels(1)
-                                                wf.setsampwidth(2)
-                                                wf.setframerate(16000)
-                                                wf.writeframes(accumulated_caller_pcm)
-                                            wav_b64 = base64.b64encode(wav_io.getvalue()).decode("ascii")
-                                            caller_speech, _ = transcribe_gemini_voice_audio(wav_b64, mime_type="audio/wav")
-                                            print(f"[Vobiz Stream] Caller said: '{caller_speech}'", flush=True)
-                                        except Exception as stt_err:
-                                            print(f"[Vobiz Stream] STT error: {stt_err}", flush=True)
+                                        # 1. First priority: Check ultra-fast pre-computed step audio in RAM (<10ms instant response)
+                                        k1 = f"{clean_phone}_{step_idx_to_play}"
+                                        k2 = f"{str(phone).strip()}_{step_idx_to_play}"
+                                        k3 = f"latest_{step_idx_to_play}"
+                                        precomputed_step_pcm = _OUTBOUND_STEPS_PCM.get(k1) or _OUTBOUND_STEPS_PCM.get(k2) or _OUTBOUND_STEPS_PCM.get(k3)
 
-                                        # Generate intelligent reply based on what caller ACTUALLY said
-                                        reply_text = generate_intelligent_second_response(caller_speech or "Haan kahiye", step_target, agent_inst)
-                                        print(f"[Vobiz Stream] Priya intelligent reply: '{reply_text}'", flush=True)
-                                        step_pcm = get_pcm24_from_text(reply_text)
-                                        if step_pcm:
-                                            stream_audio_bytes(step_pcm)
+                                        if precomputed_step_pcm:
+                                            print(f"[Vobiz Stream] Instant RAM cache hit for Step {step_idx_to_play + 1}! Playing {len(precomputed_step_pcm)} bytes PCM (<50ms delay)...", flush=True)
+                                            stream_audio_bytes(precomputed_step_pcm)
+                                        else:
+                                            # 2. Fast direct fallback: immediate Gemini TTS generation
+                                            print(f"[Vobiz Stream] Delivering step response: '{step_target[:35]}'", flush=True)
+                                            reply_text = step_target if step_target else generate_intelligent_second_response("Ha kahiye", step_target, agent_inst)
+                                            step_pcm = get_pcm24_from_text(reply_text)
+                                            if step_pcm:
+                                                stream_audio_bytes(step_pcm)
+
+                                        # Reset audio accumulator for next turn
                                         accumulated_caller_pcm.clear()
-                                        # Always keep ear open for continuous conversation (no premature hangup or deaf state)
-                                        state = "LISTENING_FOR_SPEECH"
-                                        speech_detected = False
-                                        speech_energy_count = 0
-                                        silence_after_speech_count = 0
-                                        accumulated_caller_pcm.clear()
-                                        print(f"[Vobiz Stream] Turn delivered. Ear unlocked: Actively listening for caller's next reply...", flush=True)
+                                        if current_step_index >= total_steps:
+                                            print(f"[Vobiz Stream] Final step {current_step_index}/{total_steps} finished playing. Concluding call safely...", flush=True)
+                                            time.sleep(1.5)
+                                            break
+                                        else:
+                                            # Automatically unlock ear and listen for caller's next reply!
+                                            print(f"[Vobiz Stream] Step {current_step_index}/{total_steps} delivered. Automatically listening for caller turn {current_step_index + 1}...", flush=True)
+                                            state = "LISTENING_FOR_SPEECH"
+                                            speech_detected = False
+                                            speech_energy_count = 0
+                                            silence_after_speech_count = 0
+                                            accumulated_caller_pcm.clear()
                         except Exception as ex:
                             print(f"[Vobiz Stream] Media processing error: {ex}", flush=True)
 
