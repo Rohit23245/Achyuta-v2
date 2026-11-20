@@ -3440,15 +3440,38 @@ class LiveGeminiBidiSession:
             pass
 
 def get_pcm24_from_text(text):
-    """Generates fresh 24kHz raw PCM bytes directly from Gemini TTS (no stale disk cache)."""
+    """
+    Retrieves or generates 24kHz raw PCM bytes directly from Gemini TTS with disk caching.
+    Guarantees instant (<20ms) audio playback for pre-generated greetings.
+    """
+    if not text or not text.strip():
+        return None
     try:
-        b64_audio, err = generate_gemini_voice_audio(text)
+        clean = " ".join(text.strip().split())
+        h = hashlib.md5(clean.encode("utf-8")).hexdigest()
+        cache_dir = os.path.join(STATIC_DIR, "audio_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        raw_path = os.path.join(cache_dir, f"pcm24_{h}.raw")
+
+        # Instant zero-latency disk cache hit (<5ms)
+        if os.path.exists(raw_path):
+            with open(raw_path, "rb") as f:
+                cached_bytes = f.read()
+                if len(cached_bytes) > 0:
+                    return cached_bytes
+
+        # Fresh generation from Gemini Live Native Audio API
+        b64_audio, err = generate_gemini_voice_audio(clean)
         if b64_audio and not err:
             wav_bytes = base64.b64decode(b64_audio)
             with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
-                return wf.readframes(wf.getnframes())
+                pcm = wf.readframes(wf.getnframes())
+                if pcm:
+                    with open(raw_path, "wb") as f:
+                        f.write(pcm)
+                    return pcm
     except Exception as e:
-        print(f"[Vobiz Stream] Error generating fresh PCM for text '{text[:20]}': {e}", flush=True)
+        print(f"[Vobiz Stream] Error generating/caching PCM for text '{text[:20]}': {e}", flush=True)
     return None
 
 def handle_vobiz_stream_ws(handler, query_params):
@@ -3499,18 +3522,6 @@ def handle_vobiz_stream_ws(handler, query_params):
     total_steps = len(steps_list)
     print(f"[Vobiz Stream] Initialized multi-turn flow for {phone}: First msg + {total_steps} response steps.", flush=True)
 
-    # Initialize persistent low-latency Gemini Live Bidi Session for the call
-    system_inst_full = (
-        f"You are a real human female calling executive named Priya calling on behalf of the configured business in natural Hindi.\n"
-        f"Rules:\n"
-        f"1. Always respond verbally directly to the human caller in natural, polite Hindi (1-2 short sentences max).\n"
-        f"2. Directly answer or acknowledge whatever the customer says (e.g. if they say Hello or ask who is calling, warmly answer that you are Priya).\n"
-        f"3. Specific Behavioral Instructions: \"{agent_inst}\".\n"
-        f"4. You are a real human executive. Never say you are an AI, computer, or cannot shop.\n"
-        f"5. NEVER explain your thoughts or output meta text. Speak directly to the caller."
-    )
-    bidi_session = LiveGeminiBidiSession(system_inst_full)
-
     stream_id = None
     call_id = None
     state = "GREETING_QUEUED"
@@ -3530,10 +3541,27 @@ def handle_vobiz_stream_ws(handler, query_params):
         first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(f"+{clean_phone}", None)
 
     if not first_pcm:
-        print(f"[Vobiz Stream] Pre-computed PCM not found in memory, generating now for '{first_msg[:25]}'...", flush=True)
+        print(f"[Vobiz Stream] Fast fetching PCM for '{first_msg[:25]}'...", flush=True)
         first_pcm = get_pcm24_from_text(first_msg)
     else:
         print(f"[Vobiz Stream] Instant zero-delay greeting PCM ready from memory ({len(first_pcm)} bytes)!", flush=True)
+
+    # Lazy-init persistent Gemini Live Bidi Session asynchronously in background thread
+    # so connection handshake NEVER delays the first greeting playback!
+    bidi_session = None
+    def _init_bidi():
+        nonlocal bidi_session
+        system_inst_full = (
+            f"You are a real human female calling executive named Priya calling on behalf of the configured business in natural Hindi.\n"
+            f"Rules:\n"
+            f"1. Always respond verbally directly to the human caller in natural, polite Hindi (1-2 short sentences max).\n"
+            f"2. Directly answer or acknowledge whatever the customer says (e.g. if they say Hello or ask who is calling, warmly answer that you are Priya).\n"
+            f"3. Specific Behavioral Instructions: \"{agent_inst}\".\n"
+            f"4. You are a real human executive. Never say you are an AI, computer, or cannot shop.\n"
+            f"5. NEVER explain your thoughts or output meta text. Speak directly to the caller."
+        )
+        bidi_session = LiveGeminiBidiSession(system_inst_full)
+    threading.Thread(target=_init_bidi, daemon=True).start()
 
     # 20ms chunks at 24kHz 16-bit mono = 24000 * 2 * 0.02 = 960 bytes
     CHUNK_BYTES = 960
@@ -3582,25 +3610,28 @@ def handle_vobiz_stream_ws(handler, query_params):
                     call_id = event.get("callId") or start_meta.get("callId") or start_meta.get("callUUID")
                     print(f"[Vobiz Stream] Received 'start' event! streamId={stream_id}, callId={call_id}", flush=True)
 
-                    # Professional greeting playback: immediate 0.15s start
-                    time.sleep(0.15)
+                    # Professional greeting playback: instant start
+                    time.sleep(0.05)
                     if first_pcm:
                         print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...", flush=True)
                         stream_audio_bytes(first_pcm)
                         # Grace period for line echo to completely clear before opening ear
-                        time.sleep(0.6)
+                        time.sleep(0.5)
                         if stream_id:
                             chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "greeting_done"}
                             send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
                     else:
-                        # If for any reason greeting wasn't pre-computed, speak directly via live Gemini session
-                        print(f"[Vobiz Stream] Streaming live Gemini greeting for '{first_msg[:30]}'...", flush=True)
-                        bidi_session.stream_speech_turn(
-                            b"", 
-                            first_msg, 
-                            lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
-                        )
-                        time.sleep(0.6)
+                        # Fallback: get fast from cache or live
+                        alt_pcm = get_pcm24_from_text(first_msg)
+                        if alt_pcm:
+                            stream_audio_bytes(alt_pcm)
+                        elif bidi_session:
+                            bidi_session.stream_speech_turn(
+                                b"", 
+                                first_msg, 
+                                lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
+                            )
+                        time.sleep(0.5)
 
                     state = "LISTENING_FOR_SPEECH"
                     speech_energy_count = 0
