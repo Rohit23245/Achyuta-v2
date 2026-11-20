@@ -543,18 +543,30 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
     if len(clean) == 10:
         clean = '91' + clean
 
-    # Pre-generate greeting PCM asynchronously or in background thread so audio is 100% ready when user answers phone
+    cfg = get_calling_script_config()
+    agent_name = cfg.get("agent_name", "Priya")
+    comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
+
+    # Resolve exact speech text that will be spoken upon call connect
     msg_to_speak = str(custom_message or "").strip()
-    if msg_to_speak:
-        def _pregen():
-            try:
-                pcm = get_pcm24_from_text(msg_to_speak)
-                if pcm:
-                    _OUTBOUND_PRECOMPUTED_PCM[clean] = pcm
-                    print(f"[Outbound Pre-gen] Pre-computed {len(pcm)} bytes PCM for {clean}", flush=True)
-            except Exception as e:
-                print(f"[Outbound Pre-gen] Error: {e}", flush=True)
-        threading.Thread(target=_pregen, daemon=True).start()
+    if not msg_to_speak:
+        msg_to_speak = (cfg.get("greeting") or "Namaste! Main Achyuta se baat kar raha hoon.").strip()
+    msg_to_speak = msg_to_speak.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
+
+    # Pre-generate greeting PCM immediately in background thread under ALL phone variations
+    # so that phone answer has ZERO latency (<100ms) from RAM
+    def _pregen():
+        try:
+            pcm = get_pcm24_from_text(msg_to_speak)
+            if pcm:
+                _OUTBOUND_PRECOMPUTED_PCM[clean] = pcm
+                if clean.startswith("91") and len(clean) == 12:
+                    _OUTBOUND_PRECOMPUTED_PCM[clean[2:]] = pcm
+                _OUTBOUND_PRECOMPUTED_PCM[f"+{clean}"] = pcm
+                print(f"[Outbound Pre-gen] Pre-computed {len(pcm)} bytes PCM for {clean} ('{msg_to_speak[:25]}...')", flush=True)
+        except Exception as e:
+            print(f"[Outbound Pre-gen] Error: {e}", flush=True)
+    threading.Thread(target=_pregen, daemon=True).start()
 
     auth_id = os.environ.get('VOBIZ_AUTH_ID', VOBIZ_AUTH_ID)
     auth_token = os.environ.get('VOBIZ_AUTH_TOKEN', VOBIZ_AUTH_TOKEN)
@@ -609,6 +621,7 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
 
             logs = get_ai_call_logs_data()
             curr_time = int(time.time())
+            ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%d %b, %I:%M %p')
             new_log = {
                 "id": f"call_{len(logs)+1}_{curr_time}",
                 "call_uuid": uuid_val,
@@ -618,8 +631,8 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
                 "duration_seconds": 0,
                 "initiated_at": curr_time,
                 "recording_url": "",
-                "created_at": "Just now",
-                "notes": "Outbound AI Call initiated via Vobiz Telephony"
+                "created_at": ist_now,
+                "notes": "Outbound AI Call queued via Vobiz Telephony"
             }
             logs.insert(0, new_log)
             with open(CALL_LOGS_PATH, "w", encoding="utf-8") as f:
@@ -3509,6 +3522,13 @@ def handle_vobiz_stream_ws(handler, query_params):
     
     clean_phone = re.sub(r'[^0-9]', '', str(phone))
     first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(clean_phone, None)
+    if not first_pcm and clean_phone.startswith("91") and len(clean_phone) == 12:
+        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(clean_phone[2:], None)
+    if not first_pcm and len(clean_phone) == 10:
+        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop("91" + clean_phone, None)
+    if not first_pcm:
+        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.pop(f"+{clean_phone}", None)
+
     if not first_pcm:
         print(f"[Vobiz Stream] Pre-computed PCM not found in memory, generating now for '{first_msg[:25]}'...", flush=True)
         first_pcm = get_pcm24_from_text(first_msg)
@@ -3562,20 +3582,31 @@ def handle_vobiz_stream_ws(handler, query_params):
                     call_id = event.get("callId") or start_meta.get("callId") or start_meta.get("callUUID")
                     print(f"[Vobiz Stream] Received 'start' event! streamId={stream_id}, callId={call_id}", flush=True)
 
-                    # Give 1.0s grace period for line audio to connect before speaking greeting
-                    time.sleep(1.0)
+                    # Professional greeting playback: immediate 0.15s start
+                    time.sleep(0.15)
                     if first_pcm:
                         print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...", flush=True)
                         stream_audio_bytes(first_pcm)
-                        # Grace period for playback to finish before opening ear
-                        time.sleep(0.4)
+                        # Grace period for line echo to completely clear before opening ear
+                        time.sleep(0.6)
                         if stream_id:
                             chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "greeting_done"}
                             send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
+                    else:
+                        # If for any reason greeting wasn't pre-computed, speak directly via live Gemini session
+                        print(f"[Vobiz Stream] Streaming live Gemini greeting for '{first_msg[:30]}'...", flush=True)
+                        bidi_session.stream_speech_turn(
+                            b"", 
+                            first_msg, 
+                            lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
+                        )
+                        time.sleep(0.6)
+
                     state = "LISTENING_FOR_SPEECH"
                     speech_energy_count = 0
                     silence_after_speech_count = 0
-                    print("[Vobiz Stream] Now actively listening for caller speech (ignoring line silence)...", flush=True)
+                    accumulated_caller_pcm.clear()
+                    print("[Vobiz Stream] Ear unlocked: Actively listening for caller speech (ignoring line silence)...", flush=True)
 
                 elif event_name == "checkpoint":
                     chk_name = event.get("name")
@@ -3591,6 +3622,7 @@ def handle_vobiz_stream_ws(handler, query_params):
                             speech_detected = False
                             speech_energy_count = 0
                             silence_after_speech_count = 0
+                            accumulated_caller_pcm.clear()
                     elif chk_name == "second_response_done":
                         time.sleep(1.0)
                         break
@@ -3603,11 +3635,13 @@ def handle_vobiz_stream_ws(handler, query_params):
                             pcm_in = base64.b64decode(payload_b64)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Speech detection threshold (background noise is ~100-400; vocal speech is >850)
-                            if rms > 850:
+                            # Industry-standard Voice Activity Detection:
+                            # Background line hiss & breath is RMS ~100-500
+                            # Clear human speech into phone mic is RMS > 1200
+                            if rms > 1200:
                                 speech_energy_count += 1
-                                # Require at least 5 frames (~0.25s) of sustained vocal energy to avoid breath/rustle triggering
-                                if speech_energy_count >= 5:
+                                # Require at least 7 consecutive speech frames (~350ms of real voice phonemes)
+                                if speech_energy_count >= 7:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller real speech confirmed! RMS={rms}", flush=True)
                                     speech_detected = True
@@ -3617,19 +3651,19 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # ~0.5s of silence after real speech indicates caller has finished speaking
-                                    if silence_after_speech_count >= 10:
-                                        # Only trigger if we collected at least ~0.35s of real voice PCM
-                                        if len(accumulated_caller_pcm) < 11200:
-                                            # Discard noise blip
-                                            print(f"[Vobiz Stream] Discarding short noise spike ({len(accumulated_caller_pcm)} bytes).", flush=True)
+                                    # ~0.65s (13 frames of 50ms) of silence after real speech indicates caller has finished sentence
+                                    if silence_after_speech_count >= 13:
+                                        # Only trigger if we collected at least ~0.6s of real voice PCM (~19200 bytes at 16kHz 16-bit)
+                                        if len(accumulated_caller_pcm) < 19200:
+                                            # Discard cough, phone click, or breath noise spike
+                                            print(f"[Vobiz Stream] Discarding brief line click/noise spike ({len(accumulated_caller_pcm)} bytes). Waiting for real words...", flush=True)
                                             speech_detected = False
                                             speech_energy_count = 0
                                             silence_after_speech_count = 0
                                             accumulated_caller_pcm.clear()
                                             continue
 
-                                        print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
+                                        print(f"[Vobiz Stream] Caller finished speaking sentence ({len(accumulated_caller_pcm)} bytes PCM). Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
                                         state = "DELIVERING_RESPONSE"
 
                                         # Pick current step target direction
@@ -3668,6 +3702,7 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             speech_detected = False
                                             speech_energy_count = 0
                                             silence_after_speech_count = 0
+                                            accumulated_caller_pcm.clear()
                         except Exception as ex:
                             print(f"[Vobiz Stream] Media processing error: {ex}", flush=True)
 

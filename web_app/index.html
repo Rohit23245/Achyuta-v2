@@ -4644,22 +4644,31 @@
       }
 
       tbody.innerHTML = logs.map((l, idx) => {
-        const isCompleted = (l.call_status || '').toLowerCase() === 'completed';
-        const isInitiated = (l.call_status || '').toLowerCase() === 'initiated';
-        const isBusy = (l.call_status || '').toLowerCase().includes('busy') || (l.call_status || '').toLowerCase().includes('reject');
+        const rawStatus = (l.call_status || '').toLowerCase();
+        const isConnected = rawStatus === 'connected' || rawStatus === 'completed';
+        const isInitiated = rawStatus === 'initiated' || rawStatus === 'queued';
+        const isBusy = rawStatus.includes('busy');
+        const isRejected = rawStatus.includes('reject') || rawStatus.includes('refuse');
+        const isNoAnswer = rawStatus.includes('no answer') || rawStatus.includes('no_answer') || rawStatus.includes('timeout') || rawStatus.includes('no_user_response');
         
-        const dotColor = isCompleted ? 'bg-emerald-500' : (isInitiated ? 'bg-amber-500' : 'bg-rose-500');
+        const dotColor = isConnected ? 'bg-emerald-500' : (isInitiated ? 'bg-amber-500' : (isBusy ? 'bg-amber-600' : 'bg-rose-500'));
         const custName = l.customer_name || 'Direct Call';
         const phone = l.customer_phone || '--';
-        const dur = l.duration_seconds ? `${l.duration_seconds}s` : (isInitiated ? 'Calling...' : '0s');
-        const costStr = l.cost_inr || (isCompleted ? '₹0.380' : '₹0.00');
+        const dur = (isConnected && l.duration_seconds > 0) ? `${l.duration_seconds}s` : (isInitiated ? 'Dialing...' : '0s');
+        const costStr = l.cost_inr || (isConnected ? '₹0.380' : '₹0.00');
         const timeStr = l.created_at || 'Just now';
 
-        const statusBadge = isCompleted 
+        const statusBadge = isConnected 
           ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Connected</span>'
           : isInitiated 
-            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Initiated</span>'
-            : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/20"><span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>' + escapeHtml(l.call_status || 'Ended') + '</span>';
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Queued / Dialing</span>'
+            : isBusy
+              ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Busy</span>'
+              : isRejected
+                ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Rejected</span>'
+                : isNoAnswer
+                  ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/20"><span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>No Answer</span>'
+                  : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/20"><span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>' + escapeHtml(l.call_status || 'Ended') + '</span>';
 
         return `
           <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition border-b" style="border-color: var(--border-color);">
@@ -6394,8 +6403,8 @@
 
       if (banner && phoneEl) {
         phoneEl.textContent = clean;
-        if (titleEl) titleEl.textContent = 'Initiating Call...';
-        if (subEl) subEl.textContent = 'Calling your phone via Vobiz';
+        if (titleEl) titleEl.textContent = 'Dialing Request Sent...';
+        if (subEl) subEl.textContent = 'Connecting through carrier network...';
         if (dotEl) {
           dotEl.className = 'w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0';
         }
@@ -6403,7 +6412,7 @@
         banner.classList.remove('hidden');
       }
 
-      showScreenToast('Triggering outbound AI call to ' + clean + '...');
+      showScreenToast('Dialing request sent for ' + clean + '...');
 
       try {
         const res = await fetch('/api/voice_agent/trigger', {
@@ -6419,7 +6428,6 @@
         });
         const data = await res.json();
         if (data.success) {
-          showScreenToast('Call placed! Ringing your phone...');
           loadCallingAgentData();
 
           const callUuid = data.data?.api_id || data.data?.request_uuid || '';
@@ -6449,8 +6457,9 @@
                     if (titleEl) titleEl.textContent = 'Call Connected (Live AI Conversation)';
                     if (subEl) subEl.textContent = 'Customer answered phone';
                     if (dotEl) dotEl.className = 'w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping flex-shrink-0';
+                    showScreenToast('Call Connected! User answered.');
                     
-                    // Start conversation timer ONLY after call is answered
+                    // Start conversation timer ONLY after call is actually answered
                     if (!_liveCallTicker) {
                       _liveCallTicker = setInterval(() => {
                         _liveCallSeconds++;
@@ -6461,7 +6470,7 @@
                     }
                   } else if (stData.is_ringing && !callAnswered) {
                     if (titleEl) titleEl.textContent = 'Phone is Ringing...';
-                    if (subEl) subEl.textContent = 'Waiting for you to pick up the call';
+                    if (subEl) subEl.textContent = 'Handset is ringing, waiting for pick up';
                     if (dotEl) dotEl.className = 'w-3.5 h-3.5 rounded-full bg-amber-400 animate-ping flex-shrink-0';
                   }
                 } catch(e) {}
@@ -6476,9 +6485,11 @@
 
         } else {
           showScreenToast(data.message || 'Call trigger failed');
+          if (banner) banner.classList.add('hidden');
         }
       } catch (err) {
-        showScreenToast('Call connection initiated.');
+        showScreenToast('Call connection failed.');
+        if (banner) banner.classList.add('hidden');
       }
     }
 
