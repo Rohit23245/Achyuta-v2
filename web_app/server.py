@@ -616,8 +616,14 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
         with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
             res = json.loads(r.read().decode("utf-8"))
             
-            uuid_val = res.get("api_id") or res.get("request_uuid") or f"vobiz_{int(time.time())}"
-            update_live_call_state(uuid_val, "queued", {"phone": f"+{clean}", "name": customer_name})
+            # Vobiz Call CDR queries require request_uuid
+            uuid_val = res.get("request_uuid") or res.get("api_id") or f"vobiz_{int(time.time())}"
+            api_id_val = res.get("api_id") or ""
+            
+            # Register in tracker under both IDs so callbacks and polls always match
+            update_live_call_state(uuid_val, "calling", {"phone": f"+{clean}", "name": customer_name, "request_uuid": uuid_val, "api_id": api_id_val})
+            if api_id_val and api_id_val != uuid_val:
+                update_live_call_state(api_id_val, "calling", {"phone": f"+{clean}", "name": customer_name, "request_uuid": uuid_val, "api_id": api_id_val})
 
             logs = get_ai_call_logs_data()
             curr_time = int(time.time())
@@ -627,7 +633,7 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
                 "call_uuid": uuid_val,
                 "customer_phone": f"+{clean}",
                 "customer_name": customer_name,
-                "call_status": "Initiated",
+                "call_status": "Calling",
                 "duration_seconds": 0,
                 "initiated_at": curr_time,
                 "recording_url": "",
@@ -3610,6 +3616,10 @@ def handle_vobiz_stream_ws(handler, query_params):
                     call_id = event.get("callId") or start_meta.get("callId") or start_meta.get("callUUID")
                     print(f"[Vobiz Stream] Received 'start' event! streamId={stream_id}, callId={call_id}", flush=True)
 
+                    # Update live tracker immediately to connected/picked state
+                    if call_id:
+                        update_live_call_state(call_id, "connected")
+
                     # Professional greeting playback: instant start
                     time.sleep(0.05)
                     if first_pcm:
@@ -3749,6 +3759,8 @@ def handle_vobiz_stream_ws(handler, query_params):
     except Exception as e:
         print(f"[Vobiz Stream] Error in stream loop: {e}", flush=True)
     finally:
+        if call_id:
+            update_live_call_state(call_id, "ended", {"hangup_cause": "Call Completed"})
         try:
             bidi_session.close()
         except Exception:
@@ -5181,17 +5193,19 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             
             # 1. First check in-memory real-time state from callbacks
             tracked = LIVE_CALL_TRACKER.get(call_uuid, {})
-            current_state = tracked.get("state", "initiated")
+            current_state = tracked.get("state", "calling")
 
             is_ended = current_state in ["ended", "completed", "busy", "rejected", "failed"]
-            is_ringing = current_state == "ringing"
-            is_connected = current_state == "connected"
+            is_ringing = current_state in ["ringing", "ring"]
+            is_connected = current_state in ["connected", "picked", "in-progress"]
             hangup_cause = tracked.get("hangup_cause", "")
             bill_duration = tracked.get("bill_duration", 0)
 
             # 2. If not ended yet, query Vobiz Cloud CDR directly to sync actual status
             if not is_ended:
-                url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Call/{call_uuid}/"
+                # Query using request_uuid or call_uuid
+                target_uuid = tracked.get("request_uuid") or call_uuid
+                url = f"https://api.vobiz.ai/api/v1/Account/{VOBIZ_AUTH_ID}/Call/{target_uuid}/"
                 headers = {
                     "X-Auth-ID": VOBIZ_AUTH_ID,
                     "X-Auth-Token": VOBIZ_AUTH_TOKEN
@@ -5204,17 +5218,27 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 except Exception as e:
                     pass
 
-                if call_data.get("end_time") or call_data.get("hangup_cause"):
+                vobiz_state = (call_data.get("call_state") or "").lower()
+                hangup_c = call_data.get("hangup_cause") or call_data.get("hangup_cause_name") or ""
+                
+                if call_data.get("end_time") or hangup_c or vobiz_state in ["ended", "completed", "busy", "failed"]:
                     is_ended = True
+                    is_connected = False
+                    is_ringing = False
                     current_state = "ended"
-                    hangup_cause = call_data.get("hangup_cause") or "Completed"
-                    bill_duration = int(call_data.get("bill_duration") or 0)
+                    hangup_cause = hangup_c or "Completed"
+                    bill_duration = int(call_data.get("bill_duration") or call_data.get("duration") or 0)
                     update_live_call_state(call_uuid, "ended", {"hangup_cause": hangup_cause, "bill_duration": bill_duration})
-                elif call_data.get("answer_time"):
+                elif call_data.get("answer_time") or vobiz_state in ["in-progress", "connected"]:
                     is_connected = True
                     is_ringing = False
                     current_state = "connected"
                     update_live_call_state(call_uuid, "connected")
+                elif vobiz_state in ["ringing", "ring"]:
+                    is_ringing = True
+                    is_connected = False
+                    current_state = "ringing"
+                    update_live_call_state(call_uuid, "ringing")
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
