@@ -1812,6 +1812,14 @@
                 <span class="truncate">Initiate Call</span>
               </button>
 
+              <!-- Tab: Create / Manage List (New Dedicated Portal Module) -->
+              <button type="button" onclick="switchCallingPortalTab('createlist')" id="cportal-tab-createlist" class="cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-start gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+                </svg>
+                <span class="truncate">Create List</span>
+              </button>
+
               <!-- Tab 2: Agent Flow -->
               <button type="button" onclick="switchCallingPortalTab('flow')" id="cportal-tab-flow" class="cportal-nav-btn flex-1 md:flex-none h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-between gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
                 <div class="flex items-center gap-2.5 min-w-0">
@@ -1936,6 +1944,71 @@
                 </div>
               </div>
 
+            </div>
+
+            <!-- SUB-PANEL: CREATE / MANAGE CALLING LIST INLINE -->
+            <div id="cportal-panel-createlist" class="cportal-subpanel space-y-4 hidden">
+              <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-4" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                <div class="flex items-center justify-between pb-3 border-b flex-wrap gap-2" style="border-color: var(--border-color);">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+                    </div>
+                    <div>
+                      <h3 class="text-base font-bold tracking-tight" style="color: var(--text);">Create Calling Campaign List</h3>
+                      <p class="text-[11px] text-zinc-400">Save custom target numbers or select leads directly from CRM</p>
+                    </div>
+                  </div>
+                  <button type="button" onclick="handleSaveCallingList()" class="h-8 px-4 text-xs font-bold rounded-xl bg-teal-600 hover:bg-teal-500 text-white transition shadow-sm cursor-pointer flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                    <span>Save List</span>
+                  </button>
+                </div>
+
+                <div class="space-y-4 pt-1">
+                  <div>
+                    <label class="block text-xs font-semibold mb-1" style="color: var(--text);">List / Campaign Name *</label>
+                    <input type="text" id="clm-list-name" placeholder="e.g. Real Estate Investors Q4" class="w-full text-xs p-2.5 rounded-xl border focus:outline-none focus:border-teal-500 transition" style="background-color: var(--input-bg); border-color: var(--border-color); color: var(--text);">
+                  </div>
+
+                  <!-- Add New Number Directly -->
+                  <div class="p-3.5 rounded-xl border space-y-2.5" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Add New Number Directly</div>
+                    <div class="flex flex-col sm:flex-row items-center gap-2">
+                      <input type="text" id="clm-new-name" placeholder="Contact Name (e.g. Vikram)" class="w-full sm:w-1/2 text-xs p-2.5 rounded-xl border focus:outline-none focus:border-teal-500" style="background-color: var(--input-bg); border-color: var(--border-color); color: var(--text);">
+                      <input type="text" id="clm-new-phone" placeholder="Mobile (e.g. 9876543210)" class="w-full sm:w-1/2 text-xs p-2.5 rounded-xl border focus:outline-none focus:border-teal-500 font-mono" style="background-color: var(--input-bg); border-color: var(--border-color); color: var(--text);">
+                      <button type="button" onclick="handleAddCustomContactToList()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition flex-shrink-0 cursor-pointer shadow-xs">
+                        Add to List
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Select from Existing CRM Leads -->
+                  <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                      <label class="text-xs font-semibold" style="color: var(--text);">Select from Existing CRM Leads</label>
+                      <div class="flex items-center gap-2">
+                        <button type="button" onclick="selectAllCrmLeadsForCalling(true)" class="text-[10px] text-teal-600 dark:text-teal-400 font-semibold hover:underline">Select All</button>
+                        <span class="text-zinc-400">•</span>
+                        <button type="button" onclick="selectAllCrmLeadsForCalling(false)" class="text-[10px] text-zinc-400 font-semibold hover:underline">Clear</button>
+                      </div>
+                    </div>
+                    <div id="clm-crm-leads-container" class="max-h-48 overflow-y-auto border rounded-xl p-2 space-y-1.5 custom-scroll text-xs" style="background-color: var(--input-bg); border-color: var(--border-color);">
+                      <!-- Rendered by JS -->
+                    </div>
+                  </div>
+
+                  <!-- Staged Contacts for this List -->
+                  <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                      <label class="text-xs font-semibold" style="color: var(--text);">List Members (<span id="clm-staged-count">0</span> contacts ready)</label>
+                    </div>
+                    <div id="clm-staged-contacts-container" class="max-h-44 overflow-y-auto border rounded-xl p-2 space-y-1 custom-scroll text-xs" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                      <!-- Rendered by JS -->
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- SUB-PANEL 2: AGENT FLOW (CONVERSATION STEPS INLINE) -->
@@ -5962,7 +6035,7 @@
        CALLING AGENT DEDICATED PORTAL NAVIGATION
        ======================================================================== */
     function switchCallingPortalTab(tabKey) {
-      const tabs = ['dialer', 'flow', 'settings', 'history'];
+      const tabs = ['dialer', 'createlist', 'flow', 'settings', 'history'];
       tabs.forEach(t => {
         const btn = document.getElementById(`cportal-tab-${t}`);
         const panel = document.getElementById(`cportal-panel-${t}`);
@@ -5986,6 +6059,9 @@
         if (typeof loadCallingAgentData === 'function') loadCallingAgentData();
       } else if (tabKey === 'settings') {
         if (typeof loadCallingScriptConfig === 'function') loadCallingScriptConfig();
+      } else if (tabKey === 'createlist') {
+        if (typeof renderCrmLeadsForCalling === 'function') renderCrmLeadsForCalling();
+        if (typeof renderStagedCallingContacts === 'function') renderStagedCallingContacts();
       }
     }
 
@@ -6201,6 +6277,7 @@
     }
 
     async function openCreateCallingListModalDirect() {
+      switchCallingPortalTab('createlist');
       const numbers = getEnteredPhoneNumbers();
       if (typeof openCreateCallingListModal === 'function') {
         await openCreateCallingListModal();
