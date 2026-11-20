@@ -5124,7 +5124,14 @@
         showScreenToast('Please enter a valid phone number');
         return;
       }
-      triggerDirectCall(phone, 'Customer');
+      // Read current dynamic speech steps from Agent Flow UI
+      const steps = getEnteredSpeechSteps();
+      const firstMsg = steps[0] || '';
+      const remaining = steps.slice(1);
+      const intentStr = remaining.length > 0 ? remaining.map((s, idx) => `Step ${idx + 2}: ${s}`).join(' | ') : '';
+      const instInput = document.getElementById('simple-call-instructions');
+      const instStr = instInput ? instInput.value.trim() : '';
+      triggerDirectCall(phone, 'Customer', firstMsg, intentStr, instStr);
     }
 
     // =========================================================================
@@ -6768,49 +6775,49 @@
     }
 
     async function loadSpeechStepsFromStorage() {
-      // 1. First attempt to load from server JSON config so new browsers / devices get persisted flow
-      try {
-        const res = await fetch('/api/voice_agent/script_config');
-        const d = await res.json();
-        if (d && d.success && d.config) {
-          const cfg = d.config;
-          // Sync instructions
-          if (cfg.agent_instructions) {
-            const instInputs = document.querySelectorAll('#simple-call-instructions');
-            instInputs.forEach(i => { if (i) i.value = cfg.agent_instructions; });
-          }
-          // Sync flow steps
-          if (Array.isArray(cfg.speech_steps) && cfg.speech_steps.length > 0) {
-            renderSpeechStepsCards(cfg.speech_steps);
-            try { localStorage.setItem('achyuta_speech_steps', JSON.stringify(cfg.speech_steps)); } catch(e){}
-            return;
-          } else if (cfg.greeting) {
-            const reconstructed = [cfg.greeting];
-            if (cfg.second_response_intent) {
-              const parts = cfg.second_response_intent.split(' | ').map(p => p.replace(/^Step \d+:\s*/, '').trim()).filter(Boolean);
-              if (parts.length > 0) reconstructed.push(...parts);
-              else reconstructed.push(cfg.second_response_intent);
-            }
-            renderSpeechStepsCards(reconstructed);
-            try { localStorage.setItem('achyuta_speech_steps', JSON.stringify(reconstructed)); } catch(e){}
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('Could not load steps from server json, falling back to local storage:', e);
-      }
-
-      // 2. Fallback to localStorage
+      // 1. Priority #1: LocalStorage preserves user custom entered flow dynamically across refreshes
+      let hasLocal = false;
       try {
         const saved = localStorage.getItem('achyuta_speech_steps');
         if (saved) {
           const steps = JSON.parse(saved);
           if (Array.isArray(steps) && steps.length > 0) {
             renderSpeechStepsCards(steps);
+            hasLocal = true;
           }
         }
       } catch (e) {
-        console.warn('Error loading speech steps from storage:', e);
+        console.warn('Error loading speech steps from local storage:', e);
+      }
+
+      // 2. Sync instructions and fallback if no local storage yet
+      try {
+        const res = await fetch('/api/voice_agent/script_config');
+        const d = await res.json();
+        if (d && d.success && d.config) {
+          const cfg = d.config;
+          if (cfg.agent_instructions) {
+            const instInputs = document.querySelectorAll('#simple-call-instructions');
+            instInputs.forEach(i => { if (i) i.value = cfg.agent_instructions; });
+          }
+          if (!hasLocal) {
+            if (Array.isArray(cfg.speech_steps) && cfg.speech_steps.length > 0) {
+              renderSpeechStepsCards(cfg.speech_steps);
+              try { localStorage.setItem('achyuta_speech_steps', JSON.stringify(cfg.speech_steps)); } catch(e){}
+            } else if (cfg.greeting) {
+              const reconstructed = [cfg.greeting];
+              if (cfg.second_response_intent) {
+                const parts = cfg.second_response_intent.split(' | ').map(p => p.replace(/^Step \d+:\s*/, '').trim()).filter(Boolean);
+                if (parts.length > 0) reconstructed.push(...parts);
+                else reconstructed.push(cfg.second_response_intent);
+              }
+              renderSpeechStepsCards(reconstructed);
+              try { localStorage.setItem('achyuta_speech_steps', JSON.stringify(reconstructed)); } catch(e){}
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load steps from server json:', e);
       }
     }
 
