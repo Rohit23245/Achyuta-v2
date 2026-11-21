@@ -251,58 +251,28 @@
       background: linear-gradient(to top, #0ea5e9, #38bdf8, #7dd3fc);
     }
   
-    /* Creative Modern AI Thinking Orb & Radar Ripple Animation */
-    @keyframes ai-think-pulse {
-      0%, 100% { transform: scale(0.85); opacity: 0.6; }
-      50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 6px #14b8a6); }
+        /* ChatGPT-Style Clean, Simple, Borderless Pulse Dots */
+    @keyframes chatgpt-dot-bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.35; }
+      40% { transform: scale(1.0); opacity: 0.95; }
     }
-    @keyframes ai-radar-ripple {
-      0% { transform: scale(0.6); opacity: 0.9; }
-      100% { transform: scale(2.2); opacity: 0; }
-    }
-    @keyframes ai-think-glow-rotate {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .ai-thinking-orb-wrap {
-      position: relative;
+    .chatgpt-thinking-dots {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
+      gap: 4px;
+      padding: 0 2px;
     }
-    .ai-thinking-ripple {
-      position: absolute;
-      inset: -2px;
+    .chatgpt-dot {
+      width: 5px;
+      height: 5px;
       border-radius: 9999px;
-      border: 1.5px solid rgba(20, 184, 166, 0.6);
-      animation: ai-radar-ripple 1.8s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+      background-color: #0d9488;
+      animation: chatgpt-dot-bounce 1.4s infinite ease-in-out both;
     }
-    .ai-thinking-ripple:nth-child(2) {
-      animation-delay: 0.6s;
-    }
-    .ai-thinking-ripple:nth-child(3) {
-      animation-delay: 1.2s;
-    }
-    .ai-thinking-core-orb {
-      width: 10px;
-      height: 10px;
-      border-radius: 9999px;
-      background: radial-gradient(circle at 35% 35%, #5eead4, #14b8a6, #0f766e);
-      box-shadow: 0 0 10px rgba(20, 184, 166, 0.85);
-      animation: ai-think-pulse 1.4s ease-in-out infinite;
-      z-index: 2;
-    }
-    .ai-thinking-orbit-ring {
-      position: absolute;
-      inset: 1px;
-      border-radius: 9999px;
-      border: 1.5px dashed rgba(45, 212, 191, 0.65);
-      animation: ai-think-glow-rotate 4s linear infinite;
-    }
-
-  </style>
+    .chatgpt-dot:nth-child(1) { animation-delay: -0.32s; }
+    .chatgpt-dot:nth-child(2) { animation-delay: -0.16s; }
+    .chatgpt-dot:nth-child(3) { animation-delay: 0s; }
+</style>
 </head>
 <body class="flex h-screen overflow-hidden antialiased light-mode" style="background-color: var(--bg); color: var(--text);">
 
@@ -7682,15 +7652,14 @@
           <img src="/static/logo.jpg" alt="Achyuta" class="w-full h-full object-cover">
           <div class="absolute inset-0 rounded-2xl border border-teal-400/50 animate-ping opacity-25 pointer-events-none"></div>
         </div>
-        <div class="flex items-center gap-2.5 py-1.5 px-3 rounded-2xl border shadow-sm backdrop-blur-md" style="background: var(--card-bg); border-color: var(--border-color); color: var(--text);">
-          <div class="ai-thinking-orb-wrap">
-            <div class="ai-thinking-ripple"></div>
-            <div class="ai-thinking-ripple"></div>
-            <div class="ai-thinking-orbit-ring"></div>
-            <div class="ai-thinking-core-orb"></div>
+        <div class="flex items-center gap-2 py-1 px-1 bg-transparent border-0 shadow-none text-zinc-500 dark:text-zinc-400 select-none">
+          <div class="chatgpt-thinking-dots">
+            <span class="chatgpt-dot"></span>
+            <span class="chatgpt-dot"></span>
+            <span class="chatgpt-dot"></span>
           </div>
-          <span class="text-xs font-semibold tracking-wide bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500 bg-clip-text text-transparent select-none">Thinking...</span>
-          <span id="${timerId}" class="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 text-teal-600 dark:text-teal-400 select-none">0s</span>
+          <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Thinking</span>
+          <span id="${timerId}" class="text-[11px] font-mono opacity-60">0s</span>
         </div>
       `;
       container.appendChild(row);
@@ -14272,7 +14241,7 @@
       } else if (state === 'thinking') {
         if (chatWave) { chatWave.classList.add('hidden'); }
         if (dockWave) { dockWave.classList.add('hidden'); }
-        const thinkingIcon = '<div class="ai-thinking-orb-wrap"><div class="ai-thinking-ripple"></div><div class="ai-thinking-ripple"></div><div class="ai-thinking-orbit-ring"></div><div class="ai-thinking-core-orb"></div></div>';
+        const thinkingIcon = '<div class="chatgpt-thinking-dots"><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span></div>';
         if (chatMicBtn) {
           chatMicBtn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30';
           chatMicBtn.style.backgroundColor = 'rgba(13, 148, 136, 0.15)';
