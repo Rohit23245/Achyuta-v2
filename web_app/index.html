@@ -260,7 +260,11 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 0 2px;
+      padding: 0;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      outline: none !important;
     }
     .chatgpt-dot {
       width: 5px;
@@ -13948,11 +13952,11 @@
           const chatMicBtn = document.getElementById('chat-mic-btn');
           const dockMicBtn = document.getElementById('dock-mic-btn');
 
-          if (chatMicBtn && !isSpeaking) {
+          if (chatMicBtn && !isSpeaking && !isProcessingVoiceTurn) {
             chatMicBtn.style.transform = 'scale(' + micScale + ')';
             chatMicBtn.style.boxShadow = isUserTalking ? ('0 0 ' + glowRadius + 'px ' + glowColor) : 'none';
           }
-          if (dockMicBtn && !isSpeaking) {
+          if (dockMicBtn && !isSpeaking && !isProcessingVoiceTurn) {
             dockMicBtn.style.transform = 'scale(' + micScale + ')';
             dockMicBtn.style.boxShadow = isUserTalking ? ('0 0 ' + glowRadius + 'px ' + glowColor) : 'none';
           }
@@ -14240,22 +14244,24 @@
         if (dockWave) { dockWave.classList.add('hidden'); }
         const thinkingIcon = '<div class="chatgpt-thinking-dots"><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span></div>';
         if (chatMicBtn) {
-          chatMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 bg-transparent border-0 shadow-none';
-          chatMicBtn.style.backgroundColor = 'transparent';
-          chatMicBtn.style.color = '#0d9488';
-          chatMicBtn.style.borderColor = 'transparent';
-          chatMicBtn.innerHTML = thinkingIcon;
+          chatMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 !bg-transparent !border-0 !border-none !shadow-none !outline-none';
+          chatMicBtn.style.setProperty('background', 'transparent', 'important');
+          chatMicBtn.style.setProperty('background-color', 'transparent', 'important');
+          chatMicBtn.style.setProperty('border', 'none', 'important');
+          chatMicBtn.style.setProperty('box-shadow', 'none', 'important');
+          chatMicBtn.style.setProperty('outline', 'none', 'important');
           chatMicBtn.style.transform = 'scale(1)';
-          chatMicBtn.style.boxShadow = 'none';
+          chatMicBtn.innerHTML = thinkingIcon;
         }
         if (dockMicBtn) {
-          dockMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 bg-transparent border-0 shadow-none';
-          dockMicBtn.style.backgroundColor = 'transparent';
-          dockMicBtn.style.color = '#0d9488';
-          dockMicBtn.style.borderColor = 'transparent';
-          dockMicBtn.innerHTML = thinkingIcon;
+          dockMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 !bg-transparent !border-0 !border-none !shadow-none !outline-none';
+          dockMicBtn.style.setProperty('background', 'transparent', 'important');
+          dockMicBtn.style.setProperty('background-color', 'transparent', 'important');
+          dockMicBtn.style.setProperty('border', 'none', 'important');
+          dockMicBtn.style.setProperty('box-shadow', 'none', 'important');
+          dockMicBtn.style.setProperty('outline', 'none', 'important');
           dockMicBtn.style.transform = 'scale(1)';
-          dockMicBtn.style.boxShadow = 'none';
+          dockMicBtn.innerHTML = thinkingIcon;
         }
         if (chatPromptInput) chatPromptInput.placeholder = "Thinking...";
         if (dockPromptInput) dockPromptInput.placeholder = "Thinking...";
