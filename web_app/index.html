@@ -276,6 +276,20 @@
     .chatgpt-dot:nth-child(1) { animation-delay: -0.32s; }
     .chatgpt-dot:nth-child(2) { animation-delay: -0.16s; }
     .chatgpt-dot:nth-child(3) { animation-delay: 0s; }
+    
+    /* Ensure thinking state has absolutely zero border, box-shadow, glow, or background */
+    #chat-mic-btn.is-thinking, #dock-mic-btn.is-thinking,
+    button:has(.chatgpt-thinking-dots),
+    .chatgpt-thinking-dots,
+    .chatgpt-thinking-dots * {
+      background: transparent !important;
+      background-color: transparent !important;
+      border: 0 !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      outline: none !important;
+      -webkit-box-shadow: none !important;
+    }
 </style>
 </head>
 <body onclick="unlockAudioEngine()" class="flex h-screen overflow-hidden antialiased light-mode" style="background-color: var(--bg); color: var(--text);">
@@ -14216,6 +14230,7 @@
         if (chatWave) { chatWave.classList.add('hidden'); chatWave.classList.remove('flex', 'listening', 'speaking'); }
         if (dockWave) { dockWave.classList.add('hidden'); dockWave.classList.remove('flex', 'listening', 'speaking'); }
         if (chatMicBtn) {
+          chatMicBtn.style.cssText = '';
           chatMicBtn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 hover:bg-black/5 dark:hover:bg-white/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 active:scale-95 relative';
           chatMicBtn.style.backgroundColor = 'var(--card-bg)';
           chatMicBtn.style.color = '';
@@ -14225,6 +14240,7 @@
           chatMicBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 01-3-3V4.5a3 3 0 016 0v7.5a3 3 0 01-3 3z"/></svg>';
         }
         if (dockMicBtn) {
+          dockMicBtn.style.cssText = '';
           dockMicBtn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 hover:bg-black/5 dark:hover:bg-white/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 active:scale-95 relative';
           dockMicBtn.style.backgroundColor = 'var(--card-bg)';
           dockMicBtn.style.color = '';
@@ -14259,23 +14275,13 @@
         if (dockWave) { dockWave.classList.add('hidden'); }
         const thinkingIcon = '<div class="chatgpt-thinking-dots"><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span></div>';
         if (chatMicBtn) {
-          chatMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 !bg-transparent !border-0 !border-none !shadow-none !outline-none';
-          chatMicBtn.style.setProperty('background', 'transparent', 'important');
-          chatMicBtn.style.setProperty('background-color', 'transparent', 'important');
-          chatMicBtn.style.setProperty('border', 'none', 'important');
-          chatMicBtn.style.setProperty('box-shadow', 'none', 'important');
-          chatMicBtn.style.setProperty('outline', 'none', 'important');
-          chatMicBtn.style.transform = 'scale(1)';
+          chatMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 is-thinking !bg-transparent !border-0 !border-none !shadow-none !outline-none';
+          chatMicBtn.style.cssText = 'background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; outline: none !important; transform: scale(1);';
           chatMicBtn.innerHTML = thinkingIcon;
         }
         if (dockMicBtn) {
-          dockMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 !bg-transparent !border-0 !border-none !shadow-none !outline-none';
-          dockMicBtn.style.setProperty('background', 'transparent', 'important');
-          dockMicBtn.style.setProperty('background-color', 'transparent', 'important');
-          dockMicBtn.style.setProperty('border', 'none', 'important');
-          dockMicBtn.style.setProperty('box-shadow', 'none', 'important');
-          dockMicBtn.style.setProperty('outline', 'none', 'important');
-          dockMicBtn.style.transform = 'scale(1)';
+          dockMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 is-thinking !bg-transparent !border-0 !border-none !shadow-none !outline-none';
+          dockMicBtn.style.cssText = 'background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; outline: none !important; transform: scale(1);';
           dockMicBtn.innerHTML = thinkingIcon;
         }
         if (chatPromptInput) chatPromptInput.placeholder = "Thinking...";
