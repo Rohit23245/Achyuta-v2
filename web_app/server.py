@@ -3606,8 +3606,13 @@ def handle_vobiz_stream_ws(handler, query_params):
         elif not steps_list and resp_intent.strip():
             steps_list.append(resp_intent.strip())
 
+    cfg = get_calling_script_config()
+    if not steps_list:
+        default_intent = (cfg.get("second_response_intent") or "Customer ki baat ko sunkar politely samjhao ki hum AI voice automation provide karte hain aur unhe bolo ki link bhej diya gaya hai.").strip()
+        if default_intent:
+            steps_list.append(default_intent)
+
     if not first_msg:
-        cfg = get_calling_script_config()
         first_msg = (cfg.get("greeting") or f"Namaste {cust_name} ji! Main Achyuta Enterprise se baat kar raha hoon.").replace("{customer_name}", cust_name)
 
     current_step_index = 0
@@ -3773,11 +3778,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                             pcm_in = base64.b64decode(payload_b64)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Real phone human speech is RMS > 1000 (typical telecom speech 1000-2800, line noise 100-600)
-                            if rms > 1000:
+                            # Real phone human speech detection (RMS > 350 for cellular/PSTN codecs)
+                            if rms > 350:
                                 speech_energy_count += 1
-                                # Speech lock: 3 consecutive speech frames (~150ms of real voice phonemes)
-                                if speech_energy_count >= 3:
+                                # Speech lock: 2 consecutive speech frames (~100ms)
+                                if speech_energy_count >= 2:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
                                     speech_detected = True
@@ -3789,9 +3794,9 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     accumulated_caller_pcm.extend(pcm_in)
                                     # Natural turn end: ~0.4s (8 frames) of silence indicates caller finished sentence
                                     if silence_after_speech_count >= 8:
-                                        # Trigger when caller speaks at least ~0.3s of real speech (>9600 bytes)
-                                        if len(accumulated_caller_pcm) < 9600:
-                                            # Discard brief line click / cough
+                                        # Trigger when caller speaks at least ~0.2s of real speech (>4000 bytes)
+                                        if len(accumulated_caller_pcm) < 4000:
+                                            # Discard tiny line click / glitch
                                             speech_detected = False
                                             speech_energy_count = 0
                                             silence_after_speech_count = 0
