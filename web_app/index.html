@@ -13705,6 +13705,33 @@
     let isVoiceModeActive = false;
     let isVoiceMuted = false;
     let voiceSynthesis = window.speechSynthesis || null;
+    let isAudioEngineUnlocked = false;
+
+    function unlockAudioEngine() {
+      if (isAudioEngineUnlocked) return;
+      try {
+        const silentAudio = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=");
+        silentAudio.volume = 0.01;
+        const playPromise = silentAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            isAudioEngineUnlocked = true;
+            console.log("[AUDIO ENGINE UNLOCKED] Browser autoplay permitted.");
+          }).catch(e => {
+            console.log("[AUDIO UNLOCK ATTEMPT]", e);
+          });
+        }
+      } catch (e) {}
+
+      if (window.AudioContext || window.webkitAudioContext) {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          if (ctx.state === 'suspended') {
+            ctx.resume();
+          }
+        } catch(e) {}
+      }
+    }
     let currentUtterance = null;
     let isSpeaking = false;
     let voiceRestartTimer = null;
@@ -14146,6 +14173,7 @@
 
       isVoiceModeActive = true;
       isProcessingVoiceTurn = false;
+      unlockAudioEngine();
 
       // Set initial listening state on prompt input and mic button
       setVoiceOrbState('listening');
@@ -14587,8 +14615,14 @@
             fallbackBrowserSpeech(cleanSpeech);
           };
 
-          await currentAudioPlayer.play();
-          return;
+          try {
+            await currentAudioPlayer.play();
+            return;
+          } catch(playErr) {
+            console.warn("[AUDIO PLAY REJECTED BY BROWSER, RETRYING WITH FALLBACK]:", playErr);
+            fallbackBrowserSpeech(cleanSpeech);
+            return;
+          }
         } else {
           fallbackBrowserSpeech(cleanSpeech);
         }
@@ -14599,17 +14633,73 @@
     }
 
     function fallbackBrowserSpeech(cleanSpeech) {
-      // Browser SpeechSynthesis completely DISABLED to prevent robotic interference
-      // Gemini 2.5 Flash Native Audio is the SOLE audio authority
-      console.warn("[BROWSER SPEECH DISABLED]: Strict Gemini 2.5 Flash Native Audio policy");
-      if (voiceSynthesis) {
-        try { voiceSynthesis.cancel(); } catch(e) {}
+      if (!cleanSpeech || isVoiceMuted) {
+        isSpeaking = false;
+        resumeMicrophoneAfterSpeech();
+        if (isVoiceModeActive) {
+          setVoiceOrbState('listening');
+          restartRecordingAfterTurn();
+        }
+        return;
       }
-      isSpeaking = false;
-      resumeMicrophoneAfterSpeech();
-      if (isVoiceModeActive) {
-        setVoiceOrbState('listening');
-        restartRecordingAfterTurn();
+
+      console.log("[PLAYING SPEECH VIA BROWSER FALLBACK]:", cleanSpeech.substring(0, 30));
+      if (!window.speechSynthesis) {
+        isSpeaking = false;
+        resumeMicrophoneAfterSpeech();
+        if (isVoiceModeActive) {
+          setVoiceOrbState('listening');
+          restartRecordingAfterTurn();
+        }
+        return;
+      }
+
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(cleanSpeech);
+        utter.lang = 'hi-IN';
+        utter.rate = 1.0;
+        utter.pitch = 1.0;
+
+        // Try to pick natural Hindi or Indian English voice if available
+        const voices = window.speechSynthesis.getVoices();
+        const hiVoice = voices.find(v => v.lang.includes('hi') || v.lang.includes('IN'));
+        if (hiVoice) utter.voice = hiVoice;
+
+        utter.onstart = () => {
+          isSpeaking = true;
+          pauseMicrophoneForSpeech();
+          setVoiceOrbState('speaking');
+        };
+
+        utter.onend = () => {
+          isSpeaking = false;
+          resumeMicrophoneAfterSpeech();
+          if (isVoiceModeActive) {
+            setVoiceOrbState('listening');
+            restartRecordingAfterTurn();
+          }
+        };
+
+        utter.onerror = (e) => {
+          console.warn("[SPEECH SYNTHESIS ERROR]:", e);
+          isSpeaking = false;
+          resumeMicrophoneAfterSpeech();
+          if (isVoiceModeActive) {
+            setVoiceOrbState('listening');
+            restartRecordingAfterTurn();
+          }
+        };
+
+        window.speechSynthesis.speak(utter);
+      } catch(e) {
+        console.warn("[FALLBACK SPEECH EXCEPTION]:", e);
+        isSpeaking = false;
+        resumeMicrophoneAfterSpeech();
+        if (isVoiceModeActive) {
+          setVoiceOrbState('listening');
+          restartRecordingAfterTurn();
+        }
       }
     }
 
