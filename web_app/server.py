@@ -337,9 +337,7 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     # 5. Only after caller speaks and completes, agent delivers second response intent
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">
-        {ws_stream_url}
-    </Stream>
+    <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">{ws_stream_url}</Stream>
 </Response>"""
     return xml
 
