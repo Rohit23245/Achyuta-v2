@@ -4896,7 +4896,7 @@
               if (msg.role === 'user') {
                 appendUserMessage(msg.text);
               } else {
-                appendBotMessage(msg.text);
+                appendBotMessage(msg.text, msg.action_meta, msg.thinking_seconds);
               }
             });
             document.getElementById('hero-section')?.classList.add('hidden');
@@ -7549,6 +7549,7 @@
           body: JSON.stringify({ prompt: text, history: chatHistory })
         });
         const data = await res.json();
+        const thinkSec = thinkingEl && typeof thinkingEl.getElapsedSeconds === 'function' ? thinkingEl.getElapsedSeconds() : null;
         thinkingEl.remove();
         if (data.error_type === 'quota_limit' || data.error_type === 'system_error') {
           const isConn = data.error_type === 'system_error' || (data.reply && data.reply.includes('Connection issue'));
@@ -7567,8 +7568,9 @@
                 appendQuotaAlert(newData.retry_time, newData.retry_seconds || (isConn2 ? 10 : 30), null, isConn2);
                 return;
               }
-              appendBotMessage(newData.reply, newData.action_meta);
-              chatHistory.push({ role: 'model', text: newData.reply });
+              const retrySec = retryThinking && typeof retryThinking.getElapsedSeconds === 'function' ? retryThinking.getElapsedSeconds() : null;
+              appendBotMessage(newData.reply, newData.action_meta, retrySec);
+              chatHistory.push({ role: 'model', text: newData.reply, thinking_seconds: retrySec });
               saveCurrentSessionToHistory();
               if (newData.action_executed) {
                 try {
@@ -7598,8 +7600,8 @@
           return;
         }
 
-        appendBotMessage(data.reply, data.action_meta);
-        chatHistory.push({ role: 'model', text: data.reply });
+        appendBotMessage(data.reply, data.action_meta, thinkSec);
+        chatHistory.push({ role: 'model', text: data.reply, thinking_seconds: thinkSec });
         saveCurrentSessionToHistory();
 
         // If voice mode is active, always speak the response aloud
@@ -7681,6 +7683,10 @@
       }, 500);
 
       const origRemove = row.remove.bind(row);
+      row.getElapsedSeconds = () => {
+        const sec = Math.round((Date.now() - startTime) / 1000);
+        return Math.max(1, sec);
+      };
       row.remove = () => {
         clearInterval(intervalId);
         origRemove();
@@ -7883,11 +7889,19 @@
       }
     }
 
-    function appendBotMessage(text, actionMeta) {
+    function appendBotMessage(text, actionMeta, thinkingSeconds = null) {
       const container = document.getElementById('messages-container');
       if (!container) return;
       const row = document.createElement('div');
-      row.className = 'w-full flex justify-start gap-3 text-sm leading-relaxed';
+      row.className = 'w-full flex justify-start gap-3 text-sm leading-relaxed group';
+
+      const thinkingBadgeHtml = (thinkingSeconds && thinkingSeconds > 0) ? `
+        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 mb-2 rounded-full border border-teal-500/25 bg-teal-500/[0.07] text-teal-700 dark:text-teal-300 text-[11px] font-mono select-none shadow-2xs" title="Time taken to think and process">
+          <svg class="w-3 h-3 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="font-sans font-medium">Thought for</span>
+          <span class="font-bold">${thinkingSeconds}s</span>
+        </div>
+      ` : '';
 
       let meetingCardHtml = '';
       if (actionMeta && (actionMeta.action === 'meeting_scheduled' || actionMeta.action_type === 'schedule_meeting')) {
@@ -7961,6 +7975,7 @@
           <img src="/static/logo.jpg" alt="Achyuta" class="w-full h-full object-cover">
         </div>
         <div class="flex-1 space-y-2 pt-0.5 markdown-body" style="color: var(--text);">
+          ${thinkingBadgeHtml}
           ${formatBotResponse(text)}
           ${meetingCardHtml}
         </div>
@@ -11138,7 +11153,7 @@
           if (msg.role === 'user') {
             appendUserMessage(msg.text);
           } else {
-            appendBotMessage(msg.text);
+            appendBotMessage(msg.text, msg.action_meta, msg.thinking_seconds);
           }
         });
 
@@ -14355,6 +14370,7 @@
         });
         const data = await res.json();
         showThinkingIndicator(false);
+        const voiceThinkSec = inlineThinkingEl && typeof inlineThinkingEl.getElapsedSeconds === 'function' ? inlineThinkingEl.getElapsedSeconds() : null;
         if (inlineThinkingEl) inlineThinkingEl.remove();
 
         // 1. Quota exhaustion limit handling (Voice Alert + On-screen Visual Toast + Chat Alert + Auto-retry)
@@ -14374,8 +14390,8 @@
         // 2. Normal response & action execution
         const replyText = data.reply || "Aapka task process ho gaya hai.";
         
-        appendBotMessage(replyText, data.action_meta);
-        chatHistory.push({ role: 'model', text: replyText });
+        appendBotMessage(replyText, data.action_meta, voiceThinkSec);
+        chatHistory.push({ role: 'model', text: replyText, thinking_seconds: voiceThinkSec });
         saveCurrentSessionToHistory();
 
         // Refresh CRM databases if action executed
