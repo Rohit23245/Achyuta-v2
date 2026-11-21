@@ -14243,22 +14243,22 @@
         if (dockWave) { dockWave.classList.add('hidden'); }
         const thinkingIcon = '<div class="chatgpt-thinking-dots"><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span><span class="chatgpt-dot"></span></div>';
         if (chatMicBtn) {
-          chatMicBtn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30';
-          chatMicBtn.style.backgroundColor = 'rgba(13, 148, 136, 0.15)';
+          chatMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 bg-transparent border-0 shadow-none';
+          chatMicBtn.style.backgroundColor = 'transparent';
           chatMicBtn.style.color = '#0d9488';
-          chatMicBtn.style.borderColor = 'rgba(13, 148, 136, 0.3)';
+          chatMicBtn.style.borderColor = 'transparent';
           chatMicBtn.innerHTML = thinkingIcon;
           chatMicBtn.style.transform = 'scale(1)';
-          chatMicBtn.style.boxShadow = '0 0 12px rgba(13, 148, 136, 0.3)';
+          chatMicBtn.style.boxShadow = 'none';
         }
         if (dockMicBtn) {
-          dockMicBtn.className = 'w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm flex-shrink-0 bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30';
-          dockMicBtn.style.backgroundColor = 'rgba(13, 148, 136, 0.15)';
+          dockMicBtn.className = 'w-8 h-8 flex items-center justify-center transition flex-shrink-0 bg-transparent border-0 shadow-none';
+          dockMicBtn.style.backgroundColor = 'transparent';
           dockMicBtn.style.color = '#0d9488';
-          dockMicBtn.style.borderColor = 'rgba(13, 148, 136, 0.3)';
+          dockMicBtn.style.borderColor = 'transparent';
           dockMicBtn.innerHTML = thinkingIcon;
           dockMicBtn.style.transform = 'scale(1)';
-          dockMicBtn.style.boxShadow = '0 0 12px rgba(13, 148, 136, 0.3)';
+          dockMicBtn.style.boxShadow = 'none';
         }
         if (chatPromptInput) chatPromptInput.placeholder = "Thinking...";
         if (dockPromptInput) dockPromptInput.placeholder = "Thinking...";
