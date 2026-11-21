@@ -13845,9 +13845,13 @@
           const spoken = (webSpeechTranscript + ' ' + interim).trim();
           if (spoken.length >= 2) {
             // Live feedback in input placeholder so user sees what is heard
-            const chatInp = document.getElementById('chatInput');
+            const chatInp = document.getElementById('prompt-input');
+            const dockInp = document.getElementById('universal-prompt-input');
             if (chatInp && isVoiceModeActive) {
               chatInp.placeholder = spoken + '...';
+            }
+            if (dockInp && isVoiceModeActive) {
+              dockInp.placeholder = spoken + '...';
             }
             if (voiceRestartTimer) clearTimeout(voiceRestartTimer);
             voiceRestartTimer = setTimeout(() => {
@@ -13856,11 +13860,12 @@
                 if (finalTxt.length >= 2) {
                   webSpeechTranscript = '';
                   if (chatInp) chatInp.placeholder = 'Thinking...';
+                  if (dockInp) dockInp.placeholder = 'Thinking...';
                   showThinkingIndicator(true);
                   handleVoiceTurnCompleteWithText(finalTxt);
                 }
               }
-            }, 700);
+            }, 600);
           }
         };
 
@@ -13972,8 +13977,8 @@
           }
 
           // Voice Activity Detection (VAD) State Machine
-          // Sensitive threshold for normal speaking volume
-          const isUserTalking = avgVolume > 5;
+          // Sensitive threshold for normal mobile speaking volume (avgVolume > 3)
+          const isUserTalking = avgVolume > 3;
           const micScale = isUserTalking ? (1 + Math.min(0.25, (avgVolume / 150) * 0.25)).toFixed(3) : 1;
           const glowColor = isUserTalking ? ('rgba(13, 148, 136, ' + Math.min(0.8, avgVolume / 100).toFixed(2) + ')') : 'transparent';
           const glowRadius = isUserTalking ? Math.round(Math.min(16, avgVolume / 6)) : 0;
@@ -13995,17 +14000,21 @@
             if (!vadSpeechActive) {
               vadSpeechActive = true;
               vadSpeechStartTime = now;
+              const chatInp = document.getElementById('prompt-input');
+              const dockInp = document.getElementById('universal-prompt-input');
+              if (chatInp && isVoiceModeActive && !webSpeechTranscript) chatInp.placeholder = "Listening... bolte rahiye...";
+              if (dockInp && isVoiceModeActive && !webSpeechTranscript) dockInp.placeholder = "Listening... bolte rahiye...";
             }
             vadSilenceStartTime = 0; // Reset silence counter while user continues speaking
           } else if (vadSpeechActive && !isSpeaking && !isProcessingVoiceTurn) {
             if (!vadSilenceStartTime) {
               vadSilenceStartTime = now;
-            } else if (now - vadSilenceStartTime > 650) {
-              // Wait 650ms of silence before submitting speech turn
+            } else if (now - vadSilenceStartTime > 500) {
+              // Wait 500ms of silence before submitting speech turn
               const totalSpeechDuration = now - vadSpeechStartTime;
               vadSpeechActive = false;
               vadSilenceStartTime = 0;
-              if (totalSpeechDuration > 200) {
+              if (totalSpeechDuration > 150) {
                 showThinkingIndicator(true);
                 handleVoiceTurnComplete();
               }
