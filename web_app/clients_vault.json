@@ -8242,5 +8242,35 @@
     "last_followup": "-",
     "next_followup": "-",
     "notes": "BUSY"
+  },
+  {
+    "id": "client_sheet_32_1795221184",
+    "name": "95732 74439",
+    "company": "95732 74439",
+    "phone": "~Yesh Bandaru",
+    "email": "Followup",
+    "status": "Lead",
+    "source": "Google Sheet",
+    "created_at": "2026-11-21 06:03"
+  },
+  {
+    "id": "client_sheet_33_1795221184",
+    "name": "98662 54618",
+    "company": "98662 54618",
+    "phone": "~Venkatesh",
+    "email": "",
+    "status": "Lead",
+    "source": "Google Sheet",
+    "created_at": "2026-11-21 06:03"
+  },
+  {
+    "id": "client_sheet_34_1795221184",
+    "name": "77992 85123",
+    "company": "77992 85123",
+    "phone": "BusinessLabs",
+    "email": "",
+    "status": "Lead",
+    "source": "Google Sheet",
+    "created_at": "2026-11-21 06:03"
   }
 ]
