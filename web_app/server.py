@@ -7195,7 +7195,7 @@ def transcribe_gemini_voice_audio(audio_base64, mime_type="audio/webm;codecs=opu
     elif "mp4" in mime_type or "m4a" in mime_type:
         clean_mime = "audio/mp4"
 
-    candidate_models = ["gemini-3.5-flash", "gemini-flash-latest"]
+    candidate_models = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-flash-latest"]
     for model_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={VOICE_API_KEY}"
         payload = {

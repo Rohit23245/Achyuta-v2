@@ -14049,12 +14049,16 @@
       let recordedBlob = null;
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         try {
-          mediaRecorder.stop();
-          await new Promise(res => setTimeout(res, 120));
-          if (audioChunks.length > 0) {
-            const mime = mediaRecorder.mimeType || 'audio/webm';
-            recordedBlob = new Blob(audioChunks, { type: mime });
-          }
+          await new Promise(resolve => {
+            mediaRecorder.onstop = () => {
+              if (audioChunks.length > 0) {
+                const mime = mediaRecorder.mimeType || 'audio/webm';
+                recordedBlob = new Blob(audioChunks, { type: mime });
+              }
+              resolve();
+            };
+            mediaRecorder.stop();
+          });
         } catch(e) {
           console.warn("[RECORDER STOP ERROR]:", e);
         }
