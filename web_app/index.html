@@ -1864,24 +1864,13 @@
                   <span id="calling-lists-count-badge" class="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">0</span>
                 </button>
 
-                <!-- Tab 2: Agent Flow -->
-                <button type="button" onclick="switchCallingPortalTab('flow')" id="cportal-tab-flow" class="cportal-nav-btn h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-between gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-emerald-500 whitespace-nowrap">
-                  <div class="flex items-center gap-2.5 min-w-0">
-                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
-                    </svg>
-                    <span class="truncate">Agent Flow</span>
-                  </div>
-                  <span id="speech-steps-header-count" class="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">2</span>
-                </button>
-
                 <!-- Tab 3: Agent Settings -->
                 <button type="button" onclick="switchCallingPortalTab('settings')" id="cportal-tab-settings" class="cportal-nav-btn h-10 px-3.5 rounded-xl text-xs font-medium flex items-center justify-start gap-2.5 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-emerald-500 whitespace-nowrap">
                   <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                   </svg>
-                  <span class="truncate">Settings & Tone</span>
+                  <span class="truncate">Settings & Instructions</span>
                 </button>
 
                 <!-- Tab 4: Calls & Costing -->
@@ -2157,70 +2146,6 @@
               </div>
             </div>
 
-            <!-- SUB-PANEL 2: AGENT FLOW (CONVERSATION STEPS INLINE) -->
-            <div id="cportal-panel-flow" class="cportal-subpanel space-y-4 hidden">
-              <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-4" style="background-color: var(--card-bg); border-color: var(--border-color);">
-                <div class="flex items-center justify-between pb-3 border-b flex-wrap gap-2" style="border-color: var(--border-color);">
-                  <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
-                      </svg>
-                    </div>
-                    <div>
-                      <div class="flex items-center gap-2">
-                        <h3 class="text-base font-bold tracking-tight" style="color: var(--text);">Agent Conversation Flow</h3>
-                        <span id="speech-steps-count-badge" class="text-[10px] px-2 py-0.5 rounded-full font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold">2 Steps</span>
-                      </div>
-                      <p class="text-[11px] text-zinc-400">Configure sequential phone messages and intent responses</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <button type="button" onclick="addSpeechStepRow()" class="h-8 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer" style="border-color: var(--border-color); color: var(--text);">
-                      <svg class="w-3.5 h-3.5 text-teal-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                      <span>Add Step</span>
-                    </button>
-                    <button type="button" onclick="saveSpeechStepsExplicitly()" class="h-8 px-4 text-xs font-bold rounded-xl bg-teal-600 hover:bg-teal-500 text-white transition shadow-sm cursor-pointer flex items-center gap-1.5">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                      <span>Save Flow</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Flow Steps Container -->
-                <div id="speech-steps-container" class="space-y-3">
-                  <!-- Step 1: First Message -->
-                  <div class="speech-step-card rounded-xl border p-3.5 relative" style="background-color: var(--input-bg); border-color: var(--border-color);" data-step-index="1">
-                    <div class="flex items-center justify-between mb-1.5">
-                      <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
-                        <span class="step-dot w-2 h-2 rounded-full bg-teal-500"></span>
-                        <span class="step-title">1. First Message (Initial Speech)</span>
-                      </label>
-                      <span class="step-badge text-[10px] text-zinc-400">Call connect hote hi</span>
-                    </div>
-                    <textarea rows="2" placeholder="Call connect hote hi agent exact ye initial message bolega..." class="speech-step-textarea w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">Namaste! Main Achyuta Enterprise Solutions se Priya baat kar rahi hoon. Hum aapke business sales aur operations ko automate karne ke liye vishesh AI plans lekar aaye hain. Kya aapse 1 minute baat ho sakti hai?</textarea>
-                  </div>
-
-                  <!-- Step 2: Second Response -->
-                  <div class="speech-step-card rounded-xl border p-3.5 relative" style="background-color: var(--input-bg); border-color: var(--border-color);" data-step-index="2">
-                    <div class="flex items-center justify-between mb-1.5">
-                      <label class="block text-xs font-bold flex items-center gap-1.5" style="color: var(--text);">
-                        <span class="step-dot w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span class="step-title">2. Second Response Intent (Sunkar Reply)</span>
-                      </label>
-                      <div class="flex items-center gap-2">
-                        <span class="step-badge text-[10px] text-zinc-400">Direction / Goal</span>
-                        <button type="button" onclick="removeSpeechStepRow(this)" class="w-5 h-5 rounded-md hover:bg-rose-500/10 text-rose-500 flex items-center justify-center transition" title="Remove step">
-                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15"/></svg>
-                        </button>
-                      </div>
-                    </div>
-                    <textarea rows="2" placeholder="Customer ki baat sunkar agent ko kis direction me reply dena hai..." class="speech-step-textarea w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-none focus:border-teal-500 custom-scroll font-medium" style="background-color: var(--card-bg); border-color: var(--input-border); color: var(--text);">Customer ki baat ko sunkar aur samajhkar politely samjhao ki hum AI voice agent aur CRM automate karte hain jisse unka time bachta hai, aur unhe bolo ki main aapke WhatsApp par plans ka link bhej rahi hoon taaki aap dekh sakein.</textarea>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <!-- SUB-PANEL 3: AGENT SETTINGS & INSTRUCTIONS INLINE -->
             <div id="cportal-panel-settings" class="cportal-subpanel space-y-4 hidden">
               <div class="rounded-2xl border p-5 sm:p-6 shadow-sm space-y-4" style="background-color: var(--card-bg); border-color: var(--border-color);">
@@ -2350,20 +2275,6 @@
             </div>
           </button>
 
-          <!-- 3. Agent Flow -->
-          <button type="button" onclick="switchCallingPortalTab('flow'); closeCallingPortalMenu();" id="cportal-mobtab-flow" class="cportal-mob-nav-btn group w-full h-11 px-3.5 rounded-xl text-xs font-medium flex items-center justify-between gap-3 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-emerald-500">
-            <div class="flex items-center gap-3 min-w-0">
-              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
-              </svg>
-              <div class="flex flex-col text-left">
-                <span class="truncate font-semibold group-hover:text-emerald-500 transition-colors">Agent Flow</span>
-                <span class="text-[10px] text-zinc-400 group-hover:text-emerald-500/80 transition-colors">Script sequence & prompts</span>
-              </div>
-            </div>
-            <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">Flow</span>
-          </button>
-
           <!-- 4. Settings & Tone -->
           <button type="button" onclick="switchCallingPortalTab('settings'); closeCallingPortalMenu();" id="cportal-mobtab-settings" class="cportal-mob-nav-btn group w-full h-11 px-3.5 rounded-xl text-xs font-medium flex items-center justify-start gap-3 transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-zinc-400 hover:text-emerald-500">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -2371,7 +2282,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
             </svg>
             <div class="flex flex-col text-left">
-              <span class="truncate font-semibold group-hover:text-emerald-500 transition-colors">Settings & Tone</span>
+              <span class="truncate font-semibold group-hover:text-emerald-500 transition-colors">Settings & Instructions</span>
               <span class="text-[10px] text-zinc-400 group-hover:text-emerald-500/80 transition-colors">Voice instructions & personality</span>
             </div>
           </button>
@@ -6526,7 +6437,7 @@
     }
 
     function switchCallingPortalTab(tabKey) {
-      const tabs = ['dialer', 'createlist', 'flow', 'settings', 'history'];
+      const tabs = ['dialer', 'createlist', 'settings', 'history'];
       tabs.forEach(t => {
         const btn = document.getElementById(`cportal-tab-${t}`);
         const mobBtn = document.getElementById(`cportal-mobtab-${t}`);

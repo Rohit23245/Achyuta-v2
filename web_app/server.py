@@ -613,61 +613,6 @@ def trigger_ai_outbound_call(phone, customer_name="Customer", custom_message="",
     agent_name = cfg.get("agent_name", "Priya")
     comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
 
-    # Resolve exact speech text that will be spoken upon call connect
-    msg_to_speak = str(custom_message or "").strip()
-    if not msg_to_speak:
-        msg_to_speak = (cfg.get("greeting") or "Namaste! Main Achyuta se baat kar raha hoon.").strip()
-    msg_to_speak = msg_to_speak.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
-
-    # Pre-generate greeting PCM synchronously from fast disk cache or Gemini
-    # so that phone answer has GUARANTEED ZERO latency (<100ms) from RAM
-    try:
-        pcm = get_pcm24_from_text(msg_to_speak)
-        if pcm:
-            _OUTBOUND_PRECOMPUTED_PCM[clean] = pcm
-            if clean.startswith("91") and len(clean) == 12:
-                _OUTBOUND_PRECOMPUTED_PCM[clean[2:]] = pcm
-            _OUTBOUND_PRECOMPUTED_PCM[f"+{clean}"] = pcm
-            _OUTBOUND_PRECOMPUTED_PCM[phone] = pcm
-            _OUTBOUND_PRECOMPUTED_PCM[str(phone).strip()] = pcm
-            _OUTBOUND_PRECOMPUTED_PCM["latest"] = pcm
-            print(f"[Outbound Pre-gen] Instant pre-computed {len(pcm)} bytes PCM ready for {clean} ('{msg_to_speak[:25]}...')", flush=True)
-    except Exception as e:
-        print(f"[Outbound Pre-gen] Error: {e}", flush=True)
-
-    # Pre-generate subsequent flow response steps in background so Step 2/3 replies take ZERO latency (<100ms)
-    def _pregen_steps():
-        try:
-            steps_to_cache = []
-            if response_intent:
-                if response_intent.startswith("[") and response_intent.endswith("]"):
-                    try:
-                        steps_to_cache = json.loads(response_intent)
-                    except Exception:
-                        pass
-                if not steps_to_cache and " | " in response_intent:
-                    for p in response_intent.split(" | "):
-                        cleaned_p = re.sub(r'^Step \d+:\s*', '', p).strip()
-                        if cleaned_p:
-                            steps_to_cache.append(cleaned_p)
-                elif not steps_to_cache and response_intent.strip():
-                    steps_to_cache.append(response_intent.strip())
-
-            for idx, st in enumerate(steps_to_cache):
-                if st:
-                    step_pcm = get_pcm24_from_text(st)
-                    if step_pcm:
-                        k1 = f"{clean}_{idx}"
-                        k2 = f"{str(phone).strip()}_{idx}"
-                        k3 = f"latest_{idx}"
-                        _OUTBOUND_STEPS_PCM[k1] = step_pcm
-                        _OUTBOUND_STEPS_PCM[k2] = step_pcm
-                        _OUTBOUND_STEPS_PCM[k3] = step_pcm
-                        print(f"[Outbound Step Pre-gen] Cached Step {idx+1} ({len(step_pcm)} bytes) for {clean}", flush=True)
-        except Exception as ex:
-            print(f"[Outbound Step Pre-gen] Error: {ex}", flush=True)
-    threading.Thread(target=_pregen_steps, daemon=True).start()
-
     auth_id = VOBIZ_AUTH_ID
     auth_token = VOBIZ_AUTH_TOKEN
     did_number = VOBIZ_DID_NUMBER
@@ -3635,52 +3580,17 @@ def handle_vobiz_stream_ws(handler, query_params):
 
     stream_id = None
     call_id = None
-    state = "GREETING_QUEUED"
+    stream_id = None
+    call_id = None
+    state = "LISTENING_FOR_SPEECH"
     speech_detected = False
     speech_energy_count = 0
     silence_after_speech_count = 0
     accumulated_caller_pcm = bytearray()
     start_time = time.time()
-    
     clean_phone = re.sub(r'[^0-9]', '', str(phone))
-    first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get(clean_phone) or _OUTBOUND_PRECOMPUTED_PCM.get(str(phone).strip())
-    if not first_pcm and clean_phone.startswith("91") and len(clean_phone) == 12:
-        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get(clean_phone[2:])
-    if not first_pcm and len(clean_phone) == 10:
-        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get("91" + clean_phone)
-    if not first_pcm:
-        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get(f"+{clean_phone}")
-    if not first_pcm:
-        first_pcm = _OUTBOUND_PRECOMPUTED_PCM.get("latest")
-
-    if not first_pcm:
-        print(f"[Vobiz Stream] Fast fetching PCM for '{first_msg[:25]}'...", flush=True)
-        first_pcm = get_pcm24_from_text(first_msg)
-    else:
-        print(f"[Vobiz Stream] Instant zero-delay greeting PCM ready from memory ({len(first_pcm)} bytes)!", flush=True)
-
-    # Lazy-init persistent Gemini Live Bidi Session asynchronously in background thread
-    # so connection handshake NEVER delays the first greeting playback!
-    bidi_session = None
-    def _init_bidi():
-        nonlocal bidi_session
-        system_inst_full = (
-            f"You are a real human female calling executive named Priya calling on behalf of the configured business in natural Hindi.\n"
-            f"Rules:\n"
-            f"1. Always respond verbally directly to the human caller in natural, polite Hindi (1-2 short sentences max).\n"
-              f"2. Directly answer or acknowledge whatever the customer says. If the customer says Hello, reply with Hello (do NOT substitute Hello with Namaste unless they said Namaste).\n"
-            f"3. Specific Behavioral Instructions: \"{agent_inst}\".\n"
-            f"4. You are a real human executive. Never say you are an AI, computer, or cannot shop.\n"
-            f"5. NEVER explain your thoughts or output meta text. Speak directly to the caller."
-        )
-        bidi_session = LiveGeminiBidiSession(system_inst_full)
-    threading.Thread(target=_init_bidi, daemon=True).start()
-
-    # 20ms chunks at 24kHz 16-bit mono = 24000 * 2 * 0.02 = 960 bytes
     CHUNK_BYTES = 960
-
-    print(f"[Vobiz Stream] Connected for {cust_name} ({phone}). Initial PCM ready: {len(first_pcm) if first_pcm else 0} bytes.", flush=True)
-
+    print(f"[Vobiz Stream] Live 2-way Voice AI Connected for {cust_name} ({phone}). Ready to listen immediately.", flush=True)
     def stream_audio_bytes(pcm_bytes):
         if not pcm_bytes:
             return
@@ -3726,38 +3636,16 @@ def handle_vobiz_stream_ws(handler, query_params):
                     # Update live tracker immediately to connected/picked state
                     if call_id:
                         update_live_call_state(call_id, "connected", {
-                            "current_speaker": "bot",
-                            "latest_text": first_msg
+                            "current_speaker": "caller",
+                            "latest_text": "Call Connected. Listening to caller..."
                         })
-                        append_call_dialog_turn(call_id, "bot", first_msg)
 
-                    # Professional greeting playback: instant start
-                    time.sleep(0.05)
-                    if first_pcm:
-                        print(f"[Vobiz Stream] Playing first greeting ({len(first_pcm)} bytes PCM)...", flush=True)
-                        stream_audio_bytes(first_pcm)
-                        # Grace period for line echo to completely clear before opening ear
-                        time.sleep(0.5)
-                        if stream_id:
-                            chk_frame = {"event": "checkpoint", "streamId": stream_id, "name": "greeting_done"}
-                            send_ws_frame(raw_sock, 0x1, json.dumps(chk_frame))
-                    else:
-                        # Fallback: get fast from cache or live
-                        alt_pcm = get_pcm24_from_text(first_msg)
-                        if alt_pcm:
-                            stream_audio_bytes(alt_pcm)
-                        elif bidi_session:
-                            bidi_session.stream_speech_turn(
-                                b"", 
-                                first_msg, 
-                                lambda pcm_chunk: stream_audio_bytes(pcm_chunk)
-                            )
-                        time.sleep(0.5)
-
+                    # Unlock ear immediately: Zero static message. Listen directly to customer!
                     state = "LISTENING_FOR_SPEECH"
                     speech_energy_count = 0
                     silence_after_speech_count = 0
                     accumulated_caller_pcm.clear()
+                    print("[Vobiz Stream] Ear unlocked: Live 2-way Voice AI active. Listening to caller...", flush=True)
                     if call_id:
                         update_live_call_state(call_id, "connected", {
                             "current_speaker": "caller",
