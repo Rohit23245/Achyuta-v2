@@ -13810,27 +13810,24 @@
             }
           }
           const spoken = (webSpeechTranscript + ' ' + interim).trim();
-          // Filter out short noise/fragments (e.g. single syllable like 'गे', 'हा', 'अ') from prematurely firing
-          if (spoken.length >= 3 && spoken.split(/\s+/).length >= 1) {
-            // Patient natural silence detection: Wait 1400ms so user can pause naturally between words without premature submission
+          if (spoken.length >= 2) {
+            // Live feedback in input placeholder so user sees what is heard
+            const chatInp = document.getElementById('chatInput');
+            if (chatInp && isVoiceModeActive) {
+              chatInp.placeholder = spoken + '...';
+            }
             if (voiceRestartTimer) clearTimeout(voiceRestartTimer);
             voiceRestartTimer = setTimeout(() => {
               if (isVoiceModeActive && !isSpeaking && !isProcessingVoiceTurn) {
-                // Also verify user is not currently producing microphone energy (double check with VAD)
-                const now = Date.now();
-                if (vadSpeechActive && (now - vadSilenceStartTime < 1000)) {
-                  // User is still speaking or breathing into mic, give more time
-                  return;
-                }
                 const finalTxt = (webSpeechTranscript + ' ' + interim).trim();
-                // Avoid firing on meaningless single-letter fragments or single syllables under 3 characters
-                if (finalTxt.length >= 3 && !/^[a-zA-Z\u0900-\u097F]{1,2}$/.test(finalTxt)) {
+                if (finalTxt.length >= 2) {
                   webSpeechTranscript = '';
+                  if (chatInp) chatInp.placeholder = 'Thinking...';
                   showThinkingIndicator(true);
                   handleVoiceTurnCompleteWithText(finalTxt);
                 }
               }
-            }, 1400);
+            }, 700);
           }
         };
 
@@ -13970,12 +13967,12 @@
           } else if (vadSpeechActive && !isSpeaking && !isProcessingVoiceTurn) {
             if (!vadSilenceStartTime) {
               vadSilenceStartTime = now;
-            } else if (now - vadSilenceStartTime > 1000) {
-              // Wait 1.0 second of solid silence before finalizing turn
+            } else if (now - vadSilenceStartTime > 650) {
+              // Wait 650ms of silence before submitting speech turn
               const totalSpeechDuration = now - vadSpeechStartTime;
               vadSpeechActive = false;
               vadSilenceStartTime = 0;
-              if (totalSpeechDuration > 250) {
+              if (totalSpeechDuration > 200) {
                 showThinkingIndicator(true);
                 handleVoiceTurnComplete();
               }
