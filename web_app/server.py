@@ -3680,11 +3680,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                             pcm_in = base64.b64decode(payload_b64)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Real phone human speech detection (RMS > 350 for cellular/PSTN codecs)
-                            if rms > 350:
+                            # Highly sensitive cellular speech detection (RMS > 180 for mobile networks)
+                            if rms > 180:
                                 speech_energy_count += 1
-                                # Speech lock: 2 consecutive speech frames (~100ms)
-                                if speech_energy_count >= 2:
+                                # Immediate speech lock: 1-2 frames (~50-100ms)
+                                if speech_energy_count >= 1:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
                                     speech_detected = True
@@ -3694,11 +3694,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # Natural turn end: ~0.4s (8 frames) of silence indicates caller finished sentence
-                                    if silence_after_speech_count >= 8:
-                                        # Trigger when caller speaks at least ~0.2s of real speech (>4000 bytes)
-                                        if len(accumulated_caller_pcm) < 4000:
-                                            # Discard tiny line click / glitch
+                                    # Turn end: ~350ms (7 frames) of silence indicates caller finished speaking
+                                    if silence_after_speech_count >= 7:
+                                        # Accept speech chunk (>1600 bytes, ~100ms)
+                                        if len(accumulated_caller_pcm) < 1600:
+                                            # Discard tiny line click
                                             speech_detected = False
                                             speech_energy_count = 0
                                             silence_after_speech_count = 0
