@@ -340,7 +340,6 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">
         {ws_stream_url}
     </Stream>
-    <Hangup/>
 </Response>"""
     return xml
 
@@ -3580,8 +3579,6 @@ def handle_vobiz_stream_ws(handler, query_params):
 
     stream_id = None
     call_id = None
-    stream_id = None
-    call_id = None
     state = "LISTENING_FOR_SPEECH"
     speech_detected = False
     speech_energy_count = 0
@@ -3589,26 +3586,48 @@ def handle_vobiz_stream_ws(handler, query_params):
     accumulated_caller_pcm = bytearray()
     start_time = time.time()
     clean_phone = re.sub(r'[^0-9]', '', str(phone))
-    CHUNK_BYTES = 960
+    CHUNK_BYTES = 640  # 20ms of 16kHz L16 (640 bytes)
     print(f"[Vobiz Stream] Live 2-way Voice AI Connected for {cust_name} ({phone}). Ready to listen immediately.", flush=True)
-    def stream_audio_bytes(pcm_bytes):
+
+    def stream_audio_bytes(pcm_bytes, target_rate=16000):
         if not pcm_bytes:
             return
-        total_len = len(pcm_bytes)
-        for i in range(0, total_len, CHUNK_BYTES):
-            chunk = pcm_bytes[i:i + CHUNK_BYTES]
+        # If PCM bytes is 24kHz (default from Gemini Aoede TTS), resample cleanly to 16kHz for telephony PSTN
+        try:
+            import audioop
+            # Resample 24000Hz to 16000Hz (width=2, channels=1)
+            pcm16k, _ = audioop.ratecv(pcm_bytes, 2, 1, 24000, target_rate, None)
+        except Exception as re_err:
+            print(f"[Vobiz Stream] Resample warning ({re_err}), using raw PCM", flush=True)
+            pcm16k = pcm_bytes
+            target_rate = 24000
+
+        total_len = len(pcm16k)
+        chunk_size = 640 if target_rate == 16000 else 960
+        sleep_interval = 0.019
+
+        for i in range(0, total_len, chunk_size):
+            chunk = pcm16k[i:i + chunk_size]
             frame = {
                 "event": "playAudio",
+                "streamId": str(stream_id) if stream_id else "",
                 "media": {
                     "contentType": "audio/x-l16",
-                    "sampleRate": 24000,
+                    "sampleRate": target_rate,
                     "payload": base64.b64encode(chunk).decode("ascii")
                 }
             }
-            if stream_id:
-                frame["streamId"] = stream_id
             send_ws_frame(raw_sock, 0x1, json.dumps(frame))
-            time.sleep(0.018)  # Smooth real-time flow
+            time.sleep(sleep_interval)
+
+        # After queuing all chunks, send checkpoint to track delivery
+        if stream_id:
+            ckpt = {
+                "event": "checkpoint",
+                "streamId": str(stream_id),
+                "name": f"turn_play_{int(time.time())}"
+            }
+            send_ws_frame(raw_sock, 0x1, json.dumps(ckpt))
 
     try:
         while True:
@@ -3653,24 +3672,15 @@ def handle_vobiz_stream_ws(handler, query_params):
                         })
                     print("[Vobiz Stream] Ear unlocked: Actively listening for caller speech (ignoring line silence)...", flush=True)
 
-                elif event_name == "checkpoint":
-                    chk_name = event.get("name")
-                    if chk_name == "step_response_done":
-                        if current_step_index >= total_steps:
-                            print(f"[Vobiz Stream] All {total_steps} dynamic steps completed. Concluding call safely...", flush=True)
-                            time.sleep(1.0)
-                            break
-                        else:
-                            # Re-enter listening state for next caller turn!
-                            print(f"[Vobiz Stream] Step {current_step_index}/{total_steps} delivered. Listening for caller turn {current_step_index + 1}...", flush=True)
-                            state = "LISTENING_FOR_SPEECH"
-                            speech_detected = False
-                            speech_energy_count = 0
-                            silence_after_speech_count = 0
-                            accumulated_caller_pcm.clear()
-                    elif chk_name == "second_response_done":
-                        time.sleep(1.0)
-                        break
+                elif event_name in ["playedStream", "checkpoint"]:
+                    chk_name = event.get("name", "")
+                    print(f"[Vobiz Stream] Received playback ack: {event_name} (name={chk_name})", flush=True)
+                    # When agent finishes speaking, make sure we are listening to caller
+                    state = "LISTENING_FOR_SPEECH"
+                    speech_detected = False
+                    speech_energy_count = 0
+                    silence_after_speech_count = 0
+                    accumulated_caller_pcm.clear()
 
                 elif event_name == "media" and state == "LISTENING_FOR_SPEECH":
                     media = event.get("media", {})
