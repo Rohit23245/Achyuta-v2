@@ -274,7 +274,7 @@
     .chatgpt-dot:nth-child(3) { animation-delay: 0s; }
 </style>
 </head>
-<body class="flex h-screen overflow-hidden antialiased light-mode" style="background-color: var(--bg); color: var(--text);">
+<body onclick="unlockAudioEngine()" class="flex h-screen overflow-hidden antialiased light-mode" style="background-color: var(--bg); color: var(--text);">
 
   <!-- Initial Full-App Preloader Screen with Modern Thinking Look & Feel -->
   <div id="page-initial-preloader">
@@ -14529,10 +14529,18 @@
             fallbackBrowserSpeech(cleanSpeech);
           };
 
-          await currentAudioPlayer.play();
-          return;
+          try {
+            await currentAudioPlayer.play();
+            return;
+          } catch(errPlay) {
+            console.warn("[PRELOADED PLAY PROMISE REJECTED]:", errPlay);
+            fallbackBrowserSpeech(cleanSpeech);
+            return;
+          }
         } catch(e) {
           console.warn("[PRELOADED PLAY FAILED]:", e);
+          fallbackBrowserSpeech(cleanSpeech);
+          return;
         }
       }
 
