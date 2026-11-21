@@ -238,54 +238,68 @@ def get_or_create_voice_audio_file(text_content):
         print(f"Error caching voice audio: {e}")
     return None
 
-def generate_intelligent_second_response(customer_speech, intent_direction="", agent_instructions=""):
+def generate_intelligent_second_response(customer_speech, intent_direction="", agent_instructions="", conversation_history=None):
     """
-    Generates intelligent dynamic conversational reply based on user intent direction, client words, and custom instructions.
+    Generates intelligent dynamic conversational reply based on user speech and natural conversation context.
+    Acts as a real human AI agent engaging in continuous voice dialogue.
     """
     cfg = get_calling_script_config()
-    intent = (intent_direction or cfg.get("second_response_intent") or "").strip()
     speech = (customer_speech or "").strip()
     custom_inst = (agent_instructions or cfg.get("agent_instructions") or "").strip()
+    intent = (intent_direction or cfg.get("second_response_intent") or "").strip()
+    agent_name = cfg.get("agent_name", "Priya")
+    comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
 
-    if not intent:
-        return "Theek hai ji, aapka bahut bahut dhanyawaad. Hum aapse jald hi WhatsApp par sampark karenge."
-
-    # If Gemini API key is available, use fast Gemini flash to formulate exact Hindi/Hinglish reply aligned with intent
-    api_key = os.environ.get('AI_API_KEY') or os.environ.get('GEMINI_API_KEY') or AI_API_KEY
-    if api_key and speech:
+    api_key = os.environ.get('AI_API_KEY') or os.environ.get('GEMINI_API_KEY') or AI_API_KEY or os.environ.get('VOICE_API_KEY') or VOICE_API_KEY
+    if api_key:
         try:
-            extra_inst = f"\nSpecific Custom Behavior & Instruction: {custom_inst}" if custom_inst else ""
-            prompt = f"""You are an Indian professional female phone caller representing the business/script goal below.
-The client just responded with: "{speech}"
-Your exact conversation goal / intent direction is: "{intent}"{extra_inst}
+            history_context = ""
+            if conversation_history and isinstance(conversation_history, list):
+                turns = []
+                for t in conversation_history[-6:]:
+                    speaker_label = "Caller" if t.get("role") == "caller" else agent_name
+                    turns.append(f"{speaker_label}: {t.get('text', '')}")
+                history_context = "\nRecent Conversation:\n" + "\n".join(turns)
+
+            extra_inst = f"\nSpecific Instructions: {custom_inst}" if custom_inst else ""
+            intent_ctx = f"\nBusiness Goal: {intent}" if intent else ""
+
+            prompt = f"""You are {agent_name}, a friendly, intelligent Indian female caller calling on behalf of {comp_name}.
+You are speaking on a live phone call directly with a customer in natural, fluent Hindi / Hinglish.
+
+Customer just said: "{speech}"
+{history_context}
+{intent_ctx}
+{extra_inst}
 
 Rules:
-1. Speak ONLY in direct, conversational natural Hindi / Hinglish.
-2. You are a real human executive. NEVER say or admit you are an AI, computer, model, or that you cannot shop or have no human preferences. If customer mentions shopping or likes, respond enthusiastically as a human!
-3. Directly answer the customer's point and smoothly deliver the intent goal in 1 to 2 short sentences.
-4. Pronounce names and brand words accurately as typed.
-5. Do NOT use asterisks, markdown, quotation marks, or emojis. Only return the exact words to speak out loud."""
-            
+1. Speak ONLY in direct, conversational natural Hindi / Hinglish (1 to 2 short, crisp sentences).
+2. Comprehend exactly what the customer asked or said, answer their specific question or acknowledge their words thoughtfully, and continue the conversation smoothly.
+3. You are a real human executive. NEVER say or admit you are an AI, bot, computer, or language model.
+4. If customer says Hello / Namaste / Kaun bol rahe ho / Kya kaam hai, greet them warmly and answer directly.
+5. Do NOT use asterisks, markdown, quotation marks, or emojis. Return ONLY the spoken words."""
+
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={api_key}"
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.4, "maxOutputTokens": 100}
+                "generationConfig": {"temperature": 0.5, "maxOutputTokens": 90}
             }
             req = urllib.request.Request(
                 url, 
                 data=json.dumps(payload).encode("utf-8"), 
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req, timeout=6) as r:
+            with urllib.request.urlopen(req, timeout=5) as r:
                 res = json.loads(r.read().decode("utf-8"))
                 reply = res["candidates"][0]["content"]["parts"][0]["text"].strip()
                 if reply:
                     return re.sub(r'[\*\#\_\"\`]', '', reply)
         except Exception as e:
-            print(f"Gemini second response error: {e}")
+            print(f"Gemini conversational response error: {e}", flush=True)
 
-    # Fallback response using intent direction
-    return f"Theek hai ji, bilkul samajh gaya. {intent}. Aapka bahut dhanyawaad!"
+    if "hello" in speech.lower() or "namaste" in speech.lower():
+        return f"Hello ji, Namaste! Main Achyuta Enterprise se bol rahi hoon, bataiye kaise madad kar sakti hoon?"
+    return "Haan ji bilkul, main aapki baat samajh rahi hoon. Bataiye aage hum aapki kaise madad kar sakte hain?"
 
 def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", response_intent="", agent_instructions=""):
     cfg = get_calling_script_config()
@@ -3803,79 +3817,78 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             accumulated_caller_pcm.clear()
                                             continue
 
-                                        print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
+                                        print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Transcribing & generating conversational response...", flush=True)
                                         state = "DELIVERING_RESPONSE"
 
-                                        # Transcribe caller audio in background or quick transcribe
-                                        caller_audio_slice = bytes(accumulated_caller_pcm)
-                                        def _async_transcribe_caller(call_target_id, raw_pcm):
-                                            try:
-                                                wav_data = pcm16_to_wav_bytes(raw_pcm, sample_rate=16000)
-                                                if wav_data:
-                                                    b64_audio = base64.b64encode(wav_data).decode("ascii")
-                                                    txt, _ = transcribe_gemini_voice_audio(b64_audio, "audio/wav")
-                                                    if txt and txt != "SILENCE":
-                                                        append_call_dialog_turn(call_target_id, "caller", txt)
-                                            except Exception as te:
-                                                print(f"[Vobiz Stream] Transcribe caller error: {te}", flush=True)
-                                        if call_id and len(caller_audio_slice) > 0:
-                                            threading.Thread(target=_async_transcribe_caller, args=(call_id, caller_audio_slice), daemon=True).start()
+                                        if call_id:
+                                            update_live_call_state(call_id, "connected", {
+                                                "current_speaker": "bot",
+                                                "latest_text": "Thinking..."
+                                            })
 
-                                        # Pick current step target direction
-                                        step_idx_to_play = current_step_index
-                                        step_target = steps_list[step_idx_to_play] if step_idx_to_play < len(steps_list) else ""
+                                        caller_audio_slice = bytes(accumulated_caller_pcm)
+                                        caller_spoken_text = ""
+                                        try:
+                                            wav_data = pcm16_to_wav_bytes(caller_audio_slice, sample_rate=16000)
+                                            if wav_data:
+                                                b64_audio = base64.b64encode(wav_data).decode("ascii")
+                                                txt, _ = transcribe_gemini_voice_audio(b64_audio, "audio/wav")
+                                                if txt and txt.strip() != "SILENCE":
+                                                    caller_spoken_text = txt.strip()
+                                        except Exception as te:
+                                            print(f"[Vobiz Stream] Transcribe caller error: {te}", flush=True)
+
+                                        if not caller_spoken_text:
+                                            caller_spoken_text = "Hello"
+
+                                        print(f"[Vobiz Stream] Caller actually said: '{caller_spoken_text}'", flush=True)
+                                        if call_id:
+                                            append_call_dialog_turn(call_id, "caller", caller_spoken_text)
+
+                                        # Fetch conversation history so AI remembers the flow
+                                        history_turns = []
+                                        if call_id and call_id in LIVE_CALL_TRACKER:
+                                            history_turns = LIVE_CALL_TRACKER[call_id].get("dialog", [])
+
+                                        # Generate pure conversational AI reply based on what the caller said
+                                        reply_text = generate_intelligent_second_response(
+                                            customer_speech=caller_spoken_text,
+                                            intent_direction=resp_intent or "",
+                                            agent_instructions=agent_inst or "",
+                                            conversation_history=history_turns
+                                        )
+
+                                        if not reply_text:
+                                            reply_text = "Haan ji, main aapki baat samajh rahi hoon. Kahiye kaise sahayata kar sakti hoon?"
+
+                                        print(f"[Vobiz Stream] AI generated speech reply: '{reply_text}'", flush=True)
+                                        if call_id:
+                                            update_live_call_state(call_id, "connected", {
+                                                "current_speaker": "bot",
+                                                "latest_text": reply_text
+                                            })
+                                            append_call_dialog_turn(call_id, "bot", reply_text)
+
+                                        step_pcm = get_pcm24_from_text(reply_text)
+                                        if step_pcm:
+                                            stream_audio_bytes(step_pcm)
+
+                                        # Reset audio accumulator for next conversational turn
+                                        accumulated_caller_pcm.clear()
                                         current_step_index += 1
 
-                                        # 1. First priority: Check ultra-fast pre-computed step audio in RAM (<10ms instant response)
-                                        k1 = f"{clean_phone}_{step_idx_to_play}"
-                                        k2 = f"{str(phone).strip()}_{step_idx_to_play}"
-                                        k3 = f"latest_{step_idx_to_play}"
-                                        precomputed_step_pcm = _OUTBOUND_STEPS_PCM.get(k1) or _OUTBOUND_STEPS_PCM.get(k2) or _OUTBOUND_STEPS_PCM.get(k3)
-
-                                        reply_text = ""
-                                        if precomputed_step_pcm:
-                                            print(f"[Vobiz Stream] Instant RAM cache hit for Step {step_idx_to_play + 1}! Playing {len(precomputed_step_pcm)} bytes PCM (<50ms delay)...", flush=True)
-                                            reply_text = step_target or "Haan ji, bilkul."
-                                            if call_id:
-                                                update_live_call_state(call_id, "connected", {
-                                                    "current_speaker": "bot",
-                                                    "latest_text": reply_text
-                                                })
-                                                append_call_dialog_turn(call_id, "bot", reply_text)
-                                            stream_audio_bytes(precomputed_step_pcm)
-                                        else:
-                                            # 2. Fast direct fallback: immediate Gemini TTS generation
-                                            print(f"[Vobiz Stream] Delivering step response: '{step_target[:35]}'", flush=True)
-                                            reply_text = step_target if step_target else generate_intelligent_second_response("Ha kahiye", step_target, agent_inst)
-                                            if call_id:
-                                                update_live_call_state(call_id, "connected", {
-                                                    "current_speaker": "bot",
-                                                    "latest_text": reply_text
-                                                })
-                                                append_call_dialog_turn(call_id, "bot", reply_text)
-                                            step_pcm = get_pcm24_from_text(reply_text)
-                                            if step_pcm:
-                                                stream_audio_bytes(step_pcm)
-
-                                        # Reset audio accumulator for next turn
+                                        # Re-enter continuous listening state
+                                        print(f"[Vobiz Stream] Turn {current_step_index} delivered. Listening for caller response...", flush=True)
+                                        state = "LISTENING_FOR_SPEECH"
+                                        speech_detected = False
+                                        speech_energy_count = 0
+                                        silence_after_speech_count = 0
                                         accumulated_caller_pcm.clear()
-                                        if current_step_index >= total_steps:
-                                            print(f"[Vobiz Stream] Final step {current_step_index}/{total_steps} finished playing. Concluding call safely...", flush=True)
-                                            time.sleep(1.5)
-                                            break
-                                        else:
-                                            # Automatically unlock ear and listen for caller's next reply!
-                                            print(f"[Vobiz Stream] Step {current_step_index}/{total_steps} delivered. Automatically listening for caller turn {current_step_index + 1}...", flush=True)
-                                            state = "LISTENING_FOR_SPEECH"
-                                            speech_detected = False
-                                            speech_energy_count = 0
-                                            silence_after_speech_count = 0
-                                            accumulated_caller_pcm.clear()
-                                            if call_id:
-                                                update_live_call_state(call_id, "connected", {
-                                                    "current_speaker": "caller",
-                                                    "latest_text": "Listening to caller..."
-                                                })
+                                        if call_id:
+                                            update_live_call_state(call_id, "connected", {
+                                                "current_speaker": "caller",
+                                                "latest_text": "Listening to caller..."
+                                            })
                         except Exception as ex:
                             print(f"[Vobiz Stream] Media processing error: {ex}", flush=True)
 
