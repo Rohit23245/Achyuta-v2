@@ -544,12 +544,47 @@ def update_live_call_state(call_uuid, state, extra=None):
     if not call_uuid:
         return
     if call_uuid not in LIVE_CALL_TRACKER:
-        LIVE_CALL_TRACKER[call_uuid] = {"state": state, "updated_at": time.time()}
+        LIVE_CALL_TRACKER[call_uuid] = {
+            "state": state, 
+            "updated_at": time.time(),
+            "dialog": [],
+            "current_speaker": "bot" if state in ["speaking", "delivering_response"] else ("caller" if state == "listening" else "idle"),
+            "latest_text": ""
+        }
     else:
         LIVE_CALL_TRACKER[call_uuid]["state"] = state
         LIVE_CALL_TRACKER[call_uuid]["updated_at"] = time.time()
     if extra and isinstance(extra, dict):
         LIVE_CALL_TRACKER[call_uuid].update(extra)
+
+def append_call_dialog_turn(call_uuid, role, text):
+    if not call_uuid or not text:
+        return
+    rec = {
+        "role": role,  # 'bot' or 'caller'
+        "text": text.strip(),
+        "time": time.time()
+    }
+    if call_uuid not in LIVE_CALL_TRACKER:
+        LIVE_CALL_TRACKER[call_uuid] = {"state": "connected", "updated_at": time.time(), "dialog": [rec], "latest_text": text.strip(), "current_speaker": role}
+    else:
+        dialog = LIVE_CALL_TRACKER[call_uuid].setdefault("dialog", [])
+        dialog.append(rec)
+        LIVE_CALL_TRACKER[call_uuid]["latest_text"] = text.strip()
+        LIVE_CALL_TRACKER[call_uuid]["current_speaker"] = role
+        LIVE_CALL_TRACKER[call_uuid]["updated_at"] = time.time()
+
+def pcm16_to_wav_bytes(pcm_bytes, sample_rate=16000):
+    try:
+        buf = io.BytesIO()
+        with wave.open(buf, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(pcm_bytes)
+        return buf.getvalue()
+    except Exception:
+        return b""
 
 # Global in-memory cache for pre-computed speech PCM audio to eliminate pickup and turn response delay
 _OUTBOUND_PRECOMPUTED_PCM = {}
@@ -3671,7 +3706,11 @@ def handle_vobiz_stream_ws(handler, query_params):
 
                     # Update live tracker immediately to connected/picked state
                     if call_id:
-                        update_live_call_state(call_id, "connected")
+                        update_live_call_state(call_id, "connected", {
+                            "current_speaker": "bot",
+                            "latest_text": first_msg
+                        })
+                        append_call_dialog_turn(call_id, "bot", first_msg)
 
                     # Professional greeting playback: instant start
                     time.sleep(0.05)
@@ -3700,6 +3739,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                     speech_energy_count = 0
                     silence_after_speech_count = 0
                     accumulated_caller_pcm.clear()
+                    if call_id:
+                        update_live_call_state(call_id, "connected", {
+                            "current_speaker": "caller",
+                            "latest_text": "Listening to caller..."
+                        })
                     print("[Vobiz Stream] Ear unlocked: Actively listening for caller speech (ignoring line silence)...", flush=True)
 
                 elif event_name == "checkpoint":
@@ -3757,6 +3801,21 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Delivering Step {current_step_index + 1} of {total_steps}...", flush=True)
                                         state = "DELIVERING_RESPONSE"
 
+                                        # Transcribe caller audio in background or quick transcribe
+                                        caller_audio_slice = bytes(accumulated_caller_pcm)
+                                        def _async_transcribe_caller(call_target_id, raw_pcm):
+                                            try:
+                                                wav_data = pcm16_to_wav_bytes(raw_pcm, sample_rate=16000)
+                                                if wav_data:
+                                                    b64_audio = base64.b64encode(wav_data).decode("ascii")
+                                                    txt, _ = transcribe_gemini_voice_audio(b64_audio, "audio/wav")
+                                                    if txt and txt != "SILENCE":
+                                                        append_call_dialog_turn(call_target_id, "caller", txt)
+                                            except Exception as te:
+                                                print(f"[Vobiz Stream] Transcribe caller error: {te}", flush=True)
+                                        if call_id and len(caller_audio_slice) > 0:
+                                            threading.Thread(target=_async_transcribe_caller, args=(call_id, caller_audio_slice), daemon=True).start()
+
                                         # Pick current step target direction
                                         step_idx_to_play = current_step_index
                                         step_target = steps_list[step_idx_to_play] if step_idx_to_play < len(steps_list) else ""
@@ -3768,13 +3827,27 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         k3 = f"latest_{step_idx_to_play}"
                                         precomputed_step_pcm = _OUTBOUND_STEPS_PCM.get(k1) or _OUTBOUND_STEPS_PCM.get(k2) or _OUTBOUND_STEPS_PCM.get(k3)
 
+                                        reply_text = ""
                                         if precomputed_step_pcm:
                                             print(f"[Vobiz Stream] Instant RAM cache hit for Step {step_idx_to_play + 1}! Playing {len(precomputed_step_pcm)} bytes PCM (<50ms delay)...", flush=True)
+                                            reply_text = step_target or "Haan ji, bilkul."
+                                            if call_id:
+                                                update_live_call_state(call_id, "connected", {
+                                                    "current_speaker": "bot",
+                                                    "latest_text": reply_text
+                                                })
+                                                append_call_dialog_turn(call_id, "bot", reply_text)
                                             stream_audio_bytes(precomputed_step_pcm)
                                         else:
                                             # 2. Fast direct fallback: immediate Gemini TTS generation
                                             print(f"[Vobiz Stream] Delivering step response: '{step_target[:35]}'", flush=True)
                                             reply_text = step_target if step_target else generate_intelligent_second_response("Ha kahiye", step_target, agent_inst)
+                                            if call_id:
+                                                update_live_call_state(call_id, "connected", {
+                                                    "current_speaker": "bot",
+                                                    "latest_text": reply_text
+                                                })
+                                                append_call_dialog_turn(call_id, "bot", reply_text)
                                             step_pcm = get_pcm24_from_text(reply_text)
                                             if step_pcm:
                                                 stream_audio_bytes(step_pcm)
@@ -3793,6 +3866,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             speech_energy_count = 0
                                             silence_after_speech_count = 0
                                             accumulated_caller_pcm.clear()
+                                            if call_id:
+                                                update_live_call_state(call_id, "connected", {
+                                                    "current_speaker": "caller",
+                                                    "latest_text": "Listening to caller..."
+                                                })
                         except Exception as ex:
                             print(f"[Vobiz Stream] Media processing error: {ex}", flush=True)
 
@@ -5299,7 +5377,10 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 "is_connected": is_connected,
                 "is_ended": is_ended,
                 "bill_duration": bill_duration,
-                "hangup_cause": hangup_cause
+                "hangup_cause": hangup_cause,
+                "current_speaker": tracked.get("current_speaker", "idle"),
+                "latest_text": tracked.get("latest_text", ""),
+                "dialog": tracked.get("dialog", [])
             }).encode("utf-8"))
             return
 

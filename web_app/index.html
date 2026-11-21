@@ -1966,14 +1966,14 @@
                 <p class="text-[11px] text-zinc-400 text-center">Call connect hote hi agent first message bolega, fir customer ki baat sunkar second response intent ke anusaar reply karega.</p>
               </div>
 
-              <!-- Active Live Call Real-Time Status Banner -->
-              <div id="calling-live-banner" class="rounded-2xl border p-4 shadow-md hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
-                <div class="flex items-center justify-between flex-wrap gap-3">
+              <!-- Active Live Call Real-Time Status Banner & Modern Voice Visualizer -->
+              <div id="calling-live-banner" class="rounded-2xl border p-4 sm:p-5 shadow-lg hidden transition-all" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                <div class="flex items-center justify-between flex-wrap gap-3 pb-3 border-b" style="border-color: var(--border-color);">
                   <div class="flex items-center gap-3">
                     <span id="calling-banner-dot" class="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0"></span>
                     <div>
                       <div class="flex items-center gap-2">
-                        <span id="calling-banner-title" class="text-xs font-bold" style="color: var(--text);">Calling...</span>
+                        <span id="calling-banner-title" class="text-xs sm:text-sm font-bold" style="color: var(--text);">Calling...</span>
                         <span id="calling-banner-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/30">Dialing</span>
                       </div>
                       <div class="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
@@ -1987,9 +1987,50 @@
                       </div>
                     </div>
                   </div>
-                  <button type="button" id="calling-end-btn" onclick="endLiveCallNow(true)" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition active:scale-95 shadow-sm cursor-pointer">
-                    End Call
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button type="button" id="calling-end-btn" onclick="endLiveCallNow(true)" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition active:scale-95 shadow-sm cursor-pointer flex items-center gap-1.5">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                      <span>End Call</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Live Voice Mode Dynamic Orb & Real-Time Waveform Inside Calling -->
+                <div id="calling-live-visual-stage" class="pt-4 flex flex-col items-center justify-center">
+                  <!-- Mini Animated Voice Orb for Phone Calls -->
+                  <div class="relative flex items-center justify-center w-28 h-28 my-2">
+                    <div id="call-orb-glow" class="absolute inset-0 rounded-full bg-teal-500/20 blur-xl animate-pulse"></div>
+                    <div id="call-orb-ring" class="absolute inset-2 rounded-full border border-teal-400/30 transition-all duration-300"></div>
+                    <div id="call-orb-core" class="relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-md overflow-hidden" style="background: radial-gradient(circle at 30% 30%, #14b8a6, #047857, #064e3b);">
+                      <div class="w-10 h-10 rounded-full bg-white/15 animate-ping opacity-50"></div>
+                      <svg id="call-orb-speaker-icon" class="absolute w-7 h-7 text-white/90 drop-shadow" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
+                      </svg>
+                    </div>
+                  </div>
+
+                  <!-- Frequency Waveform Bar Equalizer -->
+                  <div id="call-voice-wave" class="flex items-center justify-center gap-1.5 h-6 px-4 my-1 gemini-wave-container">
+                    <span class="gemini-wave-bar" style="width: 3.5px; min-height: 6px;"></span>
+                    <span class="gemini-wave-bar" style="width: 3.5px; min-height: 6px;"></span>
+                    <span class="gemini-wave-bar" style="width: 3.5px; min-height: 6px;"></span>
+                    <span class="gemini-wave-bar" style="width: 3.5px; min-height: 6px;"></span>
+                    <span class="gemini-wave-bar" style="width: 3.5px; min-height: 6px;"></span>
+                  </div>
+
+                  <!-- Real-time Live Speaking State Badge -->
+                  <div class="mt-1 mb-2">
+                    <span id="call-live-speaker-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">
+                      Dialing Carrier...
+                    </span>
+                  </div>
+
+                  <!-- Real-Time Conversational Subtitle / Live Speech Bubble -->
+                  <div class="w-full max-w-xl p-3 rounded-xl border text-center transition-all mt-1" style="background-color: var(--input-bg); border-color: var(--border-color);">
+                    <p id="call-live-transcript-text" class="text-xs sm:text-sm font-medium leading-relaxed" style="color: var(--text);">
+                      "Connecting carrier line to customer handset..."
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -7273,6 +7314,50 @@
                     }
                     if (subEl) subEl.textContent = 'Handset ringing, waiting for pick up';
                     if (dotEl) dotEl.className = 'w-3.5 h-3.5 rounded-full bg-amber-400 animate-ping flex-shrink-0';
+                  }
+
+                  // Real-time Voice Mode Visual Feedback on Active Phone Call
+                  const callWave = document.getElementById('call-voice-wave');
+                  const callOrbGlow = document.getElementById('call-orb-glow');
+                  const callOrbRing = document.getElementById('call-orb-ring');
+                  const callSpeakerBadge = document.getElementById('call-live-speaker-badge');
+                  const callTranscriptText = document.getElementById('call-live-transcript-text');
+
+                  if (stData.is_connected) {
+                    const speaker = stData.current_speaker || 'caller';
+                    const latestText = stData.latest_text || '';
+
+                    if (speaker === 'bot') {
+                      if (callSpeakerBadge) {
+                        callSpeakerBadge.textContent = 'Agent Speaking...';
+                        callSpeakerBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse';
+                      }
+                      if (callOrbGlow) callOrbGlow.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-teal-500/30 via-emerald-500/40 to-cyan-500/30 blur-2xl animate-pulse';
+                      if (callOrbRing) callOrbRing.className = 'absolute inset-2 rounded-full border-2 border-emerald-400/60 scale-105 transition-all duration-300';
+                      if (callWave) {
+                        callWave.classList.remove('hidden');
+                        callWave.classList.add('flex');
+                      }
+                      if (latestText && callTranscriptText) {
+                        callTranscriptText.textContent = `"${latestText}"`;
+                      }
+                    } else if (speaker === 'caller') {
+                      if (callSpeakerBadge) {
+                        callSpeakerBadge.textContent = 'Listening to Customer...';
+                        callSpeakerBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-cyan-500/20 text-cyan-400 border border-cyan-500/40';
+                      }
+                      if (callOrbGlow) callOrbGlow.className = 'absolute inset-0 rounded-full bg-teal-500/15 blur-xl';
+                      if (callOrbRing) callOrbRing.className = 'absolute inset-2 rounded-full border border-teal-400/30 scale-100 transition-all duration-300';
+                      if (callWave) {
+                        callWave.classList.remove('hidden');
+                        callWave.classList.add('flex');
+                      }
+                      if (latestText && callTranscriptText && latestText !== 'Listening to caller...') {
+                        callTranscriptText.textContent = `"${latestText}"`;
+                      } else if (callTranscriptText && !callTranscriptText.textContent.includes('"')) {
+                        callTranscriptText.textContent = '"Listening to customer response..."';
+                      }
+                    }
                   }
                 } catch(e) {}
               }
