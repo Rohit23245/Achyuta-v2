@@ -7040,14 +7040,16 @@ def load_voice_api_key():
             if os.path.exists(key_file):
                 with open(key_file, "r", encoding="utf-8") as f:
                     local_keys = json.load(f)
-                    val = local_keys.get('gemini_api_key') or local_keys.get('voice_api_key') or ''
+                    # Prioritize dedicated voice_api_key, then fallback to gemini_api_key
+                    val = local_keys.get('voice_api_key') or local_keys.get('gemini_api_key') or ''
                     if val:
                         return val
         except Exception as e:
             print(f"Error loading voice key from file: {e}")
         # Default fallback key for production voice synthesis
         try:
-            return base64.b64decode("QUl6YVN5QTdoT2xpNDVBQzRBNlYtaXo5MXBtQzRGZTlMZ0Z0RUsw").decode("utf-8")
+            # Fallback to verified Gemini Native Audio Dialog key
+            return base64.b64decode("QVEuQWI4Uk42SjZtYktGT0R6Nmc5ZlhRTnREWmRXY2RBUk0xMTlXMWtrNzBmX1E5bWtBZHc=").decode("utf-8")
         except:
             pass
     return k
