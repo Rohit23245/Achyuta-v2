@@ -7408,6 +7408,11 @@
     async function anyMatch(arr, str) { return arr.some(x => str.includes(x)); }
     async function handleUniversalSend(e) {
       if (e) e.preventDefault();
+      // If voice mode is active and user clicks send button, immediately commit the voice turn!
+      if (isVoiceModeActive && !isSpeaking) {
+        handleVoiceTurnComplete();
+        return;
+      }
       const input = document.getElementById('universal-prompt-input');
       const text = (input ? input.value : '').trim();
       if (!text) return;
@@ -7528,6 +7533,11 @@
 
     async function handleSend(e) {
       if (e) e.preventDefault();
+      // If voice mode is active and user clicks send button, immediately commit the voice turn!
+      if (isVoiceModeActive && !isSpeaking) {
+        handleVoiceTurnComplete();
+        return;
+      }
       
       const topInput = document.getElementById('prompt-input');
       const uniInput = document.getElementById('universal-prompt-input');
@@ -13976,9 +13986,14 @@
             });
           }
 
-          // Voice Activity Detection (VAD) State Machine
-          // Sensitive threshold for normal mobile speaking volume (avgVolume > 3)
-          const isUserTalking = avgVolume > 3;
+          // Adaptive Voice Activity Detection (VAD) State Machine
+          if (!window._vadNoiseFloor) window._vadNoiseFloor = 4;
+          // Smoothly track background noise floor during silence
+          if (!vadSpeechActive && avgVolume > 0 && avgVolume < 15) {
+            window._vadNoiseFloor = window._vadNoiseFloor * 0.95 + avgVolume * 0.05;
+          }
+          const speechThreshold = Math.max(5, window._vadNoiseFloor + 3.5);
+          const isUserTalking = avgVolume > speechThreshold;
           const micScale = isUserTalking ? (1 + Math.min(0.25, (avgVolume / 150) * 0.25)).toFixed(3) : 1;
           const glowColor = isUserTalking ? ('rgba(13, 148, 136, ' + Math.min(0.8, avgVolume / 100).toFixed(2) + ')') : 'transparent';
           const glowRadius = isUserTalking ? Math.round(Math.min(16, avgVolume / 6)) : 0;
@@ -14006,15 +14021,23 @@
               if (dockInp && isVoiceModeActive && !webSpeechTranscript) dockInp.placeholder = "Listening... bolte rahiye...";
             }
             vadSilenceStartTime = 0; // Reset silence counter while user continues speaking
+            
+            // Hard safety cap: If user has spoken continuously for > 4.5 seconds, auto-complete turn
+            if (vadSpeechStartTime && (now - vadSpeechStartTime > 4500)) {
+              vadSpeechActive = false;
+              vadSilenceStartTime = 0;
+              showThinkingIndicator(true);
+              handleVoiceTurnComplete();
+            }
           } else if (vadSpeechActive && !isSpeaking && !isProcessingVoiceTurn) {
             if (!vadSilenceStartTime) {
               vadSilenceStartTime = now;
-            } else if (now - vadSilenceStartTime > 500) {
-              // Wait 500ms of silence before submitting speech turn
+            } else if (now - vadSilenceStartTime > 650) {
+              // Wait 650ms of silence before submitting speech turn
               const totalSpeechDuration = now - vadSpeechStartTime;
               vadSpeechActive = false;
               vadSilenceStartTime = 0;
-              if (totalSpeechDuration > 150) {
+              if (totalSpeechDuration > 200) {
                 showThinkingIndicator(true);
                 handleVoiceTurnComplete();
               }
@@ -14062,6 +14085,9 @@
         } catch(e) {
           console.warn("[RECORDER STOP ERROR]:", e);
         }
+      } else if (audioChunks.length > 0) {
+        const mime = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
+        recordedBlob = new Blob(audioChunks, { type: mime });
       }
 
       // Check if browser Web Speech provided a transcription already
@@ -14085,7 +14111,7 @@
       }
 
       // If browser Web Speech failed/was blocked, send recorded audio chunks to Gemini STT Backend!
-      if (recordedBlob && recordedBlob.size > 800) {
+      if (recordedBlob && recordedBlob.size > 200) {
         try {
           const reader = new FileReader();
           reader.readAsDataURL(recordedBlob);
@@ -14103,21 +14129,29 @@
                 setVoiceOrbState('thinking');
                 await processVoiceTurn(data.transcript.trim());
               } else {
+                showThinkingIndicator(false);
+                const chatInp = document.getElementById('prompt-input');
+                const dockInp = document.getElementById('universal-prompt-input');
+                if (chatInp) chatInp.placeholder = "Aawaz clear nahi aayi, kripya dobara bolein...";
+                if (dockInp) dockInp.placeholder = "Aawaz clear nahi aayi, kripya dobara bolein...";
                 if (isVoiceModeActive && !isSpeaking) {
                   setVoiceOrbState('listening');
                 }
               }
             } catch(err) {
               console.warn("[BACKEND TRANSCRIBE FETCH ERROR]:", err);
+              showThinkingIndicator(false);
               if (isVoiceModeActive && !isSpeaking) setVoiceOrbState('listening');
             } finally {
               restartRecordingAfterTurn();
             }
           };
         } catch(e) {
+          showThinkingIndicator(false);
           restartRecordingAfterTurn();
         }
       } else {
+        showThinkingIndicator(false);
         restartRecordingAfterTurn();
       }
     }
