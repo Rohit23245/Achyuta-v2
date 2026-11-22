@@ -14617,69 +14617,8 @@
         }
       }
 
-      try {
-        // Fallback fetch if not preloaded
-        // Request Google Gemini Native Speech Synthesis Audio
-        const ttsResp = await fetch('/api/voice/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: cleanSpeech })
-        });
-        const ttsData = await ttsResp.json();
-
-        // If Gemini Native Voice Model has reached quota or returned error, speak reply directly via browser speech synthesis!
-        if (!ttsData.success) {
-          console.warn("[NATIVE TTS NOT RETURNED, USING FALLBACK]:", ttsData.error);
-          fallbackBrowserSpeech(cleanSpeech);
-          return;
-        }
-
-        // If audio returned from Gemini Native Voice Model
-        if (ttsData.success && ttsData.audio_base64) {
-          // Cancel browser synthesis before playing native audio
-          if (voiceSynthesis) {
-            try { voiceSynthesis.cancel(); } catch(e) {}
-          }
-          const audioSrc = "data:audio/wav;base64," + ttsData.audio_base64;
-          currentAudioPlayer = new Audio(audioSrc);
-          
-          currentAudioPlayer.onplay = () => {
-            isSpeaking = true;
-            pauseMicrophoneForSpeech();
-            setVoiceOrbState('speaking');
-          };
-
-          currentAudioPlayer.onended = () => {
-            isSpeaking = false;
-            currentAudioPlayer = null;
-            resumeMicrophoneAfterSpeech();
-            if (isVoiceModeActive) {
-              setVoiceOrbState('listening');
-              restartRecordingAfterTurn();
-            }
-          };
-
-          currentAudioPlayer.onerror = (e) => {
-            console.warn("[GEMINI AUDIO PLAYBACK ERROR]:", e);
-            resumeMicrophoneAfterSpeech();
-            fallbackBrowserSpeech(cleanSpeech);
-          };
-
-          try {
-            await currentAudioPlayer.play();
-            return;
-          } catch(playErr) {
-            console.warn("[AUDIO PLAY REJECTED BY BROWSER, RETRYING WITH FALLBACK]:", playErr);
-            fallbackBrowserSpeech(cleanSpeech);
-            return;
-          }
-        } else {
-          fallbackBrowserSpeech(cleanSpeech);
-        }
-      } catch (err) {
-        console.warn("[TTS FETCH ERROR]:", err);
-        fallbackBrowserSpeech(cleanSpeech);
-      }
+      // 2. ULTRA-FAST ZERO-LATENCY PATH: Start browser speech IMMEDIATELY while fetching HD voice in background
+      fallbackBrowserSpeech(cleanSpeech);
     }
 
     function fallbackBrowserSpeech(cleanSpeech) {

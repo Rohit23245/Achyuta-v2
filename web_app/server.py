@@ -7013,12 +7013,17 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 }).encode("utf-8"))
                 return
 
-            # Clean text specifically for concise voice reply if needed
+            # Ultra-low latency voice mode: do not block text response with serial TTS synthesis
+            # Audio is synthesized asynchronously on frontend via /api/voice/tts or prewarmed
             audio_b64 = None
-            try:
-                audio_b64, _ = generate_gemini_voice_audio(reply)
-            except Exception as e:
-                print("[INLINE VOICE GEN EXCEPTION]:", e)
+            if not data.get("skip_audio", False):
+                # Only synthesize inline if explicitly requested and fast
+                try:
+                    # Non-blocking or quick synthesize only for very short greetings
+                    if len(reply) < 120 and data.get("voice_mode", False):
+                        audio_b64, _ = generate_gemini_voice_audio(reply)
+                except Exception as e:
+                    print("[INLINE VOICE GEN EXCEPTION]:", e)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
