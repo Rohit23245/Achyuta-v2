@@ -3653,22 +3653,30 @@ def handle_vobiz_stream_ws(handler, query_params):
                     # Update live tracker immediately to connected/picked state
                     if call_id:
                         update_live_call_state(call_id, "connected", {
-                            "current_speaker": "caller",
-                            "latest_text": "Call Connected. Listening to caller..."
+                            "current_speaker": "bot",
+                            "latest_text": first_msg
                         })
+                        append_call_dialog_turn(call_id, "bot", first_msg)
 
-                    # Unlock ear immediately: Zero static message. Listen directly to customer!
+                    # 1. Warm Greeting Delivered Immediately on Pickup via playAudio
+                    print(f"[Vobiz Stream] Playing initial greeting to caller: '{first_msg}'", flush=True)
+                    state = "DELIVERING_RESPONSE"
+                    greeting_pcm = get_pcm24_from_text(first_msg)
+                    if greeting_pcm:
+                        stream_audio_bytes(greeting_pcm)
+
+                    # 2. After playing initial greeting, unlock ear to listen for caller
                     state = "LISTENING_FOR_SPEECH"
+                    speech_detected = False
                     speech_energy_count = 0
                     silence_after_speech_count = 0
                     accumulated_caller_pcm.clear()
-                    print("[Vobiz Stream] Ear unlocked: Live 2-way Voice AI active. Listening to caller...", flush=True)
+                    print("[Vobiz Stream] Ear unlocked: Listening for caller speech...", flush=True)
                     if call_id:
                         update_live_call_state(call_id, "connected", {
                             "current_speaker": "caller",
                             "latest_text": "Listening to caller..."
                         })
-                    print("[Vobiz Stream] Ear unlocked: Actively listening for caller speech (ignoring line silence)...", flush=True)
 
                 elif event_name in ["playedStream", "checkpoint"]:
                     chk_name = event.get("name", "")
