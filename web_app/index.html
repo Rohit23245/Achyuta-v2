@@ -14420,7 +14420,7 @@
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: spokenText, history: chatHistory })
+          body: JSON.stringify({ prompt: spokenText, history: chatHistory, voice_mode: true })
         });
         const data = await res.json();
         showThinkingIndicator(false);
@@ -14574,7 +14574,7 @@
         try { voiceSynthesis.cancel(); } catch(e) {}
       }
 
-      // 1. FAST-PATH: If audio was already returned with the chat response, play it INSTANTLY!
+      // 1. PRIMARY FAST-PATH: Play Gemini 2.5 Native HD Voice instantly!
       if (preloadedAudioBase64) {
         try {
           const audioSrc = "data:audio/wav;base64," + preloadedAudioBase64;
@@ -14617,7 +14617,43 @@
         }
       }
 
-      // 2. ULTRA-FAST ZERO-LATENCY PATH: Start browser speech IMMEDIATELY while fetching HD voice in background
+      // 2. Fetch Gemini 2.5 Native Voice via TTS endpoint if not already preloaded
+      try {
+        const ttsResp = await fetch('/api/voice/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: cleanSpeech })
+        });
+        const ttsData = await ttsResp.json();
+        if (ttsData.success && ttsData.audio_base64) {
+          const audioSrc = "data:audio/wav;base64," + ttsData.audio_base64;
+          currentAudioPlayer = new Audio(audioSrc);
+          currentAudioPlayer.onplay = () => {
+            isSpeaking = true;
+            pauseMicrophoneForSpeech();
+            setVoiceOrbState('speaking');
+          };
+          currentAudioPlayer.onended = () => {
+            isSpeaking = false;
+            currentAudioPlayer = null;
+            resumeMicrophoneAfterSpeech();
+            if (isVoiceModeActive) {
+              setVoiceOrbState('listening');
+              restartRecordingAfterTurn();
+            }
+          };
+          currentAudioPlayer.onerror = () => {
+            resumeMicrophoneAfterSpeech();
+            fallbackBrowserSpeech(cleanSpeech);
+          };
+          await currentAudioPlayer.play();
+          return;
+        }
+      } catch(errTTS) {
+        console.warn("[DYNAMIC GEMINI TTS ERROR]:", errTTS);
+      }
+
+      // 3. Fallback to browser speech only if Gemini Native TTS is unavailable or blocked
       fallbackBrowserSpeech(cleanSpeech);
     }
 

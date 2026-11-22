@@ -7013,17 +7013,14 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 }).encode("utf-8"))
                 return
 
-            # Ultra-low latency voice mode: do not block text response with serial TTS synthesis
-            # Audio is synthesized asynchronously on frontend via /api/voice/tts or prewarmed
+            # Fast Gemini Native Voice synthesis (cached or first-sentence audio)
             audio_b64 = None
-            if not data.get("skip_audio", False):
-                # Only synthesize inline if explicitly requested and fast
+            is_voice_turn = bool(data.get("voice_mode", False))
+            if is_voice_turn and reply and not data.get("skip_audio", False):
                 try:
-                    # Non-blocking or quick synthesize only for very short greetings
-                    if len(reply) < 120 and data.get("voice_mode", False):
-                        audio_b64, _ = generate_gemini_voice_audio(reply)
+                    audio_b64, _ = generate_gemini_voice_audio(reply)
                 except Exception as e:
-                    print("[INLINE VOICE GEN EXCEPTION]:", e)
+                    print("[VOICE NATIVE GEN ERROR]:", e)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -7068,14 +7065,34 @@ print(f"DEBUG: Using Voice API Key: {VOICE_API_KEY[:5]}...")
 GEMINI_TTS_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 GEMINI_STT_MODEL = "gemini-2.5-flash"
 
+VOICE_AUDIO_LRU_CACHE = {}
+
+def get_cached_voice_audio(text):
+    clean = ' '.join(text.strip().lower().split())
+    return VOICE_AUDIO_LRU_CACHE.get(clean)
+
+def set_cached_voice_audio(text, audio_b64):
+    clean = ' '.join(text.strip().lower().split())
+    if len(VOICE_AUDIO_LRU_CACHE) > 200:
+        # Evict oldest entry
+        try:
+            oldest = next(iter(VOICE_AUDIO_LRU_CACHE))
+            del VOICE_AUDIO_LRU_CACHE[oldest]
+        except: pass
+    VOICE_AUDIO_LRU_CACHE[clean] = audio_b64
+
 def generate_gemini_voice_audio(text_content):
     """
     Converts text to natural voice speech using Google Gemini's 2.5 Flash Native Audio Dialog (Live API).
-    Has UNLIMITED rate limits on Live API (no 10 requests/day block).
     Streams 24kHz raw PCM output into standard WAV base64 format for web audio playback.
+    Utilizes in-memory LRU cache for instant 0ms sub-second repeated turns.
     """
     if not text_content:
         return None, None
+
+    cached = get_cached_voice_audio(text_content)
+    if cached:
+        return cached, None
 
     clean_text = re.sub(r'```(?:canvas:html|html|css|javascript|json)?[\s\S]*?```', '', text_content)
     clean_text = re.sub(r'\*\*(.*?)\*\*', r'\1', clean_text)
@@ -7085,17 +7102,20 @@ def generate_gemini_voice_audio(text_content):
     clean_text = re.sub(r'[#\>\-\_]', ' ', clean_text)
     clean_text = ' '.join(clean_text.split())
 
-    # Limit by full sentences, never chop mid-sentence or append trailing "..." which triggers hallucination
-    if len(clean_text) > 350:
-        # Cut at sentence boundary
-        sentences = re.split(r'(?<=[.!?]) +', clean_text)
-        accumulated = ""
+    # Pick first 1-2 concise sentences for ultra-fast natural human voice delivery
+    sentences = re.split(r'(?<=[.!?])\s+', clean_text)
+    short_target = clean_text
+    if len(sentences) > 0:
+        first_few = ""
         for s in sentences:
-            if len(accumulated) + len(s) < 320:
-                accumulated += (" " if accumulated else "") + s
+            if len(first_few) + len(s) < 180:
+                first_few += (" " if first_few else "") + s
             else:
                 break
-        clean_text = accumulated or clean_text[:300].rsplit(' ', 1)[0] + "."
+        if first_few:
+            short_target = first_few
+    if len(short_target) > 200:
+        short_target = short_target[:190].rsplit(' ', 1)[0] + "."
 
     import io, wave, base64, asyncio, websockets
 
@@ -7129,7 +7149,7 @@ def generate_gemini_voice_audio(text_content):
                 "clientContent": {
                     "turns": [{
                         "role": "user",
-                          "parts": [{"text": f"Speak aloud this exact line verbatim without translating: {clean_text if clean_text.endswith(('.', '!', '?')) else clean_text + '.'}"}]
+                          "parts": [{"text": f"Speak aloud this exact line verbatim without translating: {short_target if short_target.endswith(('.', '!', '?')) else short_target + '.'}"}]
                     }],
                     "turnComplete": True
                 }
@@ -7138,7 +7158,7 @@ def generate_gemini_voice_audio(text_content):
 
             accumulated_pcm = bytearray()
             while True:
-                msg = await asyncio.wait_for(ws.recv(), timeout=12)
+                msg = await asyncio.wait_for(ws.recv(), timeout=8)
                 data = json.loads(msg)
                 server_content = data.get("serverContent", {})
                 parts = server_content.get("modelTurn", {}).get("parts", [])
@@ -7157,6 +7177,7 @@ def generate_gemini_voice_audio(text_content):
                     wav_file.setframerate(24000)  # 24kHz
                     wav_file.writeframes(bytes(accumulated_pcm))
                 wav_b64 = base64.b64encode(wav_io.getvalue()).decode("utf-8")
+                set_cached_voice_audio(text_content, wav_b64)
                 return wav_b64, None
             return None, "No audio generated from Native Audio Dialog"
 
