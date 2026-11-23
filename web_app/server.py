@@ -734,7 +734,7 @@ def load_gemini_api_key():
     return k
 
 AI_API_KEY = load_gemini_api_key()
-AI_MODEL = "gemini-3.1-flash-lite"
+AI_MODEL = "gemini-flash-lite-latest"
 
 
 def execute_agent_database_operation(prompt):
@@ -1264,7 +1264,7 @@ def load_gemini_api_key():
     return k
 
 AI_API_KEY = load_gemini_api_key()
-AI_MODEL = "gemini-3.1-flash-lite"
+AI_MODEL = "gemini-flash-lite-latest"
 
 
 # GEMINI FUNCTION CALLING (CRM TOOLS DEFINITION & RESOLVER)
@@ -7204,7 +7204,7 @@ def transcribe_gemini_voice_audio(audio_base64, mime_type="audio/webm;codecs=opu
     elif "mp4" in mime_type or "m4a" in mime_type:
         clean_mime = "audio/mp4"
 
-    candidate_models = ["gemini-3.1-flash-lite", "gemini-3.5-flash"]
+    candidate_models = ["gemini-flash-lite-latest", "gemini-3.5-flash"]
     for model_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={VOICE_API_KEY}"
         payload = {
