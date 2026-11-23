@@ -239,18 +239,31 @@ def get_or_create_voice_audio_file(text_content):
     return None
 
 def generate_intelligent_second_response(customer_speech, intent_direction="", agent_instructions="", conversation_history=None):
-    """
-    Completely free, natural, and unrestricted Gemini conversation for calling agent.
-    Zero rules, zero constraints. Responds freely to what the user says.
-    """
     speech = (customer_speech or "").strip()
     api_key = os.environ.get('AI_API_KEY') or os.environ.get('GEMINI_API_KEY') or AI_API_KEY or os.environ.get('VOICE_API_KEY') or VOICE_API_KEY
+    model = "gemini-3.1-flash-lite"
     if api_key and speech:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={api_key}"
+            history_text = ""
+            if conversation_history and isinstance(conversation_history, list):
+                for turn in conversation_history[-6:]:
+                    r = turn.get('role', 'user')
+                    t = turn.get('text', '')
+                    if t:
+                        history_text += r.capitalize() + ": " + t + "\n"
+
+            sys_prompt = (
+                "You are speaking on a live phone call with the user in India. "
+                "Speak naturally in conversational Hindi or Hinglish. "
+                "Answer directly and conversationally as a human on a call - NEVER give bullet lists, options, or written advice. "
+                "Keep your answer concise in 1 or 2 spoken sentences so it sounds like real natural phone dialogue."
+            )
+
+            prompt = sys_prompt + "\n\nConversation so far:\n" + history_text + "Caller: " + speech + "\nBot response:"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             payload = {
-                "contents": [{"parts": [{"text": f"User phone caller said: '{speech}'. Respond freely, naturally, and directly in Hindi/Hinglish."}]}],
-                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 100}
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.6, "maxOutputTokens": 80}
             }
             req = urllib.request.Request(
                 url, 
@@ -261,7 +274,7 @@ def generate_intelligent_second_response(customer_speech, intent_direction="", a
                 res = json.loads(r.read().decode("utf-8"))
                 reply = res["candidates"][0]["content"]["parts"][0]["text"].strip()
                 if reply:
-                    return re.sub(r'[\*\#\_\"\`]', '', reply)
+                    return re.sub(r'[\*\#\_\"`]', '', reply)
         except Exception as e:
             print(f"Gemini conversational response error: {e}", flush=True)
 
@@ -7191,7 +7204,7 @@ def transcribe_gemini_voice_audio(audio_base64, mime_type="audio/webm;codecs=opu
     elif "mp4" in mime_type or "m4a" in mime_type:
         clean_mime = "audio/mp4"
 
-    candidate_models = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-flash-latest"]
+    candidate_models = ["gemini-3.1-flash-lite", "gemini-3.5-flash"]
     for model_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={VOICE_API_KEY}"
         payload = {
