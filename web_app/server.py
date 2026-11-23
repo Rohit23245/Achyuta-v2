@@ -3410,7 +3410,7 @@ class LiveGeminiBidiSession:
                 self._turn_streaming(caller_pcm_16k, step_target, on_pcm_chunk), 
                 self.loop
             )
-            return future.result(timeout=7)
+            return future.result(timeout=20)
         except Exception as e:
             print(f"[LiveGeminiBidi] Error in speech turn: {e}", flush=True)
             return False
