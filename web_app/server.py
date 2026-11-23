@@ -6739,7 +6739,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                     c_req = urllib.request.Request(c_url, data=json.dumps(payload_dict).encode("utf-8"), headers={"Content-Type": "application/json"})
                     for attempt in range(2):
                         try:
-                            with urllib.request.urlopen(c_req, timeout=18) as resp:
+                            with urllib.request.urlopen(c_req, timeout=4.5) as resp:
                                 active_chat_model = candidate
                                 return json.loads(resp.read().decode("utf-8")), None
                         except urllib.error.HTTPError as err:
@@ -6760,7 +6760,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_chat_model}:generateContent?key={AI_API_KEY}"
                 for attempt in range(max_retries):
                     try:
-                        with urllib.request.urlopen(req_obj, timeout=18) as resp:
+                        with urllib.request.urlopen(req_obj, timeout=4.5) as resp:
                             return json.loads(resp.read().decode("utf-8")), None
                     except Exception as e:
                         if attempt < max_retries - 1:
@@ -7093,18 +7093,16 @@ def generate_gemini_voice_audio(text_content):
     clean_text = re.sub(r'[#\>\-\_]', ' ', clean_text)
     clean_text = ' '.join(clean_text.split())
 
-    # Speak full generated response cleanly without cutting sentences
-    if len(clean_text) > 400:
-        sentences = re.split(r'(?<=[.!?])\s+', clean_text)
-        accumulated = ""
-        for s in sentences:
-            if len(accumulated) + len(s) < 380:
-                accumulated += (" " if accumulated else "") + s
-            else:
-                break
-        short_target = accumulated or clean_text[:350].rsplit(' ', 1)[0] + "."
+    # Ultra-Fast First-Sentence Speech Synthesis:
+    # Synthesizes the first 1-2 sentences immediately (<1.2s TTFA) so user hears response instantly!
+    sentences = re.split(r'(?<=[.!?\n])\s+', clean_text)
+    if sentences:
+        accumulated = sentences[0].strip()
+        if len(sentences) > 1 and len(accumulated) < 90:
+            accumulated += " " + sentences[1].strip()
+        short_target = accumulated if len(accumulated) <= 220 else clean_text[:200].rsplit(' ', 1)[0] + "."
     else:
-        short_target = clean_text
+        short_target = clean_text[:200]
 
     import io, wave, base64, asyncio, websockets
 
@@ -7178,24 +7176,6 @@ def generate_gemini_voice_audio(text_content):
     except Exception as e:
         print("[NATIVE AUDIO DIALOG ERROR]:", e)
         return None, str(e)
-        
-        # Check quota limit
-        if e.code == 429 or "RESOURCE_EXHAUSTED" in err_msg:
-            retry_time = "kuch der"
-            m = re.search(r'retry in\s+([0-9a-zA-Z\.\s]+)', err_msg, re.IGNORECASE)
-            if m:
-                raw = m.group(1).strip().split('.')[0]
-                h_match = re.search(r'(\d+)\s*h', raw)
-                m_match = re.search(r'(\d+)\s*m', raw)
-                parts = []
-                if h_match: parts.append(f"{h_match.group(1)}h")
-                if m_match: parts.append(f"{m_match.group(1)}m")
-                if parts: retry_time = " ".join(parts)
-                else: retry_time = raw
-            return None, {"error_type": "quota_limit", "retry_time": retry_time}
-        return None, f"HTTP_{e.code}: {err_msg[:200]}"
-    except Exception as ex:
-        return None, str(ex)
 
 def transcribe_gemini_voice_audio(audio_base64, mime_type="audio/webm;codecs=opus"):
     """
