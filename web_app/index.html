@@ -13827,6 +13827,115 @@
     let vadSilenceStartTime = 0;
     let isProcessingVoiceTurn = false;
 
+    // Live Audio-to-Audio Real-Time WebSocket Engine
+    let liveAudioWS = null;
+    let liveAudioWorkletNode = null;
+    let liveAudioPlaybackQueue = [];
+    let isLiveAudioPlaying = false;
+
+    function initLiveAudioWebSocket() {
+      try {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = proto + '//' + window.location.host + '/ws/live_audio';
+        liveAudioWS = new WebSocket(wsUrl);
+
+        liveAudioWS.onopen = () => {
+          console.log("[Live Audio WS] Connected directly to Gemini 2.5 Live Stream!");
+        };
+
+        liveAudioWS.onmessage = async (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'audio') {
+              playIncomingAudioChunk(msg.data);
+            } else if (msg.type === 'thinking') {
+              setVoiceOrbState('thinking');
+            } else if (msg.type === 'turn_complete') {
+              // Bot finished speaking this turn, ear unlocks
+              setTimeout(() => {
+                if (isVoiceModeActive && !isSpeaking) {
+                  setVoiceOrbState('listening');
+                }
+              }, 400);
+            }
+          } catch(e) {}
+        };
+
+        liveAudioWS.onerror = (e) => {
+          console.warn("[Live Audio WS] Error:", e);
+        };
+
+        liveAudioWS.onclose = () => {
+          console.log("[Live Audio WS] Connection closed.");
+        };
+      } catch(e) {
+        console.warn("[Live Audio WS Init Error]:", e);
+      }
+    }
+
+    function sendLiveAudioPCM(pcmData) {
+      if (liveAudioWS && liveAudioWS.readyState === WebSocket.OPEN) {
+        // Convert Float32 or Int16 array to base64
+        const binary = String.fromCharCode.apply(null, new Uint8Array(pcmData.buffer));
+        const b64 = btoa(binary);
+        liveAudioWS.send(JSON.stringify({ type: 'audio_chunk', data: b64 }));
+      }
+    }
+
+    function triggerLiveTurnEnd() {
+      if (liveAudioWS && liveAudioWS.readyState === WebSocket.OPEN) {
+        liveAudioWS.send(JSON.stringify({ type: 'turn_end' }));
+      }
+    }
+
+    function playIncomingAudioChunk(b64Audio) {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+        }
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+
+        const binary = atob(b64Audio);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        const int16 = new Int16Array(bytes.buffer);
+        const float32 = new Float32Array(int16.length);
+        for (let i = 0; i < int16.length; i++) {
+          float32[i] = int16[i] / 32768.0;
+        }
+
+        const audioBuffer = audioContext.createBuffer(1, float32.length, 24000);
+        audioBuffer.copyToChannel(float32, 0);
+
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+
+        source.onended = () => {
+          if (liveAudioPlaybackQueue.length > 0) {
+            const next = liveAudioPlaybackQueue.shift();
+            next.start();
+          } else {
+            isSpeaking = false;
+            setVoiceOrbState('listening');
+          }
+        };
+
+        isSpeaking = true;
+        setVoiceOrbState('speaking');
+        source.start();
+      } catch(err) {
+        console.warn("[Audio Playback Error]:", err);
+      }
+    }
+
+
     // Web Speech Recognition handle (Pure STT via browser engine, No robotic playback)
     let webSpeechRecognition = null;
     let webSpeechTranscript = '';
@@ -14039,6 +14148,7 @@
               vadSilenceStartTime = 0;
               if (totalSpeechDuration > 200) {
                 showThinkingIndicator(true);
+                triggerLiveTurnEnd();
                 handleVoiceTurnComplete();
               }
             }
@@ -14232,6 +14342,7 @@
 
       // Initialize real-time audio frequency analyser & recorder
       await initAudioAnalyser();
+      initLiveAudioWebSocket();
 
       // Start hybrid web speech recognition
       if (!webSpeechRecognition) {
@@ -14253,6 +14364,7 @@
 
       // Stop audio stream, recorder, and frequency animation
       stopAudioAnalyser();
+      if (liveAudioWS) { try { liveAudioWS.close(); } catch(e){} liveAudioWS = null; }
 
       // Reset inline UI buttons & waves back to idle
       updateInlineVoiceUI('idle');

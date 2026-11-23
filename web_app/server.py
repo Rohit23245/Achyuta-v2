@@ -3499,6 +3499,83 @@ def get_pcm24_from_text(text):
         print(f"[Vobiz Stream] Error generating/caching PCM for text '{text[:20]}': {e}", flush=True)
     return None
 
+def handle_web_live_voice_ws(handler, query_params):
+    """
+    Direct Browser Web Audio-to-Audio Live Streaming Endpoint (/ws/live_audio).
+    Connects browser microphone PCM directly to Gemini 2.5 Flash Native Audio Live API via bidirectional stream.
+    Zero STT, zero text LLM roundtrip, zero TTS delay. 
+    """
+    raw_sock = handler.connection
+    raw_sock.settimeout(120.0)
+    print("[Web Live Audio] Browser connected to Live Audio-to-Audio stream!", flush=True)
+
+    cfg = get_calling_script_config()
+    agent_name = cfg.get("agent_name", "Achyuta")
+    sys_inst = (
+        f"You are {agent_name}, a real-time conversational business assistant in India speaking directly on a live voice call. "
+        "Listen to the user's speech and reply conversationally, warmly, and naturally in Hindi or Hinglish. "
+        "Keep your spoken answers concise, direct, and conversational (1-2 sentences). "
+        "Never output written bullet lists, markdown, or options. Speak naturally as in a phone call."
+    )
+
+    bidi_session = LiveGeminiBidiSession(sys_inst)
+    speech_buffer = bytearray()
+    last_speech_time = time.time()
+
+    def send_browser_audio_chunk(pcm_24k_chunk):
+        # Sends audio chunk back to browser in Base64 or binary
+        if not pcm_24k_chunk:
+            return
+        frame = {
+            "type": "audio",
+            "data": base64.b64encode(pcm_24k_chunk).decode("ascii")
+        }
+        send_ws_frame(raw_sock, 0x1, json.dumps(frame))
+
+    try:
+        # Acknowledge connection
+        send_ws_frame(raw_sock, 0x1, json.dumps({"type": "ready", "message": "Live audio session ready"}))
+
+        while True:
+            opcode, raw_data = parse_ws_frame(raw_sock)
+            if opcode is None or opcode == 0x8:
+                print("[Web Live Audio] Browser disconnected.", flush=True)
+                break
+            if opcode == 0x9:
+                send_ws_frame(raw_sock, 0xA, raw_data)
+                continue
+            if opcode == 0x1:
+                # JSON control frame or audio chunk
+                try:
+                    msg = json.loads(raw_data.decode("utf-8", errors="ignore"))
+                    m_type = msg.get("type")
+                    if m_type == "audio_chunk":
+                        chunk_b64 = msg.get("data", "")
+                        if chunk_b64:
+                            pcm_in = base64.b64decode(chunk_b64)
+                            speech_buffer.extend(pcm_in)
+                    elif m_type == "turn_end":
+                        # User stopped speaking, trigger instant model speech turn
+                        if len(speech_buffer) > 1600:
+                            send_ws_frame(raw_sock, 0x1, json.dumps({"type": "thinking"}))
+                            audio_to_send = bytes(speech_buffer)
+                            speech_buffer.clear()
+                            bidi_session.stream_speech_turn(audio_to_send, "", send_browser_audio_chunk)
+                            send_ws_frame(raw_sock, 0x1, json.dumps({"type": "turn_complete"}))
+                        else:
+                            speech_buffer.clear()
+                except Exception as ex:
+                    print(f"[Web Live Audio] Frame error: {ex}", flush=True)
+
+    except Exception as e:
+        print(f"[Web Live Audio] Stream loop error: {e}", flush=True)
+    finally:
+        try:
+            bidi_session.close()
+        except Exception:
+            pass
+        print("[Web Live Audio] Cleaned up live session.", flush=True)
+
 def handle_vobiz_stream_ws(handler, query_params):
     """
     Handles bidirectional Vobiz WebSocket audio streaming (/ws):
@@ -3806,7 +3883,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        # WebSocket Streaming Endpoint: /ws
+        # WebSocket Streaming Endpoints: /ws (Telephony) and /ws/live_audio (Web Browser Live Voice)
         if self.path.startswith("/ws") and self.headers.get("Upgrade", "").lower() == "websocket":
             self.close_connection = True
             key = self.headers.get("Sec-WebSocket-Key")
@@ -3814,8 +3891,6 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 self.send_error(400, "Missing Sec-WebSocket-Key")
                 return
             accept_val = base64.b64encode(hashlib.sha1((key + WS_MAGIC_KEY).encode()).digest()).decode()
-            
-            # Send HTTP 101 WebSocket handshake directly over unbuffered raw socket
             handshake = (
                 "HTTP/1.1 101 Switching Protocols\r\n"
                 "Upgrade: websocket\r\n"
@@ -3825,6 +3900,9 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             self.connection.sendall(handshake)
             
             parsed_query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            if self.path.startswith("/ws/live_audio"):
+                handle_web_live_voice_ws(self, parsed_query)
+                return
             handle_vobiz_stream_ws(self, parsed_query)
             return
         if self.path.startswith("/voice-webhook/second-response"):
