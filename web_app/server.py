@@ -7102,20 +7102,18 @@ def generate_gemini_voice_audio(text_content):
     clean_text = re.sub(r'[#\>\-\_]', ' ', clean_text)
     clean_text = ' '.join(clean_text.split())
 
-    # Pick first 1-2 concise sentences for ultra-fast natural human voice delivery
-    sentences = re.split(r'(?<=[.!?])\s+', clean_text)
-    short_target = clean_text
-    if len(sentences) > 0:
-        first_few = ""
+    # Speak full generated response cleanly without cutting sentences
+    if len(clean_text) > 400:
+        sentences = re.split(r'(?<=[.!?])\s+', clean_text)
+        accumulated = ""
         for s in sentences:
-            if len(first_few) + len(s) < 180:
-                first_few += (" " if first_few else "") + s
+            if len(accumulated) + len(s) < 380:
+                accumulated += (" " if accumulated else "") + s
             else:
                 break
-        if first_few:
-            short_target = first_few
-    if len(short_target) > 200:
-        short_target = short_target[:190].rsplit(' ', 1)[0] + "."
+        short_target = accumulated or clean_text[:350].rsplit(' ', 1)[0] + "."
+    else:
+        short_target = clean_text
 
     import io, wave, base64, asyncio, websockets
 
