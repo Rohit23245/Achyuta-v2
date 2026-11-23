@@ -241,42 +241,40 @@ def get_or_create_voice_audio_file(text_content):
 def generate_intelligent_second_response(customer_speech, intent_direction="", agent_instructions="", conversation_history=None):
     speech = (customer_speech or "").strip()
     api_key = os.environ.get('AI_API_KEY') or os.environ.get('GEMINI_API_KEY') or AI_API_KEY or os.environ.get('VOICE_API_KEY') or VOICE_API_KEY
-    model = "gemini-3.1-flash-lite"
+    candidate_models = ["gemini-flash-lite-latest", "gemini-3.5-flash"]
     if api_key and speech:
-        try:
-            history_text = ""
-            if conversation_history and isinstance(conversation_history, list):
-                for turn in conversation_history[-6:]:
-                    r = turn.get('role', 'user')
-                    t = turn.get('text', '')
-                    if t:
-                        history_text += r.capitalize() + ": " + t + "\n"
+        history_text = ""
+        if conversation_history and isinstance(conversation_history, list):
+            for turn in conversation_history[-6:]:
+                r = turn.get('role', 'user')
+                t = turn.get('text', '')
+                if t:
+                    history_text += r.capitalize() + ": " + t + "\n"
 
-            sys_prompt = (
-                "You are speaking on a live phone call with the user in India. "
-                "Speak naturally in conversational Hindi or Hinglish. "
-                "Answer directly and conversationally as a human on a call - NEVER give bullet lists, options, or written advice. "
-                "Keep your answer concise in 1 or 2 spoken sentences so it sounds like real natural phone dialogue."
-            )
+        sys_prompt = (
+            "You are speaking on a live phone call with the user in India. "
+            "Speak naturally in conversational Hindi or Hinglish. "
+            "Answer directly and conversationally as a human on a call - NEVER give bullet lists, options, or written advice. "
+            "Keep your answer concise in 1 or 2 spoken sentences so it sounds like real natural phone dialogue."
+        )
+        prompt = sys_prompt + "\n\nConversation so far:\n" + history_text + "Caller: " + speech + "\nBot response:"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.6, "maxOutputTokens": 80}
+        }
+        req_data = json.dumps(payload).encode("utf-8")
 
-            prompt = sys_prompt + "\n\nConversation so far:\n" + history_text + "Caller: " + speech + "\nBot response:"
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.6, "maxOutputTokens": 80}
-            }
-            req = urllib.request.Request(
-                url, 
-                data=json.dumps(payload).encode("utf-8"), 
-                headers={"Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=5) as r:
-                res = json.loads(r.read().decode("utf-8"))
-                reply = res["candidates"][0]["content"]["parts"][0]["text"].strip()
-                if reply:
-                    return re.sub(r'[\*\#\_\"`]', '', reply)
-        except Exception as e:
-            print(f"Gemini conversational response error: {e}", flush=True)
+        for model in candidate_models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+                req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    res = json.loads(r.read().decode("utf-8"))
+                    reply = res["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    if reply:
+                        return re.sub(r'[\*\#\_\"`]', '', reply)
+            except Exception as e:
+                print(f"[Calling Failover] Model {model} failed ({e}), trying next candidate...", flush=True)
 
     return "Haan ji, boliye, main sun raha hoon."
 
@@ -6700,14 +6698,18 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 }).encode("utf-8"))
                 return
 
-            # Gemini AI is the primary intelligent engine. Naive regex is reserved as offline fallback.
+            # Multi-Model Enterprise Failover Chain: Automatically fails over between active models
+            CHAT_MODELS_POOL = [AI_MODEL, "gemini-3.5-flash", "gemini-flash-lite-latest"]
+            active_models = []
+            for m_item in CHAT_MODELS_POOL:
+                if m_item and m_item not in active_models:
+                    active_models.append(m_item)
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={AI_API_KEY}"
+            active_chat_model = active_models[0]
             gatekeeper_prompt = SystemPromptGatekeeper.get_gatekeeper_prompt()
             contents = []
             for msg in history[-6:]:
                 text_content = msg.get("text", "")
-                # Exclude error banners from model turn history so they don't corrupt context
                 if "Connection issue" in text_content or "Unable to process" in text_content or "usage limit" in text_content:
                     continue
                 contents.append({"role": msg["role"], "parts": [{"text": text_content}]})
@@ -6724,45 +6726,54 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                     "temperature": 0.5
                 }
             }
-            req_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
 
             executed_tool = None
             action_executed_flag = False
             action_meta_dict = {}
 
-            # Retry helper with exponential backoff on temporary 429/503 spikes
-            def execute_gemini_request(req_obj, max_retries=3):
-                delay = 1.0
+            def execute_gemini_request_with_failover(payload_dict):
+                nonlocal active_chat_model
+                last_err = None
+                for candidate in active_models:
+                    c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{candidate}:generateContent?key={AI_API_KEY}"
+                    c_req = urllib.request.Request(c_url, data=json.dumps(payload_dict).encode("utf-8"), headers={"Content-Type": "application/json"})
+                    for attempt in range(2):
+                        try:
+                            with urllib.request.urlopen(c_req, timeout=18) as resp:
+                                active_chat_model = candidate
+                                return json.loads(resp.read().decode("utf-8")), None
+                        except urllib.error.HTTPError as err:
+                            err_str = ""
+                            try: err_str = err.read().decode("utf-8")
+                            except: pass
+                            last_err = (err.code, err_str)
+                            if err.code in [429, 500, 503]:
+                                print(f"[Model Failover] Model {candidate} (attempt {attempt+1}) returned HTTP {err.code}, testing next...", flush=True)
+                                break
+                        except Exception as ex:
+                            last_err = (500, str(ex))
+                            print(f"[Model Failover] Model {candidate} exception {ex}, testing next...", flush=True)
+                            break
+                return None, last_err
+
+            def execute_gemini_request(req_obj, max_retries=2):
+                c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_chat_model}:generateContent?key={AI_API_KEY}"
                 for attempt in range(max_retries):
                     try:
-                        with urllib.request.urlopen(req_obj, timeout=25) as resp:
+                        with urllib.request.urlopen(req_obj, timeout=18) as resp:
                             return json.loads(resp.read().decode("utf-8")), None
-                    except urllib.error.HTTPError as err:
-                        err_str = ""
-                        try: err_str = err.read().decode("utf-8")
-                        except: pass
-                        # Retry on transient spike errors
-                        if err.code in [429, 500, 503] and attempt < max_retries - 1:
-                            if "retry in" in err_str.lower() and ("h" in err_str.lower() or "m" in err_str.lower()):
-                                return None, (err.code, err_str)
-                            time.sleep(delay)
-                            delay *= 1.8
-                            continue
-                        return None, (err.code, err_str)
-                    except Exception as ex:
+                    except Exception as e:
                         if attempt < max_retries - 1:
-                            time.sleep(delay)
-                            delay *= 1.8
+                            time.sleep(0.8)
                             continue
-                        return None, (500, str(ex))
+                        return None, (500, str(e))
                 return None, (500, "Max retries exceeded")
 
             try:
-                res, http_err = execute_gemini_request(req)
+                res, http_err = execute_gemini_request_with_failover(payload)
                 if http_err:
                     err_code, err_text = http_err
-                    raise urllib.error.HTTPError(url, err_code, err_text, {}, None)
+                    raise urllib.error.HTTPError(c_url if 'c_url' in locals() else url, err_code, err_text, {}, None)
 
                 cand = res["candidates"][0]["content"]
 
@@ -6866,7 +6877,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                                     "temperature": 0.5
                                 }
                             }
-                            req_loop = urllib.request.Request(url, data=json.dumps(round_payload).encode("utf-8"), headers={"Content-Type": "application/json"})
+                            loop_url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_chat_model}:generateContent?key={AI_API_KEY}"
+                            req_loop = urllib.request.Request(loop_url, data=json.dumps(round_payload).encode("utf-8"), headers={"Content-Type": "application/json"})
                             res_loop, http_err_loop = execute_gemini_request(req_loop)
                             if http_err_loop:
                                 err_code, err_text = http_err_loop
