@@ -240,49 +240,17 @@ def get_or_create_voice_audio_file(text_content):
 
 def generate_intelligent_second_response(customer_speech, intent_direction="", agent_instructions="", conversation_history=None):
     """
-    Generates intelligent dynamic conversational reply based on user speech and natural conversation context.
-    Acts as a real human AI agent engaging in continuous voice dialogue.
+    Completely free, natural, and unrestricted Gemini conversation for calling agent.
+    Zero rules, zero constraints. Responds freely to what the user says.
     """
-    cfg = get_calling_script_config()
     speech = (customer_speech or "").strip()
-    custom_inst = (agent_instructions or cfg.get("agent_instructions") or "").strip()
-    intent = (intent_direction or cfg.get("second_response_intent") or "").strip()
-    agent_name = cfg.get("agent_name", "Priya")
-    comp_name = cfg.get("company_name", "Achyuta Enterprise Solutions")
-
     api_key = os.environ.get('AI_API_KEY') or os.environ.get('GEMINI_API_KEY') or AI_API_KEY or os.environ.get('VOICE_API_KEY') or VOICE_API_KEY
-    if api_key:
+    if api_key and speech:
         try:
-            history_context = ""
-            if conversation_history and isinstance(conversation_history, list):
-                turns = []
-                for t in conversation_history[-6:]:
-                    speaker_label = "Caller" if t.get("role") == "caller" else agent_name
-                    turns.append(f"{speaker_label}: {t.get('text', '')}")
-                history_context = "\nRecent Conversation:\n" + "\n".join(turns)
-
-            extra_inst = f"\nSpecific Instructions: {custom_inst}" if custom_inst else ""
-            intent_ctx = f"\nBusiness Goal: {intent}" if intent else ""
-
-            prompt = f"""You are {agent_name}, a friendly, intelligent Indian female caller calling on behalf of {comp_name}.
-You are speaking on a live phone call directly with a customer in natural, fluent Hindi / Hinglish.
-
-Customer just said: "{speech}"
-{history_context}
-{intent_ctx}
-{extra_inst}
-
-Rules:
-1. Speak ONLY in direct, conversational natural Hindi / Hinglish (1 to 2 short, crisp sentences).
-2. Comprehend exactly what the customer asked or said, answer their specific question or acknowledge their words thoughtfully, and continue the conversation smoothly.
-3. You are a real human executive. NEVER say or admit you are an AI, bot, computer, or language model.
-4. If customer says Hello / Namaste / Kaun bol rahe ho / Kya kaam hai, greet them warmly and answer directly.
-5. Do NOT use asterisks, markdown, quotation marks, or emojis. Return ONLY the spoken words."""
-
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_MODEL}:generateContent?key={api_key}"
             payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.5, "maxOutputTokens": 90}
+                "contents": [{"parts": [{"text": f"User phone caller said: '{speech}'. Respond freely, naturally, and directly in Hindi/Hinglish."}]}],
+                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 100}
             }
             req = urllib.request.Request(
                 url, 
@@ -297,9 +265,7 @@ Rules:
         except Exception as e:
             print(f"Gemini conversational response error: {e}", flush=True)
 
-    if "hello" in speech.lower() or "namaste" in speech.lower():
-        return f"Hello ji, Namaste! Main Achyuta Enterprise se bol rahi hoon, bataiye kaise madad kar sakti hoon?"
-    return "Haan ji bilkul, main aapki baat samajh rahi hoon. Bataiye aage hum aapki kaise madad kar sakte hain?"
+    return "Haan ji, boliye, main sun raha hoon."
 
 def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", response_intent="", agent_instructions=""):
     cfg = get_calling_script_config()
