@@ -14178,92 +14178,10 @@
     async function handleVoiceTurnComplete() {
       if (isProcessingVoiceTurn || isSpeaking || !isVoiceModeActive) return;
 
-      // Stop current recorder to finalize current audio blob
-      let recordedBlob = null;
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        try {
-          await new Promise(resolve => {
-            mediaRecorder.onstop = () => {
-              if (audioChunks.length > 0) {
-                const mime = mediaRecorder.mimeType || 'audio/webm';
-                recordedBlob = new Blob(audioChunks, { type: mime });
-              }
-              resolve();
-            };
-            mediaRecorder.stop();
-          });
-        } catch(e) {
-          console.warn("[RECORDER STOP ERROR]:", e);
-        }
-      } else if (audioChunks.length > 0) {
-        const mime = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
-        recordedBlob = new Blob(audioChunks, { type: mime });
-      }
-
-      // Check if browser Web Speech provided a transcription already
-      const webText = webSpeechTranscript.trim();
-      webSpeechTranscript = '';
-
-      if (webText && webText.length >= 2) {
-        if (isEchoOfBotSpeech(webText)) {
-          console.warn("[ECHO FILTER BLOCKED REPEATED BOT SPEECH]:", webText);
-          restartRecordingAfterTurn();
-          return;
-        }
-        isProcessingVoiceTurn = true;
-        setVoiceOrbState('thinking');
-        try {
-          await processVoiceTurn(webText);
-        } finally {
-          restartRecordingAfterTurn();
-        }
-        return;
-      }
-
-      // If browser Web Speech failed/was blocked, send recorded audio chunks to Gemini STT Backend!
-      if (recordedBlob && recordedBlob.size > 200) {
-        try {
-          const reader = new FileReader();
-          reader.readAsDataURL(recordedBlob);
-          reader.onloadend = async () => {
-            const base64Audio = reader.result.split(',')[1];
-            try {
-              const res = await fetch('/api/voice/transcribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ audio_base64: base64Audio, mime_type: recordedBlob.type })
-              });
-              const data = await res.json();
-              if (data.success && data.transcript && data.transcript.trim()) {
-                isProcessingVoiceTurn = true;
-                setVoiceOrbState('thinking');
-                await processVoiceTurn(data.transcript.trim());
-              } else {
-                showThinkingIndicator(false);
-                const chatInp = document.getElementById('prompt-input');
-                const dockInp = document.getElementById('universal-prompt-input');
-                if (chatInp) chatInp.placeholder = "Aawaz clear nahi aayi, kripya dobara bolein...";
-                if (dockInp) dockInp.placeholder = "Aawaz clear nahi aayi, kripya dobara bolein...";
-                if (isVoiceModeActive && !isSpeaking) {
-                  setVoiceOrbState('listening');
-                }
-              }
-            } catch(err) {
-              console.warn("[BACKEND TRANSCRIBE FETCH ERROR]:", err);
-              showThinkingIndicator(false);
-              if (isVoiceModeActive && !isSpeaking) setVoiceOrbState('listening');
-            } finally {
-              restartRecordingAfterTurn();
-            }
-          };
-        } catch(e) {
-          showThinkingIndicator(false);
-          restartRecordingAfterTurn();
-        }
-      } else {
-        showThinkingIndicator(false);
-        restartRecordingAfterTurn();
-      }
+      // Direct Live Audio-to-Audio: User finished speaking, send turn_end over WebSocket!
+      console.log("[Live Voice Turn] Triggering instant Gemini speech turn over WebSocket...");
+      triggerLiveTurnEnd();
+      setVoiceOrbState('thinking');
     }
 
     function restartRecordingAfterTurn() {
@@ -14364,6 +14282,7 @@
 
       // Stop audio stream, recorder, and frequency animation
       stopAudioAnalyser();
+      if (pcmAudioProcessor) { try { pcmAudioProcessor.disconnect(); } catch(e){} pcmAudioProcessor = null; }
       if (liveAudioWS) { try { liveAudioWS.close(); } catch(e){} liveAudioWS = null; }
 
       // Reset inline UI buttons & waves back to idle
