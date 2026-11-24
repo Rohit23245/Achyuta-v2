@@ -3849,7 +3849,14 @@ def handle_vobiz_stream_ws(handler, query_params):
         "Listen to the human caller and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish. "
         "Speak fluently and complete your thoughts and explanations without cutting off early."
     )
-    vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
+    vobiz_bidi_session = None
+    def _bg_init_vobiz_bidi():
+        nonlocal vobiz_bidi_session
+        try:
+            vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
+        except Exception as e:
+            print(f"[Vobiz Stream] Bg Bidi init error: {e}", flush=True)
+    threading.Thread(target=_bg_init_vobiz_bidi, daemon=True).start()
     vobiz_in_activity = False
     bot_playback_until = 0.0
     from collections import deque as _deque
