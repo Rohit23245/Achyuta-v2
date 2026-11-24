@@ -3453,7 +3453,8 @@ class LiveGeminiBidiSession:
                     }
                 }))
 
-        # 2. Complete turn - pure voice turn without overriding dummy text
+        # 2. Complete turn - signal turn completion
+        # Gemini Bidi protocol requires turns list in clientContent to signal user turn completion
         if step_target:
             instruction_text = f'Respond directly to the user in 1 short sentence in natural Hindi to achieve: "{step_target}"'
             turn_payload = {
@@ -3463,9 +3464,14 @@ class LiveGeminiBidiSession:
                 }
             }
         else:
-            # Pure bidirectional voice turn: signal turn completion without extra text parts so audio is processed directly
+            # When completing pure speech turn, Gemini protocol requires non-empty parts list:
+            # We direct it to answer the audio input naturally in Hindi.
             turn_payload = {
                 "clientContent": {
+                    "turns": [{
+                        "role": "user",
+                        "parts": [{"text": "Listen to the user's speech audio provided above and respond directly to what they said in Hindi."}]
+                    }],
                     "turnComplete": True
                 }
             }
