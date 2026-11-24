@@ -14099,20 +14099,37 @@
               console.log('[Live PCM] Mic capturing chunks, total sent:', window._pcmCount);
             }
 
-            // Resample from audioContext.sampleRate (usually 44100 or 48000) to exactly 16000Hz PCM
+            // High-quality 16kHz PCM resampling (Linear Interpolation to eliminate aliasing/distortion)
             const inRate = audioContext.sampleRate;
             const outRate = 16000;
-            const ratio = inRate / outRate;
-            const outLength = Math.floor(inputFloat.length / ratio);
-            const pcm16 = new Int16Array(outLength);
-
-            for (let i = 0; i < outLength; i++) {
-              const srcIdx = Math.floor(i * ratio);
-              const sample = Math.max(-1, Math.min(1, inputFloat[srcIdx]));
-              pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+            let pcm16;
+            if (inRate === outRate) {
+              pcm16 = new Int16Array(inputFloat.length);
+              for (let i = 0; i < inputFloat.length; i++) {
+                const sample = Math.max(-1, Math.min(1, inputFloat[i]));
+                pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+              }
+            } else {
+              const ratio = inRate / outRate;
+              const outLength = Math.floor(inputFloat.length / ratio);
+              pcm16 = new Int16Array(outLength);
+              for (let i = 0; i < outLength; i++) {
+                const pos = i * ratio;
+                const idx = Math.floor(pos);
+                const frac = pos - idx;
+                const s0 = inputFloat[idx] || 0;
+                const s1 = inputFloat[Math.min(idx + 1, inputFloat.length - 1)] || s0;
+                const interp = s0 + (s1 - s0) * frac;
+                const sample = Math.max(-1, Math.min(1, interp));
+                pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+              }
             }
 
-            sendLiveAudioPCM(pcm16);
+            // Keep a tiny 3-frame rolling pre-buffer so the first syllable is never clipped,
+            // and only stream clean speech audio (not continuous room noise)
+            if (!window._vadPreBuffer) window._vadPreBuffer = [];
+            window._vadPreBuffer.push(pcm16);
+            if (window._vadPreBuffer.length > 3) window._vadPreBuffer.shift();
 
             // In-stream volume calculation directly from mic PCM (100% immune to CSS/Analyser issues)
             let sumSq = 0;
@@ -14129,27 +14146,35 @@
               window._vadBackgroundNoise = window._vadBackgroundNoise * 0.92 + rms * 0.08;
             }
 
-            // Speech threshold is background noise + 2.5 (min 2.5) to avoid room hum
+            // Speech threshold is background noise + 2.2 (min 2.5) to avoid room hum
             const dynamicThreshold = Math.max(2.5, window._vadBackgroundNoise + 2.2);
 
-            // Natural conversational pause: 700ms silence confirms user finished sentence without cutting mid-sentence
+            // Natural conversational pause: 1200ms silence confirms user finished sentence without cutting mid-sentence
             if (rms > dynamicThreshold) {
               if (!vadSpeechActive) {
                 vadSpeechActive = true;
                 vadSpeechStartTime = now;
+                // Flush pre-buffer so the very first syllable is captured cleanly
+                for (const preChunk of window._vadPreBuffer) {
+                  sendLiveAudioPCM(preChunk);
+                }
+                window._vadPreBuffer = [];
                 console.log('[Live VAD] Voice started! RMS:', rms.toFixed(2), 'Threshold:', dynamicThreshold.toFixed(2));
                 updateVoiceDebugPill('speaking_user', 'Aap bol rahe hain (Vol: ' + rms.toFixed(1) + ')');
                 const chatInp = document.getElementById('prompt-input');
                 const dockInp = document.getElementById('universal-prompt-input');
                 if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Aap bol rahe hain... sun raha hu...';
                 if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Aap bol rahe hain... sun raha hu...';
+              } else {
+                sendLiveAudioPCM(pcm16);
               }
               vadSilenceStartTime = 0;
             } else if (vadSpeechActive) {
+              sendLiveAudioPCM(pcm16);
               if (!vadSilenceStartTime) {
                 vadSilenceStartTime = now;
-              } else if (now - vadSilenceStartTime > 700) {
-                // Natural pause of 700ms -> User completed full thought without early cutoff
+              } else if (now - vadSilenceStartTime > 1200) {
+                // Natural pause of 1200ms -> User completed full thought without early cutoff
                 const speechDuration = now - vadSpeechStartTime;
                 vadSpeechActive = false;
                 vadSilenceStartTime = 0;
