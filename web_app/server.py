@@ -3992,11 +3992,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 pcm_in, _ = audioop.ratecv(pcm_in, 2, 1, sr_in, 16000, None)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Cellular speech detection (RMS > 450 ignores line static/hum, captures real human voice)
-                            if rms > 450:
+                            # Strict cellular speech detection (RMS > 900 ignores line static/breathing, captures real human voice)
+                            if rms > 900:
                                 speech_energy_count += 1
-                                # Speech lock: 2 consecutive frames (~40ms) to filter out single line clicks
-                                if speech_energy_count >= 2:
+                                # Speech lock: 4 consecutive frames (~80ms) to filter out line clicks/noise
+                                if speech_energy_count >= 4:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
                                     if not vobiz_in_activity:
@@ -4013,8 +4013,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     vobiz_bidi_session.send_audio_chunk_live(pcm_in)
                                     # Turn end: ~900ms (18 frames) of silence indicates caller finished speaking (matches web agent)
                                     if silence_after_speech_count >= 18:
-                                        # Accept speech chunk (>1600 bytes, ~100ms)
-                                        if len(accumulated_caller_pcm) < 1600:
+                                        # Accept speech chunk (>=6400 bytes, ~200ms) to prevent noise hallucination
+                                        if len(accumulated_caller_pcm) < 6400:
                                             # Discard tiny line click and reset activity state
                                             speech_detected = False
                                             speech_energy_count = 0
