@@ -14173,8 +14173,8 @@
               sendLiveAudioPCM(pcm16);
               if (!vadSilenceStartTime) {
                 vadSilenceStartTime = now;
-              } else if (now - vadSilenceStartTime > 1200) {
-                // Natural pause of 1200ms -> User completed full thought without early cutoff
+              } else if (now - vadSilenceStartTime > 800) {
+                // Natural pause of 800ms -> Audio is already streamed live, trigger instant reply!
                 const speechDuration = now - vadSpeechStartTime;
                 vadSpeechActive = false;
                 vadSilenceStartTime = 0;

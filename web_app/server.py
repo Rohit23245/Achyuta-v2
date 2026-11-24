@@ -3433,6 +3433,109 @@ class LiveGeminiBidiSession:
         await self.ws.recv()
         print("[LiveGeminiBidi] Persistent WebSocket session established successfully!", flush=True)
 
+    def start_activity(self):
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                self.ws.send(json.dumps({"realtimeInput": {"activityStart": {}}})),
+                self.loop
+            )
+            future.result(timeout=5)
+        except Exception as e:
+            print(f"[LiveGeminiBidi] start_activity error: {e}", flush=True)
+
+    def send_audio_chunk_live(self, pcm_16k):
+        if not pcm_16k:
+            return
+        try:
+            b64_data = base64.b64encode(pcm_16k).decode('ascii')
+            asyncio.run_coroutine_threadsafe(
+                self.ws.send(json.dumps({
+                    "realtimeInput": {
+                        "mediaChunks": [{
+                            "mimeType": "audio/pcm;rate=16000",
+                            "data": b64_data
+                        }]
+                    }
+                })),
+                self.loop
+            )
+        except Exception as e:
+            print(f"[LiveGeminiBidi] send_audio_chunk_live error: {e}", flush=True)
+
+    def end_activity_and_receive(self, on_pcm_chunk, on_text_chunk=None, speech_bytes=0):
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                self._end_activity_and_receive(on_pcm_chunk, on_text_chunk, speech_bytes),
+                self.loop
+            )
+            return future.result(timeout=60)
+        except Exception as e:
+            print(f"[LiveGeminiBidi] Error in end_activity_and_receive: {e}", flush=True)
+            return False
+
+    async def _end_activity_and_receive(self, on_pcm_chunk, on_text_chunk=None, speech_bytes=0):
+        turn_start_ts = time.time()
+        await self.ws.send(json.dumps({"realtimeInput": {"activityEnd": {}}}))
+        audio_chunks_received = 0
+        retried_empty = False
+        user_heard_parts = []
+        agent_said_parts = []
+        while True:
+            raw = await self.ws.recv()
+            d = json.loads(raw)
+            sc = d.get("serverContent", {})
+            in_tr = sc.get("inputTranscription", {}).get("text")
+            if in_tr:
+                user_heard_parts.append(in_tr)
+            out_tr = sc.get("outputTranscription", {}).get("text")
+            if out_tr:
+                agent_said_parts.append(out_tr)
+            turn = sc.get("modelTurn", {})
+            for p in turn.get("parts", []):
+                if p.get("thought") and on_text_chunk:
+                    thought_text = p.get("text") or ""
+                    if thought_text:
+                        on_text_chunk(thought_text, is_thought=True)
+                elif on_text_chunk and p.get("text"):
+                    on_text_chunk(p["text"], is_thought=False)
+                inline = p.get("inlineData") or p.get("inline_data")
+                if inline and inline.get("data"):
+                    chunk = base64.b64decode(inline["data"])
+                    audio_chunks_received += 1
+                    on_pcm_chunk(chunk)
+            if sc.get("turnComplete"):
+                print(f"[LiveGeminiBidi] turnComplete received. Total audio chunks generated: {audio_chunks_received}", flush=True)
+                if audio_chunks_received == 0 and not retried_empty and speech_bytes > 3200:
+                    retried_empty = True
+                    print("[LiveGeminiBidi] 0 audio chunks for valid speech turn; retrying prompt once...", flush=True)
+                    await self.ws.send(json.dumps({
+                        "clientContent": {
+                            "turns": [{
+                                "role": "user",
+                                "parts": [{"text": "Please speak your response aloud in Hindi right now."}]
+                            }],
+                            "turnComplete": True
+                        }
+                    }))
+                    continue
+                try:
+                    debug_entry = {
+                        "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "speech_bytes": speech_bytes,
+                        "user_heard": "".join(user_heard_parts).strip(),
+                        "agent_said": "".join(agent_said_parts).strip(),
+                        "audio_chunks": audio_chunks_received,
+                        "retried": retried_empty,
+                        "duration_ms": int((time.time() - turn_start_ts) * 1000)
+                    }
+                    debug_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice_debug_transcripts.jsonl")
+                    with open(debug_path, "a", encoding="utf-8") as df:
+                        df.write(json.dumps(debug_entry, ensure_ascii=False) + "\n")
+                except Exception as log_err:
+                    print(f"[LiveGeminiBidi] Debug log write error: {log_err}", flush=True)
+                break
+        return True
+
     def stream_speech_turn(self, caller_pcm_16k, step_target, on_pcm_chunk, on_text_chunk=None):
         """
         Sends raw caller PCM audio or prompt on the active session and yields 24kHz audio chunks as they arrive with ultra-low latency.
@@ -3625,6 +3728,8 @@ def handle_web_live_voice_ws(handler, query_params):
         # Acknowledge connection
         send_ws_frame(raw_sock, 0x1, json.dumps({"type": "ready", "message": "Live audio session ready"}))
 
+        in_activity = False
+        streamed_bytes = 0
         while True:
             opcode, raw_data = parse_ws_frame(raw_sock)
             if opcode is None or opcode == 0x8:
@@ -3642,19 +3747,27 @@ def handle_web_live_voice_ws(handler, query_params):
                         chunk_b64 = msg.get("data", "")
                         if chunk_b64:
                             pcm_in = base64.b64decode(chunk_b64)
-                            speech_buffer.extend(pcm_in)
+                            if not in_activity:
+                                bidi_session.start_activity()
+                                in_activity = True
+                                streamed_bytes = 0
+                            bidi_session.send_audio_chunk_live(pcm_in)
+                            streamed_bytes += len(pcm_in)
                     elif m_type == "turn_end":
-                        # User stopped speaking, trigger instant model speech turn
-                        print(f"[Web Live Audio] turn_end received! speech_buffer bytes: {len(speech_buffer)}", flush=True)
+                        # User stopped speaking, trigger instant model speech turn (audio already streamed live!)
+                        print(f"[Web Live Audio] turn_end received! streamed_bytes: {streamed_bytes}", flush=True)
                         send_ws_frame(raw_sock, 0x1, json.dumps({
                             "type": "thinking",
-                            "speech_bytes": len(speech_buffer)
+                            "speech_bytes": streamed_bytes
                         }))
-                        audio_to_send = bytes(speech_buffer)
-                        speech_buffer.clear()
                         turn_ok = False
                         try:
-                            turn_ok = bidi_session.stream_speech_turn(audio_to_send, "", send_browser_audio_chunk, send_browser_text_chunk)
+                            if in_activity:
+                                turn_ok = bidi_session.end_activity_and_receive(send_browser_audio_chunk, send_browser_text_chunk, streamed_bytes)
+                            else:
+                                turn_ok = True
+                            in_activity = False
+                            streamed_bytes = 0
                             if not turn_ok:
                                 print("[Web Live Audio] Re-establishing Bidi session after turn hiccup...", flush=True)
                                 try:
