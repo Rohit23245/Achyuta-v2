@@ -4596,22 +4596,14 @@
       }
     }
     function switchTab(tab) {
-        // Automatically hide main sidebar and mobile sticky header when in Calling Agent tab for a standalone portal experience
+        // Keep main sidebar always visible and accessible across all tabs
         const mainSidebar = document.getElementById('main-sidebar');
         const mobileTopBar = document.getElementById('mobile-top-bar');
         if (mainSidebar) {
-          if (tab === 'calling') {
-            mainSidebar.classList.add('!hidden');
-          } else {
-            mainSidebar.classList.remove('!hidden');
-          }
+          mainSidebar.classList.remove('!hidden');
         }
         if (mobileTopBar) {
-          if (tab === 'calling') {
-            mobileTopBar.classList.add('!hidden');
-          } else {
-            mobileTopBar.classList.remove('!hidden');
-          }
+          mobileTopBar.classList.remove('!hidden');
         }
       try {
         localStorage.setItem('achyuta_active_tab', tab);
@@ -13704,7 +13696,7 @@
     // Restore active tab on page refresh so user never loses their current screen (Defaulting to 'calling' portal)
     (function initSavedTab() {
       try {
-        const savedTab = localStorage.getItem('achyuta_active_tab') || 'calling';
+        const savedTab = localStorage.getItem('achyuta_active_tab') || 'agent';
         const applySavedTab = () => {
           setTimeout(() => {
             switchTab(savedTab);
