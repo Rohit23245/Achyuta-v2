@@ -13870,6 +13870,7 @@
           try {
             const msg = JSON.parse(event.data);
             if (msg.type === 'user_transcript' && msg.text) {
+              window._lastUserSpokenText = (window._lastUserSpokenText || '') + msg.text;
               if (!window._currentLiveUserMsgEl) {
                 if (typeof appendUserMessage === 'function') {
                   appendUserMessage(msg.text);
@@ -13925,6 +13926,15 @@
                 setVoiceOrbState('listening');
                 updateVoiceDebugPill('listening', 'Listening... boliye...');
               }
+              if (window._lastUserSpokenText && window._lastUserSpokenText.trim()) {
+                chatHistory.push({ role: 'user', text: window._lastUserSpokenText.trim() });
+              }
+              if (window._lastBotSpokenText && window._lastBotSpokenText.trim()) {
+                chatHistory.push({ role: 'bot', text: window._lastBotSpokenText.trim() });
+              }
+              if (typeof saveChatSession === 'function') saveChatSession();
+              window._lastUserSpokenText = '';
+              window._lastBotSpokenText = '';
               window._currentLiveBotMsgEl = null;
               window._currentLiveUserMsgEl = null;
             }
