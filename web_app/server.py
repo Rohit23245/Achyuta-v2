@@ -3857,7 +3857,14 @@ def handle_vobiz_stream_ws(handler, query_params):
     start_time = time.time()
     clean_phone = re.sub(r'[^0-9]', '', str(phone))
     CHUNK_BYTES = 640  # 20ms of 16kHz L16 (640 bytes)
-    print(f"[Vobiz Stream] Live 2-way Voice AI Connected for {cust_name} ({phone}). Ready to listen immediately.", flush=True)
+    vobiz_sys_inst = (
+        f"You are {get_calling_script_config().get('agent_name', 'Achyuta')}, a friendly, intelligent voice assistant speaking directly on a live phone call. "
+        "Listen to the human caller and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish. "
+        "Speak fluently and complete your thoughts and explanations without cutting off early."
+    )
+    vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
+    vobiz_in_activity = False
+    print(f"[Vobiz Stream] Live 2-way Voice AI Connected & Pre-warmed for {cust_name} ({phone}). Ready to listen immediately.", flush=True)
 
     def stream_audio_bytes(pcm_bytes, target_rate=16000):
         if not pcm_bytes:
@@ -3975,13 +3982,18 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_energy_count >= 2:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
+                                    if not vobiz_in_activity:
+                                        vobiz_bidi_session.start_activity()
+                                        vobiz_in_activity = True
                                     speech_detected = True
                                     silence_after_speech_count = 0
                                     accumulated_caller_pcm.extend(pcm_in)
+                                    vobiz_bidi_session.send_audio_chunk_live(pcm_in)
                             else:
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
+                                    vobiz_bidi_session.send_audio_chunk_live(pcm_in)
                                     # Turn end: ~900ms (18 frames) of silence indicates caller finished speaking (matches web agent)
                                     if silence_after_speech_count >= 18:
                                         # Accept speech chunk (>1600 bytes, ~100ms)
@@ -3993,31 +4005,18 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             accumulated_caller_pcm.clear()
                                             continue
 
-                                        print(f"[Vobiz Stream] Caller finished speaking ({len(accumulated_caller_pcm)} bytes PCM). Transcribing & generating conversational response...", flush=True)
+                                        streamed_len = len(accumulated_caller_pcm)
+                                        print(f"[Vobiz Stream] Caller finished speaking ({streamed_len} bytes PCM). Receiving instant Gemini reply...", flush=True)
                                         state = "DELIVERING_RESPONSE"
 
                                         if call_id:
                                             update_live_call_state(call_id, "connected", {
                                                 "current_speaker": "bot",
-                                                "latest_text": "Thinking..."
-                                            })
-
-                                        caller_audio_slice = bytes(accumulated_caller_pcm)
-                                        print(f"[Vobiz Stream] Streaming {len(caller_audio_slice)} bytes directly to LiveGeminiBidiSession (instant chunked playback)...", flush=True)
-                                        if call_id:
-                                            update_live_call_state(call_id, "connected", {
-                                                "current_speaker": "bot",
                                                 "latest_text": "Speaking live..."
                                             })
-                                        if "vobiz_bidi_session" not in locals() or vobiz_bidi_session is None:
-                                            vobiz_sys_inst = (
-                                                f"You are {get_calling_script_config().get('agent_name', 'Achyuta')}, a friendly, intelligent voice assistant speaking directly on a live phone call. "
-                                                "Listen to the human caller and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish. "
-                                                "Speak fluently and complete your thoughts and explanations without cutting off early."
-                                            )
-                                            vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
-                                        # Stream each 24kHz audio chunk to Vobiz immediately as it arrives from Gemini (zero buffer wait!)
-                                        turn_ok = vobiz_bidi_session.stream_speech_turn(caller_audio_slice, "", stream_audio_bytes)
+
+                                        turn_ok = vobiz_bidi_session.end_activity_and_receive(stream_audio_bytes, speech_bytes=streamed_len)
+                                        vobiz_in_activity = False
                                         if not turn_ok:
                                             try:
                                                 vobiz_bidi_session.close()
