@@ -13885,7 +13885,7 @@
     function playIncomingContinuousAudio(b64Audio) {
       try {
         if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioContext.state === 'suspended') {
           audioContext.resume();
@@ -13904,6 +13904,7 @@
           float32[i] = int16[i] / 32768.0;
         }
 
+        // Gemini 2.5 returns 24000Hz PCM
         const audioBuffer = audioContext.createBuffer(1, float32.length, 24000);
         audioBuffer.copyToChannel(float32, 0);
 
@@ -13913,7 +13914,7 @@
 
         const now = audioContext.currentTime;
         if (nextAudioPlayTime < now) {
-          nextAudioPlayTime = now + 0.04;
+          nextAudioPlayTime = now + 0.05;
         }
 
         source.start(nextAudioPlayTime);
@@ -13926,7 +13927,7 @@
         source.onended = () => {
           const idx = liveAudioScheduledSources.indexOf(source);
           if (idx !== -1) liveAudioScheduledSources.splice(idx, 1);
-          if (liveAudioScheduledSources.length === 0 && audioContext.currentTime >= nextAudioPlayTime - 0.05) {
+          if (liveAudioScheduledSources.length === 0 && audioContext.currentTime >= nextAudioPlayTime - 0.08) {
             isSpeaking = false;
             if (isVoiceModeActive) {
               setVoiceOrbState('listening');
@@ -13950,7 +13951,7 @@
     async function initAudioAnalyser() {
       try {
         if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioContext.state === 'suspended') {
           await audioContext.resume();
@@ -13961,9 +13962,7 @@
             audio: {
               echoCancellation: true,
               noiseSuppression: true,
-              autoGainControl: true,
-              channelCount: 1,
-              sampleRate: 16000
+              autoGainControl: true
             },
             video: false
           });
@@ -13977,7 +13976,7 @@
           source.connect(audioAnalyser);
         }
 
-        // Real-time PCM audio streaming bridge
+        // Real-time PCM audio streaming bridge with exact 16kHz resampling
         if (!livePcmProcessor) {
           const bufferSize = 2048;
           livePcmProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
@@ -13985,22 +13984,22 @@
             if (!isVoiceModeActive) return;
             const inputFloat = e.inputBuffer.getChannelData(0);
 
-            // Compute energy for speech check
-            let sumSq = 0;
-            for (let i = 0; i < inputFloat.length; i++) {
-              sumSq += inputFloat[i] * inputFloat[i];
-            }
-            const rms = Math.sqrt(sumSq / inputFloat.length);
-
             // If bot is speaking, ignore mic loopback
             if (isSpeaking) return;
 
-            // Convert Float32 [-1.0, 1.0] to 16-bit PCM Int16Array
-            const pcm16 = new Int16Array(inputFloat.length);
-            for (let i = 0; i < inputFloat.length; i++) {
-              const s = Math.max(-1, Math.min(1, inputFloat[i]));
-              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            // Resample from audioContext.sampleRate (usually 44100 or 48000) to exactly 16000Hz PCM
+            const inRate = audioContext.sampleRate;
+            const outRate = 16000;
+            const ratio = inRate / outRate;
+            const outLength = Math.floor(inputFloat.length / ratio);
+            const pcm16 = new Int16Array(outLength);
+
+            for (let i = 0; i < outLength; i++) {
+              const srcIdx = Math.floor(i * ratio);
+              const sample = Math.max(-1, Math.min(1, inputFloat[srcIdx]));
+              pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
             }
+
             sendLiveAudioPCM(pcm16);
           };
 
@@ -14135,6 +14134,16 @@
     }
 
     async function openVoiceModeOverlay() {
+      // 1. Instantly switch to active agent conversation view
+      switchTab('agent');
+      const heroSec = document.getElementById('hero-section');
+      if (heroSec) heroSec.classList.add('hidden');
+      const msgBox = document.getElementById('messages-container');
+      if (msgBox) msgBox.classList.remove('hidden');
+      const chatFeedEl = document.getElementById('chat-feed');
+      if (chatFeedEl) chatFeedEl.classList.remove('justify-center');
+      if (typeof updatePromptDockWidth === 'function') updatePromptDockWidth('agent');
+
       const overlay = document.getElementById('voice-mode-overlay');
       if (overlay) overlay.classList.add('hidden');
 
