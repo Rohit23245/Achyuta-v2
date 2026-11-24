@@ -3604,13 +3604,26 @@ def handle_web_live_voice_ws(handler, query_params):
                     elif m_type == "turn_end":
                         # User stopped speaking, trigger instant model speech turn
                         print(f"[Web Live Audio] turn_end received! speech_buffer bytes: {len(speech_buffer)}", flush=True)
-                        send_ws_frame(raw_sock, 0x1, json.dumps({"type": "thinking"}))
+                        send_ws_frame(raw_sock, 0x1, json.dumps({
+                            "type": "thinking",
+                            "speech_bytes": len(speech_buffer)
+                        }))
                         audio_to_send = bytes(speech_buffer)
                         speech_buffer.clear()
+                        turn_ok = False
                         try:
-                            bidi_session.stream_speech_turn(audio_to_send, "", send_browser_audio_chunk, send_browser_text_chunk)
+                            turn_ok = bidi_session.stream_speech_turn(audio_to_send, "", send_browser_audio_chunk, send_browser_text_chunk)
+                            if not turn_ok:
+                                send_ws_frame(raw_sock, 0x1, json.dumps({
+                                    "type": "voice_error",
+                                    "error": "Gemini Live session response timeout (20s)"
+                                }))
                         except Exception as st_err:
                             print(f"[Web Live Audio] Speech turn error: {st_err}", flush=True)
+                            send_ws_frame(raw_sock, 0x1, json.dumps({
+                                "type": "voice_error",
+                                "error": f"Speech error: {str(st_err)[:100]}"
+                            }))
                         send_ws_frame(raw_sock, 0x1, json.dumps({"type": "turn_complete"}))
                 except Exception as ex:
                     print(f"[Web Live Audio] Frame error: {ex}", flush=True)

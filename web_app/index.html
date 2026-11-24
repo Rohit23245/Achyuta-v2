@@ -13890,8 +13890,21 @@
               playIncomingContinuousAudio(msg.data);
             } else if (msg.type === 'thinking') {
               setVoiceOrbState('thinking');
+            } else if (msg.type === 'voice_error') {
+              console.error('[Live Voice Server Error]:', msg.error);
+              updateVoiceDebugPill('error', 'Error: ' + (msg.error || 'Turn failed'));
+              showScreenToast('Voice Engine: ' + (msg.error || 'Server error'), false);
+              if (liveVoiceThinkingTimerInterval) {
+                clearInterval(liveVoiceThinkingTimerInterval);
+                liveVoiceThinkingTimerInterval = null;
+              }
+              setVoiceOrbState('listening');
             } else if (msg.type === 'turn_complete') {
               console.log('[Live Audio Engine] Model turn finished sending audio.');
+              if (liveVoiceThinkingTimerInterval) {
+                clearInterval(liveVoiceThinkingTimerInterval);
+                liveVoiceThinkingTimerInterval = null;
+              }
               window._currentLiveBotMsgEl = null;
             }
           } catch(e) {
@@ -13901,10 +13914,19 @@
 
         liveAudioWS.onerror = (e) => {
           console.warn('[Live Audio WS Warn]:', e);
+          updateVoiceDebugPill('error', 'WS Error (Check Network/Server)');
+          showScreenToast('WebSocket connection error.', false);
         };
 
-        liveAudioWS.onclose = () => {
-          console.log('[Live Audio WS] Connection closed.');
+        liveAudioWS.onclose = (e) => {
+          console.log('[Live Audio WS] Connection closed.', e);
+          if (liveVoiceThinkingTimerInterval) {
+            clearInterval(liveVoiceThinkingTimerInterval);
+            liveVoiceThinkingTimerInterval = null;
+          }
+          if (isVoiceModeActive && !isSpeaking) {
+            updateVoiceDebugPill('error', 'WS Disconnected (Code ' + (e.code || 1006) + ')');
+          }
         };
       } catch(e) {
         console.warn('[Live Audio WS Init Error]:', e);
@@ -14425,6 +14447,9 @@
         } else if (state === 'bot_speaking') {
           dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-400 animate-pulse';
           pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-rose-950/80 text-rose-200 border-rose-500/50';
+        } else if (state === 'error') {
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-red-400 animate-ping';
+          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-red-950/90 text-red-200 border-red-500/60 ring-2 ring-red-500/30';
         } else {
           dot.className = 'w-2.5 h-2.5 rounded-full bg-zinc-500';
           pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-zinc-900/90 text-zinc-200 border-zinc-700/60';
