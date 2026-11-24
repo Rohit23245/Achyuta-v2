@@ -13873,6 +13873,7 @@
               } else {
                 window._currentLiveBotMsgEl.textContent += msg.text;
               }
+              window._lastBotSpokenText = (window._lastBotSpokenText || '') + msg.text;
             } else if (msg.type === 'audio' && msg.data) {
               playIncomingContinuousAudio(msg.data);
             } else if (msg.type === 'thinking') {
@@ -13975,10 +13976,16 @@
           const idx = liveAudioScheduledSources.indexOf(source);
           if (idx !== -1) liveAudioScheduledSources.splice(idx, 1);
           if (liveAudioScheduledSources.length === 0 && audioContext.currentTime >= nextAudioPlayTime - 0.08) {
-            isSpeaking = false;
-            if (isVoiceModeActive) {
-              setVoiceOrbState('listening');
-            }
+            // Echo guard: Add 400ms cooldown window after audio finishes before unmuting mic
+            window._botFinishedSpeakingTime = Date.now();
+            setTimeout(() => {
+              if (liveAudioScheduledSources.length === 0) {
+                isSpeaking = false;
+                if (isVoiceModeActive) {
+                  setVoiceOrbState('listening');
+                }
+              }
+            }, 400);
           }
         };
       } catch(err) {
@@ -14007,9 +14014,9 @@
         if (!micStream) {
           micStream = await navigator.mediaDevices.getUserMedia({
             audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true
+              echoCancellation: { ideal: true },
+              noiseSuppression: { ideal: true },
+              autoGainControl: false // Disable auto gain so speaker output doesn't get boosted
             },
             video: false
           });
@@ -14031,8 +14038,11 @@
             if (!isVoiceModeActive) return;
             const inputFloat = e.inputBuffer.getChannelData(0);
 
-            // If bot is speaking, ignore mic loopback
-            if (isSpeaking) return;
+            // If bot is currently speaking or just finished within 450ms, block mic completely to prevent echo loopback
+            const nowTime = Date.now();
+            if (isSpeaking || (window._botFinishedSpeakingTime && (nowTime - window._botFinishedSpeakingTime < 450))) {
+              return;
+            }
 
             if (!window._pcmCount) window._pcmCount = 0;
             window._pcmCount++;
