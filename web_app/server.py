@@ -3982,8 +3982,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                 if speech_detected:
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
-                                    # Turn end: ~350ms (7 frames) of silence indicates caller finished speaking
-                                    if silence_after_speech_count >= 7:
+                                    # Turn end: ~900ms (18 frames) of silence indicates caller finished speaking (matches web agent)
+                                    if silence_after_speech_count >= 18:
                                         # Accept speech chunk (>1600 bytes, ~100ms)
                                         if len(accumulated_caller_pcm) < 1600:
                                             # Discard tiny line click
