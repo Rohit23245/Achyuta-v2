@@ -14063,29 +14063,30 @@
             const rms = Math.sqrt(sumSq / inputFloat.length) * 100; // 0 to 100
             const now = Date.now();
 
-            // Direct sensitive speech detection (threshold 0.8)
-            if (rms > 0.8) {
+            // Single Source of Truth VAD: Direct mic energy detection
+            const speechThreshold = 0.5; // Highly sensitive threshold for normal speaking
+            if (rms > speechThreshold) {
               if (!vadSpeechActive) {
                 vadSpeechActive = true;
                 vadSpeechStartTime = now;
-                console.log('[Direct VAD] User started speaking! RMS volume:', rms.toFixed(2));
-                updateVoiceDebugPill('speaking_user', 'User Speaking (RMS: ' + rms.toFixed(1) + ')');
+                console.log('[Live VAD] Voice started! RMS:', rms.toFixed(2));
+                updateVoiceDebugPill('speaking_user', 'Aap bol rahe hain (Vol: ' + rms.toFixed(1) + ')');
                 const chatInp = document.getElementById('prompt-input');
                 const dockInp = document.getElementById('universal-prompt-input');
-                if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Aap bol rahe hain...';
-                if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Aap bol rahe hain...';
+                if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Aap bol rahe hain... sun raha hu...';
+                if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Aap bol rahe hain... sun raha hu...';
               }
               vadSilenceStartTime = 0;
             } else if (vadSpeechActive) {
               if (!vadSilenceStartTime) {
                 vadSilenceStartTime = now;
-              } else if (now - vadSilenceStartTime > 550) {
-                // Natural pause of 550ms -> Trigger turn to Gemini Live automatically!
-                const dur = now - vadSpeechStartTime;
+              } else if (now - vadSilenceStartTime > 450) {
+                // 450ms natural pause after speaking -> Instant trigger to Gemini Live
+                const speechDuration = now - vadSpeechStartTime;
                 vadSpeechActive = false;
                 vadSilenceStartTime = 0;
-                console.log('[Direct VAD] User stopped speaking (duration: ' + dur + 'ms). Triggering turn_end automatically!');
-                updateVoiceDebugPill('thinking', 'Gemini Thinking...');
+                console.log('[Live VAD] Speech ended (' + speechDuration + 'ms). Sending turn_end!');
+                updateVoiceDebugPill('thinking', 'Gemini Soch raha hai...');
                 setVoiceOrbState('thinking');
                 triggerLiveTurnEnd();
               }
@@ -14164,33 +14165,7 @@
             dockMicBtn.style.boxShadow = isUserTalking ? ('0 0 ' + glowRadius + 'px ' + glowColor) : 'none';
           }
 
-          const now = Date.now();
-          if (isUserTalking && !isSpeaking) {
-            if (!vadSpeechActive) {
-              vadSpeechActive = true;
-              vadSpeechStartTime = now;
-              console.log('[Live VAD] Speech detected! Avg volume:', avgVolume.toFixed(2), 'threshold:', speechThreshold.toFixed(2));
-              const chatInp = document.getElementById('prompt-input');
-              const dockInp = document.getElementById('universal-prompt-input');
-              if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Aap bol rahe hain... bolte rahiye...';
-              if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Aap bol rahe hain... bolte rahiye...';
-            }
-            vadSilenceStartTime = 0;
-          } else if (vadSpeechActive && !isSpeaking) {
-            if (!vadSilenceStartTime) {
-              vadSilenceStartTime = now;
-            } else if (now - vadSilenceStartTime > 600) {
-              // User has naturally paused for 600ms -> Trigger voice turn to Gemini Live
-              const totalSpeechDuration = now - vadSpeechStartTime;
-              vadSpeechActive = false;
-              vadSilenceStartTime = 0;
-              if (totalSpeechDuration > 200) {
-                console.log('[Live Voice Turn] User finished speaking (' + totalSpeechDuration + 'ms), triggering turn_end!');
-                setVoiceOrbState('thinking');
-                triggerLiveTurnEnd();
-              }
-            }
-          }
+          // Visual wave/glow is updated cleanly without variable conflict with PCM VAD
         }
         waveAnimFrame = requestAnimationFrame(renderFrame);
       }
