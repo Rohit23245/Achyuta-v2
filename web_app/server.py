@@ -4006,10 +4006,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     if silence_after_speech_count >= 18:
                                         # Accept speech chunk (>1600 bytes, ~100ms)
                                         if len(accumulated_caller_pcm) < 1600:
-                                            # Discard tiny line click
+                                            # Discard tiny line click and reset activity state
                                             speech_detected = False
                                             speech_energy_count = 0
                                             silence_after_speech_count = 0
+                                            vobiz_in_activity = False
                                             accumulated_caller_pcm.clear()
                                             continue
 
@@ -4055,9 +4056,9 @@ def handle_vobiz_stream_ws(handler, query_params):
                     print("[Vobiz Stream] Received 'stop' event from Vobiz.", flush=True)
                     break
 
-            # Safeguard timeout (120 seconds total per multi-step call)
-            if time.time() - start_time > 120:
-                print("[Vobiz Stream] Multi-turn call timeout reached (120s). Exiting.", flush=True)
+            # Safeguard timeout (600 seconds / 10 minutes per multi-step call)
+            if time.time() - start_time > 600:
+                print("[Vobiz Stream] Multi-turn call timeout reached (600s). Exiting.", flush=True)
                 break
 
     except Exception as e:
