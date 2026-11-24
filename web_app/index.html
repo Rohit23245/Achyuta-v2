@@ -14117,6 +14117,7 @@
             // Speech threshold is background noise + 2.5 (min 2.5) to avoid room hum
             const dynamicThreshold = Math.max(2.5, window._vadBackgroundNoise + 2.2);
 
+            // Natural conversational pause: 700ms silence confirms user finished sentence without cutting mid-sentence
             if (rms > dynamicThreshold) {
               if (!vadSpeechActive) {
                 vadSpeechActive = true;
@@ -14132,8 +14133,8 @@
             } else if (vadSpeechActive) {
               if (!vadSilenceStartTime) {
                 vadSilenceStartTime = now;
-              } else if (now - vadSilenceStartTime > 450) {
-                // Natural pause of 450ms -> Trigger turn to Gemini Live automatically!
+              } else if (now - vadSilenceStartTime > 700) {
+                // Natural pause of 700ms -> User completed full thought without early cutoff
                 const speechDuration = now - vadSpeechStartTime;
                 vadSpeechActive = false;
                 vadSilenceStartTime = 0;
@@ -14144,11 +14145,11 @@
               }
             }
 
-            // Fail-safe: If user speaks continuously for > 8 seconds, automatically send turn
-            if (vadSpeechActive && (now - vadSpeechStartTime > 8000)) {
+            // Fail-safe: If user speaks continuously for > 15 seconds, automatically send turn
+            if (vadSpeechActive && (now - vadSpeechStartTime > 15000)) {
               vadSpeechActive = false;
               vadSilenceStartTime = 0;
-              console.log('[Live VAD] Max utterance length reached (8s). Forcing turn_end!');
+              console.log('[Live VAD] Max utterance length reached (15s). Forcing turn_end!');
               updateVoiceDebugPill('thinking', 'Gemini Soch raha hai...');
               setVoiceOrbState('thinking');
               triggerLiveTurnEnd();

@@ -3412,6 +3412,9 @@ class LiveGeminiBidiSession:
                     "responseModalities": ["AUDIO"],
                     "speechConfig": {
                         "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Aoede"}}
+                    },
+                    "thinkingConfig": {
+                        "thinkingBudget": 0
                     }
                 },
                 "systemInstruction": {
@@ -3432,7 +3435,7 @@ class LiveGeminiBidiSession:
                 self._turn_streaming(caller_pcm_16k, step_target, on_pcm_chunk, on_text_chunk), 
                 self.loop
             )
-            return future.result(timeout=20)
+            return future.result(timeout=60)
         except Exception as e:
             print(f"[LiveGeminiBidi] Error in speech turn: {e}", flush=True)
             return False
@@ -3624,10 +3627,12 @@ def handle_web_live_voice_ws(handler, query_params):
                         try:
                             turn_ok = bidi_session.stream_speech_turn(audio_to_send, "", send_browser_audio_chunk, send_browser_text_chunk)
                             if not turn_ok:
-                                send_ws_frame(raw_sock, 0x1, json.dumps({
-                                    "type": "voice_error",
-                                    "error": "Gemini Live session response timeout (20s)"
-                                }))
+                                print("[Web Live Audio] Re-establishing Bidi session after turn hiccup...", flush=True)
+                                try:
+                                    bidi_session.close()
+                                    bidi_session = LiveGeminiBidiSession(sys_inst)
+                                except Exception:
+                                    pass
                         except Exception as st_err:
                             print(f"[Web Live Audio] Speech turn error: {st_err}", flush=True)
                             send_ws_frame(raw_sock, 0x1, json.dumps({
