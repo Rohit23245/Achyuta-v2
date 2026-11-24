@@ -13889,8 +13889,10 @@
             } else if (msg.type === 'audio' && msg.data) {
               playIncomingContinuousAudio(msg.data);
             } else if (msg.type === 'thinking') {
+              window._isBotThinking = true;
               setVoiceOrbState('thinking');
             } else if (msg.type === 'voice_error') {
+              window._isBotThinking = false;
               console.error('[Live Voice Server Error]:', msg.error);
               updateVoiceDebugPill('error', 'Error: ' + (msg.error || 'Turn failed'));
               showScreenToast('Voice Engine: ' + (msg.error || 'Server error'), false);
@@ -13901,9 +13903,15 @@
               setVoiceOrbState('listening');
             } else if (msg.type === 'turn_complete') {
               console.log('[Live Audio Engine] Model turn finished sending audio.');
+              window._isBotThinking = false;
               if (liveVoiceThinkingTimerInterval) {
                 clearInterval(liveVoiceThinkingTimerInterval);
                 liveVoiceThinkingTimerInterval = null;
+              }
+              // If no audio chunks were scheduled, reset orb back to listening immediately
+              if (!isSpeaking && liveAudioScheduledSources.length === 0) {
+                setVoiceOrbState('listening');
+                updateVoiceDebugPill('listening', 'Listening... boliye...');
               }
               window._currentLiveBotMsgEl = null;
             }
@@ -14003,23 +14011,27 @@
         nextAudioPlayTime += audioBuffer.duration;
 
         isSpeaking = true;
+        window._isBotThinking = false;
         setVoiceOrbState('speaking');
+        updateVoiceDebugPill('bot_speaking', 'Agent bol raha hai...');
         liveAudioScheduledSources.push(source);
 
         source.onended = () => {
           const idx = liveAudioScheduledSources.indexOf(source);
           if (idx !== -1) liveAudioScheduledSources.splice(idx, 1);
           if (liveAudioScheduledSources.length === 0 && audioContext.currentTime >= nextAudioPlayTime - 0.08) {
-            // Echo guard: Add 400ms cooldown window after audio finishes before unmuting mic
+            // Strict Echo guard: Add 600ms cooldown window after audio finishes before unmuting mic
             window._botFinishedSpeakingTime = Date.now();
             setTimeout(() => {
               if (liveAudioScheduledSources.length === 0) {
                 isSpeaking = false;
+                window._isBotThinking = false;
                 if (isVoiceModeActive) {
                   setVoiceOrbState('listening');
+                  updateVoiceDebugPill('listening', 'Listening... boliye...');
                 }
               }
-            }, 400);
+            }, 600);
           }
         };
       } catch(err) {
@@ -14072,9 +14084,12 @@
             if (!isVoiceModeActive) return;
             const inputFloat = e.inputBuffer.getChannelData(0);
 
-            // If bot is currently speaking or just finished within 450ms, block mic completely to prevent echo loopback
+            // STRICT FULL-DUPLEX MUTING: Jab tak agent bol raha hai ya sooch raha hai, mic completely off/muted rahega
             const nowTime = Date.now();
-            if (isSpeaking || (window._botFinishedSpeakingTime && (nowTime - window._botFinishedSpeakingTime < 450))) {
+            if (isSpeaking || window._isBotThinking || (window._botFinishedSpeakingTime && (nowTime - window._botFinishedSpeakingTime < 600))) {
+              // Reset any VAD speech detection state while bot is active
+              vadSpeechActive = false;
+              vadSilenceStartTime = 0;
               return;
             }
 
