@@ -4012,8 +4012,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                         if "vobiz_bidi_session" not in locals() or vobiz_bidi_session is None:
                                             vobiz_sys_inst = (
                                                 f"You are {get_calling_script_config().get('agent_name', 'Achyuta')}, a friendly, intelligent voice assistant speaking directly on a live phone call. "
-                                                f"Customer name: {cust_name}. {agent_inst or ''} "
-                                                "Listen to the human caller and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish."
+                                                "Listen to the human caller and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish. "
+                                                "Speak fluently and complete your thoughts and explanations without cutting off early."
                                             )
                                             vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
                                         # Stream each 24kHz audio chunk to Vobiz immediately as it arrives from Gemini (zero buffer wait!)
