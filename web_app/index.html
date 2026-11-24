@@ -13840,12 +13840,23 @@
         liveAudioWS.onmessage = async (event) => {
           try {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'audio' && msg.data) {
+            if (msg.type === 'text' && msg.text) {
+              if (!window._currentLiveBotMsgEl) {
+                appendBotMessage(msg.text, null, 1);
+                const container = document.getElementById('messages-container');
+                if (container && container.lastElementChild) {
+                  window._currentLiveBotMsgEl = container.lastElementChild.querySelector('.chat-bubble-content') || container.lastElementChild;
+                }
+              } else {
+                window._currentLiveBotMsgEl.textContent += msg.text;
+              }
+            } else if (msg.type === 'audio' && msg.data) {
               playIncomingContinuousAudio(msg.data);
             } else if (msg.type === 'thinking') {
               setVoiceOrbState('thinking');
             } else if (msg.type === 'turn_complete') {
               console.log('[Live Audio Engine] Model turn finished sending audio.');
+              window._currentLiveBotMsgEl = null;
             }
           } catch(e) {}
         };

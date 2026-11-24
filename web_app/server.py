@@ -3423,13 +3423,13 @@ class LiveGeminiBidiSession:
         await self.ws.recv()
         print("[LiveGeminiBidi] Persistent WebSocket session established successfully!", flush=True)
 
-    def stream_speech_turn(self, caller_pcm_16k, step_target, on_pcm_chunk):
+    def stream_speech_turn(self, caller_pcm_16k, step_target, on_pcm_chunk, on_text_chunk=None):
         """
         Sends raw caller PCM audio or prompt on the active session and yields 24kHz audio chunks as they arrive with ultra-low latency.
         """
         try:
             future = asyncio.run_coroutine_threadsafe(
-                self._turn_streaming(caller_pcm_16k, step_target, on_pcm_chunk), 
+                self._turn_streaming(caller_pcm_16k, step_target, on_pcm_chunk, on_text_chunk), 
                 self.loop
             )
             return future.result(timeout=20)
@@ -3437,7 +3437,7 @@ class LiveGeminiBidiSession:
             print(f"[LiveGeminiBidi] Error in speech turn: {e}", flush=True)
             return False
 
-    async def _turn_streaming(self, caller_pcm_16k, step_target, on_pcm_chunk):
+    async def _turn_streaming(self, caller_pcm_16k, step_target, on_pcm_chunk, on_text_chunk=None):
         # 1. If real caller PCM audio bytes are available, send raw audio chunks efficiently in 500ms (16000 bytes) blocks
         if caller_pcm_16k and len(caller_pcm_16k) > 1600:
             chunk_size = 16000  # 500ms at 16kHz 16-bit mono for minimal WebSocket frame overhead
@@ -3473,6 +3473,8 @@ class LiveGeminiBidiSession:
             sc = d.get("serverContent", {})
             turn = sc.get("modelTurn", {})
             for p in turn.get("parts", []):
+                if on_text_chunk and p.get("text") and not p.get("thought"):
+                    on_text_chunk(p["text"])
                 inline = p.get("inlineData") or p.get("inline_data")
                 if inline and inline.get("data"):
                     chunk = base64.b64decode(inline["data"])
@@ -3557,6 +3559,15 @@ def handle_web_live_voice_ws(handler, query_params):
         }
         send_ws_frame(raw_sock, 0x1, json.dumps(frame))
 
+    def send_browser_text_chunk(text_chunk):
+        if not text_chunk:
+            return
+        frame = {
+            "type": "text",
+            "text": text_chunk
+        }
+        send_ws_frame(raw_sock, 0x1, json.dumps(frame))
+
     try:
         # Acknowledge connection
         send_ws_frame(raw_sock, 0x1, json.dumps({"type": "ready", "message": "Live audio session ready"}))
@@ -3585,7 +3596,7 @@ def handle_web_live_voice_ws(handler, query_params):
                         audio_to_send = bytes(speech_buffer)
                         speech_buffer.clear()
                         try:
-                            bidi_session.stream_speech_turn(audio_to_send, "", send_browser_audio_chunk)
+                            bidi_session.stream_speech_turn(audio_to_send, "", send_browser_audio_chunk, send_browser_text_chunk)
                         except Exception as st_err:
                             print(f"[Web Live Audio] Speech turn error: {st_err}", flush=True)
                         send_ws_frame(raw_sock, 0x1, json.dumps({"type": "turn_complete"}))
