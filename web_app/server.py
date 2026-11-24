@@ -26,6 +26,23 @@ except ImportError:
     whatsapp_engine = None
 import random
 import string
+try:
+    from google_sheets_sync import (
+        pull_clients_from_sheet_to_vault,
+        push_client_to_sheet_async,
+        start_periodic_sheets_sync
+    )
+except ImportError:
+    try:
+        from web_app.google_sheets_sync import (
+            pull_clients_from_sheet_to_vault,
+            push_client_to_sheet_async,
+            start_periodic_sheets_sync
+        )
+    except ImportError:
+        pull_clients_from_sheet_to_vault = None
+        push_client_to_sheet_async = None
+        start_periodic_sheets_sync = None
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -1948,6 +1965,8 @@ def resolve_gemini_tool_call(func_name, func_args):
         }
         clients.insert(0, new_c)
         write_vault(CLIENTS_VAULT_PATH, clients)
+        if push_client_to_sheet_async:
+            push_client_to_sheet_async(new_c)
         return {
             "success": True,
             "action_executed": True,
@@ -1978,6 +1997,9 @@ def resolve_gemini_tool_call(func_name, func_args):
                 added.append(new_entry)
 
         write_vault(CLIENTS_VAULT_PATH, clients)
+        if push_client_to_sheet_async:
+            for item in added:
+                push_client_to_sheet_async(item)
         return {
             "success": True,
             "action_executed": True,
@@ -5796,6 +5818,9 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                     json.dump(clients, f, ensure_ascii=False, indent=2)
             except:
                 pass
+
+            if push_client_to_sheet_async:
+                push_client_to_sheet_async(new_client)
                 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -5893,6 +5918,9 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                     json.dump(clients, f, ensure_ascii=False, indent=2)
             except:
                 pass
+
+            if push_client_to_sheet_async:
+                push_client_to_sheet_async(new_client)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -7408,6 +7436,17 @@ def check_gemini_voice_quota():
 
 def start_server():
     port = int(os.environ.get('PORT', PORT))
+    
+    # Initialize background Google Sheets 2-way sync
+    if start_periodic_sheets_sync:
+        DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+        vault_path = os.path.join(DATA_DIR, "clients_vault.json")
+        try:
+            start_periodic_sheets_sync(vault_path, interval_sec=180)
+            print("[Sheets Sync] Auto-sync background thread started successfully.", flush=True)
+        except Exception as e:
+            print(f"[Sheets Sync] Warning starting sync thread: {e}", flush=True)
+
     server = ThreadingHTTPServer(('0.0.0.0', port), AchyutaWebHandler)
     print(f"Achyuta Web App running at http://0.0.0.0:{port}")
     server.serve_forever()
