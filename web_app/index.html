@@ -14015,7 +14015,11 @@
           };
 
           source.connect(livePcmProcessor);
-          livePcmProcessor.connect(audioContext.destination);
+          // Mute script processor output so mic does not echo into local speakers
+          const zeroGain = audioContext.createGain();
+          zeroGain.gain.value = 0;
+          livePcmProcessor.connect(zeroGain);
+          zeroGain.connect(audioContext.destination);
         }
 
         startWaveFrequencyAnimation();
@@ -14059,11 +14063,12 @@
             });
           }
 
-          if (!window._vadNoiseFloor) window._vadNoiseFloor = 4;
-          if (!vadSpeechActive && avgVolume > 0 && avgVolume < 15) {
-            window._vadNoiseFloor = window._vadNoiseFloor * 0.95 + avgVolume * 0.05;
+          if (!window._vadNoiseFloor) window._vadNoiseFloor = 3;
+          if (!vadSpeechActive && avgVolume > 0 && avgVolume < 8) {
+            window._vadNoiseFloor = window._vadNoiseFloor * 0.9 + avgVolume * 0.1;
           }
-          const speechThreshold = Math.max(5, window._vadNoiseFloor + 3.5);
+          // Dynamic sensitive speech threshold (ambient noise floor + 2.0, min 3.0)
+          const speechThreshold = Math.max(3.0, window._vadNoiseFloor + 2.0);
           const isUserTalking = avgVolume > speechThreshold;
           const micScale = isUserTalking ? (1 + Math.min(0.25, (avgVolume / 150) * 0.25)).toFixed(3) : 1;
           const glowColor = isUserTalking ? ('rgba(13, 148, 136, ' + Math.min(0.8, avgVolume / 100).toFixed(2) + ')') : 'transparent';
@@ -14088,20 +14093,20 @@
               vadSpeechStartTime = now;
               const chatInp = document.getElementById('prompt-input');
               const dockInp = document.getElementById('universal-prompt-input');
-              if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Listening... bolte rahiye...';
-              if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Listening... bolte rahiye...';
+              if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Aap bol rahe hain... bolte rahiye...';
+              if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Aap bol rahe hain... bolte rahiye...';
             }
             vadSilenceStartTime = 0;
           } else if (vadSpeechActive && !isSpeaking) {
             if (!vadSilenceStartTime) {
               vadSilenceStartTime = now;
-            } else if (now - vadSilenceStartTime > 750) {
-              // User has naturally paused for 750ms -> Trigger voice turn to Gemini Live
+            } else if (now - vadSilenceStartTime > 600) {
+              // User has naturally paused for 600ms -> Trigger voice turn to Gemini Live
               const totalSpeechDuration = now - vadSpeechStartTime;
               vadSpeechActive = false;
               vadSilenceStartTime = 0;
-              if (totalSpeechDuration > 300) {
-                console.log('[Live Voice Turn] User finished speaking, sending turn_end to Gemini Live!');
+              if (totalSpeechDuration > 200) {
+                console.log('[Live Voice Turn] User finished speaking (' + totalSpeechDuration + 'ms), triggering turn_end!');
                 setVoiceOrbState('thinking');
                 triggerLiveTurnEnd();
               }
