@@ -920,7 +920,10 @@
 
       <!-- Table Container with infinite scrolling (10 items per batch) -->
       <div class="flex-1 min-h-0 rounded-2xl border shadow-sm flex flex-col overflow-hidden" style="background-color: var(--card-bg); border-color: var(--border-color);">
-        <div id="table-scroll-container" class="flex-1 overflow-y-auto custom-scroll" onscroll="handleTableScroll()">
+        <div class="p-3 border-b flex items-center gap-2" style="border-color: var(--border-color);">
+          <input type="text" placeholder="Search clients by name, phone or status..." oninput="const q=this.value.toLowerCase(); document.querySelectorAll('#table-scroll-container tbody tr').forEach(r => r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none');" class="w-full px-3 py-2 rounded-xl border text-xs outline-none focus:border-teal-500 transition" style="background-color: var(--input-bg); border-color: var(--border-color); color: var(--text);">
+        </div>
+        <div id="table-scroll-container" class="flex-1 overflow-y-auto overflow-x-hidden custom-scroll" onscroll="handleTableScroll()">
           <table class="w-full text-left text-xs border-collapse">
             <thead class="text-[11px] font-semibold uppercase tracking-wider border-b sticky top-0 z-20" style="background-color: var(--sidebar-bg); border-color: var(--border-color); color: var(--text-muted);">
               <tr>
