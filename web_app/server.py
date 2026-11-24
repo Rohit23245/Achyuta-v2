@@ -3968,11 +3968,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                             pcm_in = base64.b64decode(payload_b64)
                             rms = calculate_pcm16_rms(pcm_in)
                             
-                            # Highly sensitive cellular speech detection (RMS > 180 for mobile networks)
-                            if rms > 180:
+                            # Cellular speech detection (RMS > 450 ignores line static/hum, captures real human voice)
+                            if rms > 450:
                                 speech_energy_count += 1
-                                # Immediate speech lock: 1-2 frames (~50-100ms)
-                                if speech_energy_count >= 1:
+                                # Speech lock: 2 consecutive frames (~40ms) to filter out single line clicks
+                                if speech_energy_count >= 2:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
                                     speech_detected = True
