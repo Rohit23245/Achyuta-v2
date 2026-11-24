@@ -13863,7 +13863,13 @@
         liveAudioWS.onmessage = async (event) => {
           try {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'text' && msg.text) {
+            if (msg.type === 'thought' && msg.text) {
+              window._latestBotThought = msg.text;
+              const chatInp = document.getElementById('prompt-input');
+              const dockInp = document.getElementById('universal-prompt-input');
+              if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Thinking: ' + msg.text;
+              if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Thinking: ' + msg.text;
+            } else if (msg.type === 'text' && msg.text) {
               if (!window._currentLiveBotMsgEl) {
                 appendBotMessage(msg.text, null, 1);
                 const container = document.getElementById('messages-container');
@@ -14373,29 +14379,49 @@
     }
 
     
+    let thinkingTimerInterval = null;
+    let thinkingStartTime = 0;
+
     function updateVoiceDebugPill(state, text) {
       try {
         const pill = document.getElementById('live-voice-debug-pill');
         const dot = document.getElementById('live-voice-debug-dot');
         const txt = document.getElementById('live-voice-debug-text');
         if (!pill || !dot || !txt) return;
-        
+
+        if (state === 'thinking') {
+          if (!thinkingTimerInterval) {
+            thinkingStartTime = Date.now();
+            thinkingTimerInterval = setInterval(() => {
+              const elapsed = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
+              const detail = window._latestBotThought ? ` (${window._latestBotThought.slice(0, 25)}...)` : '';
+              txt.textContent = `Soch raha hai... ${elapsed}s${detail}`;
+            }, 100);
+          }
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-bounce';
+          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-amber-950/85 text-amber-200 border-amber-500/60 ring-2 ring-amber-500/20';
+          return;
+        }
+
+        // Clean thinking timer for other states
+        if (thinkingTimerInterval) {
+          clearInterval(thinkingTimerInterval);
+          thinkingTimerInterval = null;
+        }
+
         txt.textContent = text || state;
         if (state === 'listening') {
           dot.className = 'w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping';
-          pill.className = 'fixed top-4 right-4 z-50 px-3 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-teal-950/80 text-teal-200 border-teal-500/40';
+          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-teal-950/80 text-teal-200 border-teal-500/40';
         } else if (state === 'speaking_user') {
           dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
-          pill.className = 'fixed top-4 right-4 z-50 px-3 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-emerald-950/80 text-emerald-200 border-emerald-500/50';
-        } else if (state === 'thinking') {
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-bounce';
-          pill.className = 'fixed top-4 right-4 z-50 px-3 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-amber-950/80 text-amber-200 border-amber-500/50';
+          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-emerald-950/80 text-emerald-200 border-emerald-500/50';
         } else if (state === 'bot_speaking') {
           dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-400 animate-pulse';
-          pill.className = 'fixed top-4 right-4 z-50 px-3 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-rose-950/80 text-rose-200 border-rose-500/50';
+          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-rose-950/80 text-rose-200 border-rose-500/50';
         } else {
           dot.className = 'w-2.5 h-2.5 rounded-full bg-zinc-500';
-          pill.className = 'fixed top-4 right-4 z-50 px-3 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-zinc-900/90 text-zinc-200 border-zinc-700/60';
+          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-zinc-900/90 text-zinc-200 border-zinc-700/60';
         }
       } catch(e) {}
     }

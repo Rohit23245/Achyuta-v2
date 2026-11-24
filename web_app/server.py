@@ -3467,19 +3467,28 @@ class LiveGeminiBidiSession:
                 "turnComplete": True
             }
         }))
+        audio_chunks_received = 0
         while True:
             raw = await self.ws.recv()
             d = json.loads(raw)
             sc = d.get("serverContent", {})
             turn = sc.get("modelTurn", {})
             for p in turn.get("parts", []):
-                if on_text_chunk and p.get("text") and not p.get("thought"):
-                    on_text_chunk(p["text"])
+                # If Gemini Live returns thought / reasoning process
+                if p.get("thought") and on_text_chunk:
+                    thought_text = p.get("text") or ""
+                    if thought_text:
+                        on_text_chunk(thought_text, is_thought=True)
+                elif on_text_chunk and p.get("text"):
+                    on_text_chunk(p["text"], is_thought=False)
+                
                 inline = p.get("inlineData") or p.get("inline_data")
                 if inline and inline.get("data"):
                     chunk = base64.b64decode(inline["data"])
+                    audio_chunks_received += 1
                     on_pcm_chunk(chunk)
             if sc.get("turnComplete"):
+                print(f"[LiveGeminiBidi] turnComplete received. Total audio chunks generated: {audio_chunks_received}", flush=True)
                 break
         return True
 
@@ -3561,11 +3570,11 @@ def handle_web_live_voice_ws(handler, query_params):
         }
         send_ws_frame(raw_sock, 0x1, json.dumps(frame))
 
-    def send_browser_text_chunk(text_chunk):
+    def send_browser_text_chunk(text_chunk, is_thought=False):
         if not text_chunk:
             return
         frame = {
-            "type": "text",
+            "type": "thought" if is_thought else "text",
             "text": text_chunk
         }
         send_ws_frame(raw_sock, 0x1, json.dumps(frame))
