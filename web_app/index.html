@@ -965,19 +965,19 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Total Salary Paid (All Staff)</span>
-          <span id="stat-staff-total-paid" class="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400 font-mono">₹0</span>
+          <span id="stat-staff-total-paid" class="text-lg sm:text-2xl font-bold mt-1 truncate text-emerald-600 dark:text-emerald-400 font-mono">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Monthly Committed Payroll</span>
-          <span id="stat-staff-monthly-payroll" class="text-2xl font-bold mt-1 text-teal-600 dark:text-teal-400 font-mono">₹0</span>
+          <span id="stat-staff-monthly-payroll" class="text-lg sm:text-2xl font-bold mt-1 truncate text-teal-600 dark:text-teal-400 font-mono">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Pending Salary Dues</span>
-          <span id="stat-staff-pending-dues" class="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400 font-mono">₹0</span>
+          <span id="stat-staff-pending-dues" class="text-lg sm:text-2xl font-bold mt-1 truncate text-amber-600 dark:text-amber-400 font-mono">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Total Active Employees</span>
-          <span id="stat-staff-active-count" class="text-2xl font-bold mt-1" style="color: var(--text);">0</span>
+          <span id="stat-staff-active-count" class="text-lg sm:text-2xl font-bold mt-1 truncate" style="color: var(--text);">0</span>
         </div>
       </div>
 
@@ -1284,7 +1284,7 @@
             <span class="text-xs font-semibold text-zinc-400 group-hover:text-emerald-500 transition">Total Salary Paid</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Paid</span>
           </div>
-          <span id="stat-sal-paid" class="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">₹0</span>
+          <span id="stat-sal-paid" class="text-lg sm:text-2xl font-bold mt-1 truncate text-emerald-600 dark:text-emerald-400">₹0</span>
         </button>
 
         <button type="button" onclick="filterSalaryStatus('Pending')" id="card-sal-pending" class="p-4 rounded-xl border flex flex-col justify-between text-left cursor-pointer transition hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow-md group" style="background-color: var(--card-bg); border-color: var(--border-color);">
@@ -1292,7 +1292,7 @@
             <span class="text-xs font-semibold text-zinc-400 group-hover:text-amber-500 transition">Pending Disbursals</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">Pending</span>
           </div>
-          <span id="stat-sal-pending" class="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400">₹0</span>
+          <span id="stat-sal-pending" class="text-lg sm:text-2xl font-bold mt-1 truncate text-amber-600 dark:text-amber-400">₹0</span>
         </button>
 
         <button type="button" onclick="filterSalaryStatus('all')" id="card-sal-avg" class="p-4 rounded-xl border flex flex-col justify-between text-left cursor-pointer transition hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow-md group" style="background-color: var(--card-bg); border-color: var(--border-color);">
@@ -1300,7 +1300,7 @@
             <span class="text-xs font-semibold text-zinc-400 group-hover:text-teal-500 transition">Average Payout</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">Monthly</span>
           </div>
-          <span id="stat-sal-avg" class="text-2xl font-bold mt-1 text-teal-600 dark:text-teal-400">₹0</span>
+          <span id="stat-sal-avg" class="text-lg sm:text-2xl font-bold mt-1 truncate text-teal-600 dark:text-teal-400">₹0</span>
         </button>
 
         <button type="button" onclick="filterSalaryStatus('all')" id="card-sal-count" class="p-4 rounded-xl border flex flex-col justify-between text-left cursor-pointer transition hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow-md group border-emerald-500/40" style="background-color: var(--card-bg); border-color: var(--border-color);">
@@ -1308,7 +1308,7 @@
             <span class="text-xs font-semibold text-zinc-400 group-hover:text-emerald-500 transition">Staff Covered</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">All</span>
           </div>
-          <span id="stat-sal-count" class="text-2xl font-bold mt-1" style="color: var(--text);">0</span>
+          <span id="stat-sal-count" class="text-lg sm:text-2xl font-bold mt-1 truncate" style="color: var(--text);">0</span>
         </button>
       </div>
 
@@ -1454,19 +1454,19 @@
       <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Today's Present</span>
-          <span id="stat-att-present" class="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">1</span>
+          <span id="stat-att-present" class="text-lg sm:text-2xl font-bold mt-1 truncate text-emerald-600 dark:text-emerald-400">1</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Late Arrivals</span>
-          <span id="stat-att-late" class="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400">0</span>
+          <span id="stat-att-late" class="text-lg sm:text-2xl font-bold mt-1 truncate text-amber-600 dark:text-amber-400">0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Average Shift Hours</span>
-          <span id="stat-att-hours" class="text-2xl font-bold mt-1 text-teal-600 dark:text-teal-400">9.0 hrs</span>
+          <span id="stat-att-hours" class="text-lg sm:text-2xl font-bold mt-1 truncate text-teal-600 dark:text-teal-400">9.0 hrs</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Active Staff</span>
-          <span id="stat-att-staff" class="text-2xl font-bold mt-1" style="color: var(--text);">2</span>
+          <span id="stat-att-staff" class="text-lg sm:text-2xl font-bold mt-1 truncate" style="color: var(--text);">2</span>
         </div>
       </div>
 
@@ -1520,19 +1520,19 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Total Billed</span>
-          <span id="stat-invoices-total" class="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">₹0</span>
+          <span id="stat-invoices-total" class="text-lg sm:text-2xl font-bold mt-1 truncate text-emerald-600 dark:text-emerald-400">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-emerald-500">Collected (Paid)</span>
-          <span id="stat-invoices-paid" class="text-2xl font-bold mt-1 text-emerald-500">₹0</span>
+          <span id="stat-invoices-paid" class="text-lg sm:text-2xl font-bold mt-1 truncate text-emerald-500">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-amber-500">Pending / Unpaid</span>
-          <span id="stat-invoices-pending" class="text-2xl font-bold mt-1 text-amber-500">₹0</span>
+          <span id="stat-invoices-pending" class="text-lg sm:text-2xl font-bold mt-1 truncate text-amber-500">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-purple-500">Total GST Filed</span>
-          <span id="stat-invoices-gst" class="text-2xl font-bold mt-1 text-purple-500">₹0</span>
+          <span id="stat-invoices-gst" class="text-lg sm:text-2xl font-bold mt-1 truncate text-purple-500">₹0</span>
         </div>
       </div>
 
@@ -1620,19 +1620,19 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Total Quoted Pipeline</span>
-          <span id="stat-proposals-total" class="text-2xl font-bold mt-1 text-teal-600 dark:text-teal-400">₹0</span>
+          <span id="stat-proposals-total" class="text-lg sm:text-2xl font-bold mt-1 truncate text-teal-600 dark:text-teal-400">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-emerald-500">Accepted Proposals</span>
-          <span id="stat-proposals-accepted" class="text-2xl font-bold mt-1 text-emerald-500">₹0</span>
+          <span id="stat-proposals-accepted" class="text-lg sm:text-2xl font-bold mt-1 truncate text-emerald-500">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-zinc-400">Pending Review</span>
-          <span id="stat-proposals-pending" class="text-2xl font-bold mt-1" style="color: var(--text);">₹0</span>
+          <span id="stat-proposals-pending" class="text-lg sm:text-2xl font-bold mt-1 truncate" style="color: var(--text);">₹0</span>
         </div>
         <div class="p-4 rounded-xl border flex flex-col justify-between" style="background-color: var(--card-bg); border-color: var(--border-color);">
           <span class="text-xs font-semibold text-purple-500">Proposal Ratio</span>
-          <span id="stat-proposals-rate" class="text-2xl font-bold mt-1 text-purple-500">100%</span>
+          <span id="stat-proposals-rate" class="text-lg sm:text-2xl font-bold mt-1 truncate text-purple-500">100%</span>
         </div>
       </div>
 
