@@ -304,6 +304,26 @@
       </div>
     </div>
   </div>
+  <script>
+    // Immediate early dismissal fallback so user is NEVER stuck on loading screen
+    (function dismissPreloaderEarly() {
+      function removePreloader() {
+        const el = document.getElementById('page-initial-preloader');
+        if (el) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 200);
+        }
+      }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(removePreloader, 100);
+      } else {
+        document.addEventListener('DOMContentLoaded', removePreloader);
+        window.addEventListener('load', removePreloader);
+        setTimeout(removePreloader, 400); // hard timeout 400ms max
+      }
+    })();
+  </script>
 
   <!-- Mobile Sidebar Backdrop Overlay -->
   <div id="mobile-sidebar-overlay" onclick="closeMobileSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden md:hidden transition-all duration-300"></div>
