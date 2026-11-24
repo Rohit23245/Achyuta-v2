@@ -3420,6 +3420,7 @@ class LiveGeminiBidiSession:
                 "systemInstruction": {
                     "parts": [{"text": self.system_instruction}]
                 },
+                "tools": GEMINI_CRM_TOOLS if "GEMINI_CRM_TOOLS" in globals() else [],
                 "inputAudioTranscription": {},
                 "outputAudioTranscription": {},
                 "realtimeInputConfig": {
@@ -3483,6 +3484,28 @@ class LiveGeminiBidiSession:
         while True:
             raw = await self.ws.recv()
             d = json.loads(raw)
+            if d.get("toolCall"):
+                fn_responses = []
+                for fc in d["toolCall"].get("functionCalls", []):
+                    fc_id = fc.get("id", "")
+                    fc_name = fc.get("name", "")
+                    fc_args = fc.get("args", {}) or {}
+                    print(f"[LiveGeminiBidi] Executing CRM tool: {fc_name}({fc_args})", flush=True)
+                    try:
+                        if "execute_crm_tool_call" in globals():
+                            res_obj = execute_crm_tool_call(fc_name, fc_args)
+                        else:
+                            res_obj = {"status": "ok", "message": f"Tool {fc_name} received"}
+                    except Exception as te:
+                        res_obj = {"error": str(te)}
+                    fn_responses.append({
+                        "id": fc_id,
+                        "name": fc_name,
+                        "response": {"result": res_obj}
+                    })
+                if fn_responses:
+                    await self.ws.send(json.dumps({"toolResponse": {"functionResponses": fn_responses}}))
+                continue
             sc = d.get("serverContent", {})
             in_tr = sc.get("inputTranscription", {}).get("text")
             if in_tr:
@@ -3579,6 +3602,28 @@ class LiveGeminiBidiSession:
         while True:
             raw = await self.ws.recv()
             d = json.loads(raw)
+            if d.get("toolCall"):
+                fn_responses = []
+                for fc in d["toolCall"].get("functionCalls", []):
+                    fc_id = fc.get("id", "")
+                    fc_name = fc.get("name", "")
+                    fc_args = fc.get("args", {}) or {}
+                    print(f"[LiveGeminiBidi] Executing CRM tool: {fc_name}({fc_args})", flush=True)
+                    try:
+                        if "execute_crm_tool_call" in globals():
+                            res_obj = execute_crm_tool_call(fc_name, fc_args)
+                        else:
+                            res_obj = {"status": "ok", "message": f"Tool {fc_name} received"}
+                    except Exception as te:
+                        res_obj = {"error": str(te)}
+                    fn_responses.append({
+                        "id": fc_id,
+                        "name": fc_name,
+                        "response": {"result": res_obj}
+                    })
+                if fn_responses:
+                    await self.ws.send(json.dumps({"toolResponse": {"functionResponses": fn_responses}}))
+                continue
             sc = d.get("serverContent", {})
             in_tr = sc.get("inputTranscription", {}).get("text")
             if in_tr:

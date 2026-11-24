@@ -14358,6 +14358,7 @@
       }
 
       updateInlineVoiceUI('idle');
+      updateVoiceDebugPill('idle', '');
       isSpeaking = false;
     }
 
@@ -14470,6 +14471,15 @@
         const dot = document.getElementById('live-voice-debug-dot');
         const txt = document.getElementById('live-voice-debug-text');
         if (!pill || !dot || !txt) return;
+
+        if (!isVoiceModeActive && state !== 'error') {
+          if (liveVoiceThinkingTimerInterval) {
+            clearInterval(liveVoiceThinkingTimerInterval);
+            liveVoiceThinkingTimerInterval = null;
+          }
+          txt.textContent = '';
+          return;
+        }
 
         if (state === 'thinking') {
           if (!liveVoiceThinkingTimerInterval) {
