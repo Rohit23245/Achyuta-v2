@@ -3454,13 +3454,16 @@ class LiveGeminiBidiSession:
                 }))
 
         # 2. Complete turn with the target objective direction (no STT roundtrip required!)
-        instruction_text = (
-            f'Respond directly to the caller in 1 short sentence in natural Hindi to achieve: "{step_target}"'
-            if step_target else 'Acknowledge the caller politely in 1 short sentence in natural Hindi.'
-        )
+        if step_target:
+            instruction_text = f'Respond directly to the user in 1 short sentence in natural Hindi to achieve: "{step_target}"'
+            user_parts = [{"text": instruction_text}]
+        else:
+            # Natural pure voice turn without pre-canned override
+            user_parts = [{"text": "Kripya Hindi me sankshipt aur swabhavik jawab dein."}]
+
         await self.ws.send(json.dumps({
             "clientContent": {
-                "turns": [{"role": "user", "parts": [{"text": instruction_text}]}],
+                "turns": [{"role": "user", "parts": user_parts}],
                 "turnComplete": True
             }
         }))

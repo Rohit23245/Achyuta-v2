@@ -13784,30 +13784,16 @@
     }
 
     function pauseMicrophoneForSpeech() {
-      if (webSpeechRecognition) {
-        try { webSpeechRecognition.abort(); } catch(e) {}
-      }
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        try { mediaRecorder.pause(); } catch(e) {}
-      }
       if (micStream) {
         micStream.getAudioTracks().forEach(track => { track.enabled = false; });
       }
     }
 
     function resumeMicrophoneAfterSpeech() {
-      // Delay mic re-enabling by 400ms so any room echo/reverb completely dies down
       setTimeout(() => {
         if (!isVoiceModeActive || isSpeaking) return;
         if (micStream) {
           micStream.getAudioTracks().forEach(track => { track.enabled = true; });
-        }
-        if (mediaRecorder && mediaRecorder.state === 'paused') {
-          try { mediaRecorder.resume(); } catch(e) {}
-        }
-        if (webSpeechRecognition && isVoiceModeActive && !isSpeaking) {
-          webSpeechTranscript = '';
-          try { webSpeechRecognition.start(); } catch(e) {}
         }
       }, 400);
     }
@@ -13827,56 +13813,63 @@
     let vadSilenceStartTime = 0;
     let isProcessingVoiceTurn = false;
 
-    // Live Audio-to-Audio Real-Time WebSocket Engine
+    // =========================================================================
+    // DIRECT LIVE AUDIO-TO-AUDIO WEBSOCKET STREAMING ENGINE (GEMINI 2.5 LIVE)
+    // Seamless real-time microphone PCM streaming + Gapless 24kHz Audio Queue
+    // Eliminates STT roundtrip, Text LLM lag, 4.5s timeouts and audio cutoffs
+    // =========================================================================
+
     let liveAudioWS = null;
-    let liveAudioWorkletNode = null;
-    let liveAudioPlaybackQueue = [];
-    let isLiveAudioPlaying = false;
+    let livePcmProcessor = null;
+    let nextAudioPlayTime = 0;
+    let liveAudioScheduledSources = [];
 
     function initLiveAudioWebSocket() {
       try {
+        if (liveAudioWS && (liveAudioWS.readyState === WebSocket.OPEN || liveAudioWS.readyState === WebSocket.CONNECTING)) {
+          return;
+        }
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = proto + '//' + window.location.host + '/ws/live_audio';
         liveAudioWS = new WebSocket(wsUrl);
 
         liveAudioWS.onopen = () => {
-          console.log("[Live Audio WS] Connected directly to Gemini 2.5 Live Stream!");
+          console.log('[Live Audio Engine] Connected directly to Gemini 2.5 Live WebSocket stream!');
         };
 
         liveAudioWS.onmessage = async (event) => {
           try {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'audio') {
-              playIncomingAudioChunk(msg.data);
+            if (msg.type === 'audio' && msg.data) {
+              playIncomingContinuousAudio(msg.data);
             } else if (msg.type === 'thinking') {
               setVoiceOrbState('thinking');
             } else if (msg.type === 'turn_complete') {
-              // Bot finished speaking this turn, ear unlocks
-              setTimeout(() => {
-                if (isVoiceModeActive && !isSpeaking) {
-                  setVoiceOrbState('listening');
-                }
-              }, 400);
+              console.log('[Live Audio Engine] Model turn finished sending audio.');
             }
           } catch(e) {}
         };
 
         liveAudioWS.onerror = (e) => {
-          console.warn("[Live Audio WS] Error:", e);
+          console.warn('[Live Audio WS Warn]:', e);
         };
 
         liveAudioWS.onclose = () => {
-          console.log("[Live Audio WS] Connection closed.");
+          console.log('[Live Audio WS] Connection closed.');
         };
       } catch(e) {
-        console.warn("[Live Audio WS Init Error]:", e);
+        console.warn('[Live Audio WS Init Error]:', e);
       }
     }
 
-    function sendLiveAudioPCM(pcmData) {
+    function sendLiveAudioPCM(int16Array) {
       if (liveAudioWS && liveAudioWS.readyState === WebSocket.OPEN) {
-        // Convert Float32 or Int16 array to base64
-        const binary = String.fromCharCode.apply(null, new Uint8Array(pcmData.buffer));
+        const bytes = new Uint8Array(int16Array.buffer);
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
         const b64 = btoa(binary);
         liveAudioWS.send(JSON.stringify({ type: 'audio_chunk', data: b64 }));
       }
@@ -13888,7 +13881,8 @@
       }
     }
 
-    function playIncomingAudioChunk(b64Audio) {
+    // Gapless scheduled continuous 24kHz audio playback
+    function playIncomingContinuousAudio(b64Audio) {
       try {
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
@@ -13917,145 +13911,107 @@
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
 
-        source.onended = () => {
-          if (liveAudioPlaybackQueue.length > 0) {
-            const next = liveAudioPlaybackQueue.shift();
-            next.start();
-          } else {
-            isSpeaking = false;
-            setVoiceOrbState('listening');
-          }
-        };
+        const now = audioContext.currentTime;
+        if (nextAudioPlayTime < now) {
+          nextAudioPlayTime = now + 0.04;
+        }
+
+        source.start(nextAudioPlayTime);
+        nextAudioPlayTime += audioBuffer.duration;
 
         isSpeaking = true;
         setVoiceOrbState('speaking');
-        source.start();
+        liveAudioScheduledSources.push(source);
+
+        source.onended = () => {
+          const idx = liveAudioScheduledSources.indexOf(source);
+          if (idx !== -1) liveAudioScheduledSources.splice(idx, 1);
+          if (liveAudioScheduledSources.length === 0 && audioContext.currentTime >= nextAudioPlayTime - 0.05) {
+            isSpeaking = false;
+            if (isVoiceModeActive) {
+              setVoiceOrbState('listening');
+            }
+          }
+        };
       } catch(err) {
-        console.warn("[Audio Playback Error]:", err);
+        console.warn('[Gapless Audio Playback Error]:', err);
       }
     }
 
-
-    // Web Speech Recognition handle (Pure STT via browser engine, No robotic playback)
-    let webSpeechRecognition = null;
-    let webSpeechTranscript = '';
-    let webSpeechActive = false;
-
-    function initWebSpeechRecognition() {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) return null;
-
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'hi-IN';
-
-        recognition.onresult = (event) => {
-          if (isSpeaking || isProcessingVoiceTurn || !isVoiceModeActive) return;
-          let interim = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              webSpeechTranscript += ' ' + event.results[i][0].transcript;
-            } else {
-              interim += event.results[i][0].transcript;
-            }
-          }
-          const spoken = (webSpeechTranscript + ' ' + interim).trim();
-          if (spoken.length >= 2) {
-            // Live feedback in input placeholder so user sees what is heard
-            const chatInp = document.getElementById('prompt-input');
-            const dockInp = document.getElementById('universal-prompt-input');
-            if (chatInp && isVoiceModeActive) {
-              chatInp.placeholder = spoken + '...';
-            }
-            if (dockInp && isVoiceModeActive) {
-              dockInp.placeholder = spoken + '...';
-            }
-            if (voiceRestartTimer) clearTimeout(voiceRestartTimer);
-            voiceRestartTimer = setTimeout(() => {
-              if (isVoiceModeActive && !isSpeaking && !isProcessingVoiceTurn) {
-                const finalTxt = (webSpeechTranscript + ' ' + interim).trim();
-                if (finalTxt.length >= 2) {
-                  webSpeechTranscript = '';
-                  if (chatInp) chatInp.placeholder = 'Thinking...';
-                  if (dockInp) dockInp.placeholder = 'Thinking...';
-                  showThinkingIndicator(true);
-                  handleVoiceTurnCompleteWithText(finalTxt);
-                }
-              }
-            }, 600);
-          }
-        };
-
-        recognition.onerror = (e) => {
-          console.warn("[SPEECH RECOG WARN]:", e.error);
-        };
-
-        recognition.onend = () => {
-          if (isVoiceModeActive && !isSpeaking && webSpeechActive) {
-            try { recognition.start(); } catch(err) {}
-          }
-        };
-        return recognition;
-      } catch(e) {
-        return null;
+    function stopAllLiveAudioPlayback() {
+      for (const s of liveAudioScheduledSources) {
+        try { s.stop(); } catch(e) {}
       }
+      liveAudioScheduledSources = [];
+      nextAudioPlayTime = 0;
+      isSpeaking = false;
     }
 
     async function initAudioAnalyser() {
       try {
         if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         }
         if (audioContext.state === 'suspended') {
           await audioContext.resume();
         }
+
         if (!micStream) {
           micStream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: true,
               noiseSuppression: true,
-              autoGainControl: true
+              autoGainControl: true,
+              channelCount: 1,
+              sampleRate: 16000
             },
             video: false
           });
         }
+
+        const source = audioContext.createMediaStreamSource(micStream);
+
         if (!audioAnalyser) {
           audioAnalyser = audioContext.createAnalyser();
           audioAnalyser.fftSize = 64;
-          const source = audioContext.createMediaStreamSource(micStream);
           source.connect(audioAnalyser);
         }
 
-        // Initialize MediaRecorder on same stream
-        startRecordingStream(micStream);
+        // Real-time PCM audio streaming bridge
+        if (!livePcmProcessor) {
+          const bufferSize = 2048;
+          livePcmProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+          livePcmProcessor.onaudioprocess = (e) => {
+            if (!isVoiceModeActive) return;
+            const inputFloat = e.inputBuffer.getChannelData(0);
 
-        // Start real-time audio visualizer & voice activity detection
+            // Compute energy for speech check
+            let sumSq = 0;
+            for (let i = 0; i < inputFloat.length; i++) {
+              sumSq += inputFloat[i] * inputFloat[i];
+            }
+            const rms = Math.sqrt(sumSq / inputFloat.length);
+
+            // If bot is speaking, ignore mic loopback
+            if (isSpeaking) return;
+
+            // Convert Float32 [-1.0, 1.0] to 16-bit PCM Int16Array
+            const pcm16 = new Int16Array(inputFloat.length);
+            for (let i = 0; i < inputFloat.length; i++) {
+              const s = Math.max(-1, Math.min(1, inputFloat[i]));
+              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            sendLiveAudioPCM(pcm16);
+          };
+
+          source.connect(livePcmProcessor);
+          livePcmProcessor.connect(audioContext.destination);
+        }
+
         startWaveFrequencyAnimation();
       } catch(e) {
-        console.warn("[AUDIO STREAM ERROR]:", e);
-        showScreenToast("Please allow microphone permission to talk.", false);
-      }
-    }
-
-    function startRecordingStream(stream) {
-      if (!stream) return;
-      try {
-        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
-        mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
-        audioChunks = [];
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) {
-            audioChunks.push(e.data);
-          }
-        };
-
-        // Slice data in 250ms chunks
-        mediaRecorder.start(250);
-      } catch(e) {
-        console.warn("[MEDIA RECORDER ERROR]:", e);
+        console.warn('[Audio Analyser Error]:', e);
+        showScreenToast('Please allow microphone permission to talk.', false);
       }
     }
 
@@ -14068,14 +14024,12 @@
         if (audioAnalyser) {
           audioAnalyser.getByteFrequencyData(dataArray);
 
-          // Calculate average energy in voice speech bands (bands 1 to 16)
           let sum = 0;
           for (let i = 1; i < 16; i++) {
             sum += (dataArray[i] || 0);
           }
-          const avgVolume = sum / 15; // 0 to 255
+          const avgVolume = sum / 15;
 
-          // Real responsive bar heights from microphone frequency (No fake CSS animations)
           const b1 = Math.max(6, Math.min(30, 6 + ((dataArray[2] || 0) / 255) * 24));
           const b2 = Math.max(8, Math.min(38, 8 + ((dataArray[5] || 0) / 255) * 30));
           const b3 = Math.max(10, Math.min(42, 10 + ((dataArray[8] || 0) / 255) * 32));
@@ -14095,9 +14049,7 @@
             });
           }
 
-          // Adaptive Voice Activity Detection (VAD) State Machine
           if (!window._vadNoiseFloor) window._vadNoiseFloor = 4;
-          // Smoothly track background noise floor during silence
           if (!vadSpeechActive && avgVolume > 0 && avgVolume < 15) {
             window._vadNoiseFloor = window._vadNoiseFloor * 0.95 + avgVolume * 0.05;
           }
@@ -14110,46 +14062,38 @@
           const chatMicBtn = document.getElementById('chat-mic-btn');
           const dockMicBtn = document.getElementById('dock-mic-btn');
 
-          if (chatMicBtn && !isSpeaking && !isProcessingVoiceTurn) {
+          if (chatMicBtn && !isSpeaking) {
             chatMicBtn.style.transform = 'scale(' + micScale + ')';
             chatMicBtn.style.boxShadow = isUserTalking ? ('0 0 ' + glowRadius + 'px ' + glowColor) : 'none';
           }
-          if (dockMicBtn && !isSpeaking && !isProcessingVoiceTurn) {
+          if (dockMicBtn && !isSpeaking) {
             dockMicBtn.style.transform = 'scale(' + micScale + ')';
             dockMicBtn.style.boxShadow = isUserTalking ? ('0 0 ' + glowRadius + 'px ' + glowColor) : 'none';
           }
 
           const now = Date.now();
-          if (isUserTalking && !isSpeaking && !isProcessingVoiceTurn) {
+          if (isUserTalking && !isSpeaking) {
             if (!vadSpeechActive) {
               vadSpeechActive = true;
               vadSpeechStartTime = now;
               const chatInp = document.getElementById('prompt-input');
               const dockInp = document.getElementById('universal-prompt-input');
-              if (chatInp && isVoiceModeActive && !webSpeechTranscript) chatInp.placeholder = "Listening... bolte rahiye...";
-              if (dockInp && isVoiceModeActive && !webSpeechTranscript) dockInp.placeholder = "Listening... bolte rahiye...";
+              if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Listening... bolte rahiye...';
+              if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Listening... bolte rahiye...';
             }
-            vadSilenceStartTime = 0; // Reset silence counter while user continues speaking
-            
-            // Hard safety cap: If user has spoken continuously for > 4.5 seconds, auto-complete turn
-            if (vadSpeechStartTime && (now - vadSpeechStartTime > 4500)) {
-              vadSpeechActive = false;
-              vadSilenceStartTime = 0;
-              showThinkingIndicator(true);
-              handleVoiceTurnComplete();
-            }
-          } else if (vadSpeechActive && !isSpeaking && !isProcessingVoiceTurn) {
+            vadSilenceStartTime = 0;
+          } else if (vadSpeechActive && !isSpeaking) {
             if (!vadSilenceStartTime) {
               vadSilenceStartTime = now;
-            } else if (now - vadSilenceStartTime > 650) {
-              // Wait 650ms of silence before submitting speech turn
+            } else if (now - vadSilenceStartTime > 750) {
+              // User has naturally paused for 750ms -> Trigger voice turn to Gemini Live
               const totalSpeechDuration = now - vadSpeechStartTime;
               vadSpeechActive = false;
               vadSilenceStartTime = 0;
-              if (totalSpeechDuration > 200) {
-                showThinkingIndicator(true);
+              if (totalSpeechDuration > 300) {
+                console.log('[Live Voice Turn] User finished speaking, sending turn_end to Gemini Live!');
+                setVoiceOrbState('thinking');
                 triggerLiveTurnEnd();
-                handleVoiceTurnComplete();
               }
             }
           }
@@ -14159,67 +14103,26 @@
       waveAnimFrame = requestAnimationFrame(renderFrame);
     }
 
-    async function handleVoiceTurnCompleteWithText(spokenText) {
-      if (isProcessingVoiceTurn || isSpeaking || !isVoiceModeActive) return;
-      if (isEchoOfBotSpeech(spokenText)) {
-        console.warn("[ECHO FILTER BLOCKED REPEATED BOT SPEECH]:", spokenText);
-        webSpeechTranscript = '';
-        return;
-      }
-      isProcessingVoiceTurn = true;
-      setVoiceOrbState('thinking');
-      try {
-        await processVoiceTurn(spokenText);
-      } finally {
-        restartRecordingAfterTurn();
-      }
-    }
-
-    async function handleVoiceTurnComplete() {
-      if (isProcessingVoiceTurn || isSpeaking || !isVoiceModeActive) return;
-
-      // Direct Live Audio-to-Audio: User finished speaking, send turn_end over WebSocket!
-      console.log("[Live Voice Turn] Triggering instant Gemini speech turn over WebSocket...");
-      triggerLiveTurnEnd();
-      setVoiceOrbState('thinking');
-    }
-
-    function restartRecordingAfterTurn() {
-      isProcessingVoiceTurn = false;
-      audioChunks = [];
-      vadSpeechActive = false;
-      vadSilenceStartTime = 0;
-      if (micStream && isVoiceModeActive && !isSpeaking) {
-        startRecordingStream(micStream);
-        if (isVoiceModeActive) setVoiceOrbState('listening');
-      }
-    }
-
     function stopAudioAnalyser() {
       if (waveAnimFrame) {
         cancelAnimationFrame(waveAnimFrame);
         waveAnimFrame = null;
       }
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        try { mediaRecorder.stop(); } catch(e) {}
+      if (livePcmProcessor) {
+        try { livePcmProcessor.disconnect(); } catch(e) {}
+        livePcmProcessor = null;
       }
-      mediaRecorder = null;
-      audioChunks = [];
       if (micStream) {
         micStream.getTracks().forEach(track => track.stop());
         micStream = null;
       }
-      if (audioContext && audioContext.state !== 'closed') {
-        try { audioContext.close(); } catch(e) {}
-        audioContext = null;
-        audioAnalyser = null;
-      }
+      audioAnalyser = null;
     }
 
     async function toggleVoiceModeOverlay() {
-      // If voice is currently speaking, clicking the mic button immediately interrupts / mutes bot speech!
+      // If voice is currently speaking, clicking immediately stops/mutes bot
       if (isSpeaking) {
-        stopAgentSpeaking();
+        stopAllLiveAudioPlayback();
         return;
       }
 
@@ -14228,79 +14131,41 @@
         return;
       }
 
-      // In-prompt inline voice mode only (No full-screen overlay)
       openVoiceModeOverlay();
-
-      // Perform quota probe in parallel in background
-      try {
-        fetch('/api/voice/quota_check?t=' + Date.now())
-          .then(res => res.json())
-          .then(qData => {
-            if (qData && qData.allowed === false) {
-              const resetTime = qData.retry_time || 'a few hours';
-              showScreenToast('Usage limit reached. Resets in ' + resetTime + '.', 'warning');
-              appendQuotaAlert(resetTime);
-              closeVoiceModeOverlay();
-            }
-          }).catch(() => {});
-      } catch(e) {}
     }
 
     async function openVoiceModeOverlay() {
-      // Keep full screen overlay hidden - operate entirely within prompt input
       const overlay = document.getElementById('voice-mode-overlay');
       if (overlay) overlay.classList.add('hidden');
 
       isVoiceModeActive = true;
-      isProcessingVoiceTurn = false;
       unlockAudioEngine();
-
-      // Set initial listening state on prompt input and mic button
       setVoiceOrbState('listening');
 
-      // Initialize real-time audio frequency analyser & recorder
-      await initAudioAnalyser();
       initLiveAudioWebSocket();
-
-      // Start hybrid web speech recognition
-      if (!webSpeechRecognition) {
-        webSpeechRecognition = initWebSpeechRecognition();
-      }
-      if (webSpeechRecognition) {
-        webSpeechActive = true;
-        try { webSpeechRecognition.start(); } catch(e) {}
-      }
+      await initAudioAnalyser();
     }
 
     function closeVoiceModeOverlay() {
       isVoiceModeActive = false;
-      isProcessingVoiceTurn = false;
-      webSpeechActive = false;
+      vadSpeechActive = false;
+      vadSilenceStartTime = 0;
 
       const overlay = document.getElementById('voice-mode-overlay');
       if (overlay) overlay.classList.add('hidden');
 
-      // Stop audio stream, recorder, and frequency animation
       stopAudioAnalyser();
-      if (pcmAudioProcessor) { try { pcmAudioProcessor.disconnect(); } catch(e){} pcmAudioProcessor = null; }
-      if (liveAudioWS) { try { liveAudioWS.close(); } catch(e){} liveAudioWS = null; }
+      stopAllLiveAudioPlayback();
 
-      // Reset inline UI buttons & waves back to idle
+      if (liveAudioWS) {
+        try { liveAudioWS.close(); } catch(e) {}
+        liveAudioWS = null;
+      }
+
       updateInlineVoiceUI('idle');
-
-      if (voiceRestartTimer) clearTimeout(voiceRestartTimer);
-      if (webSpeechRecognition) {
-        try { webSpeechRecognition.abort(); } catch(e) {}
-      }
-      if (voiceSynthesis) {
-        try { voiceSynthesis.cancel(); } catch(e) {}
-      }
-      if (currentAudioPlayer) {
-        try { currentAudioPlayer.pause(); } catch(e) {}
-        currentAudioPlayer = null;
-      }
       isSpeaking = false;
     }
+
 
     function updateInlineVoiceUI(state) {
       const chatMicBtn = document.getElementById('chat-mic-btn');
