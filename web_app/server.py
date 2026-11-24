@@ -3865,6 +3865,18 @@ def handle_vobiz_stream_ws(handler, query_params):
     vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
     vobiz_in_activity = False
     bot_playback_until = 0.0
+    import queue as _q
+    vobiz_audio_out_q = _q.Queue()
+    def _vobiz_audio_sender_worker():
+        while True:
+            item = vobiz_audio_out_q.get()
+            if item is None:
+                break
+            try:
+                stream_audio_bytes(item)
+            except Exception:
+                pass
+    threading.Thread(target=_vobiz_audio_sender_worker, daemon=True).start()
     print(f"[Vobiz Stream] Live 2-way Voice AI Connected & Pre-warmed for {cust_name} ({phone}). Ready to listen immediately.", flush=True)
 
     def stream_audio_bytes(pcm_bytes, target_rate=16000):
@@ -4011,8 +4023,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
                                     vobiz_bidi_session.send_audio_chunk_live(pcm_in)
-                                    # Turn end: ~900ms (18 frames) of silence indicates caller finished speaking (matches web agent)
-                                    if silence_after_speech_count >= 18:
+                                    # Turn end: ~600ms (12 frames) of silence triggers instant <1s Gemini reply
+                                    if silence_after_speech_count >= 12:
                                         # Accept speech chunk (>=6400 bytes, ~200ms) to prevent noise hallucination
                                         if len(accumulated_caller_pcm) < 6400:
                                             # Discard tiny line click and reset activity state
@@ -4039,7 +4051,7 @@ def handle_vobiz_stream_ws(handler, query_params):
                                                 # 24kHz 16-bit mono = 48000 bytes/sec
                                                 dur = len(chunk_24k) / 48000.0
                                                 bot_playback_until = max(bot_playback_until, time.time()) + dur
-                                                stream_audio_bytes(chunk_24k)
+                                                vobiz_audio_out_q.put(chunk_24k)
 
                                         turn_ok = vobiz_bidi_session.end_activity_and_receive(_vobiz_stream_and_track, speech_bytes=streamed_len)
                                         vobiz_in_activity = False
