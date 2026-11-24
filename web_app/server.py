@@ -3505,19 +3505,6 @@ class LiveGeminiBidiSession:
                     on_pcm_chunk(chunk)
             if sc.get("turnComplete"):
                 print(f"[LiveGeminiBidi] turnComplete received. Total audio chunks generated: {audio_chunks_received}", flush=True)
-                if audio_chunks_received == 0 and not retried_empty and speech_bytes > 3200:
-                    retried_empty = True
-                    print("[LiveGeminiBidi] 0 audio chunks for valid speech turn; retrying prompt once...", flush=True)
-                    await self.ws.send(json.dumps({
-                        "clientContent": {
-                            "turns": [{
-                                "role": "user",
-                                "parts": [{"text": "Please speak your response aloud in Hindi right now."}]
-                            }],
-                            "turnComplete": True
-                        }
-                    }))
-                    continue
                 try:
                     debug_entry = {
                         "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -4023,8 +4010,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
                                     vobiz_bidi_session.send_audio_chunk_live(pcm_in)
-                                    # Turn end: ~400ms (8 frames) of silence triggers ultra-fast Gemini reply
-                                    if silence_after_speech_count >= 8:
+                                    # Turn end: ~800ms (16 frames) of silence matches web agent so sentences are never cut mid-word
+                                    if silence_after_speech_count >= 16:
                                         # Accept speech chunk (>=6400 bytes, ~200ms) to prevent noise hallucination
                                         if len(accumulated_caller_pcm) < 6400:
                                             # Discard tiny line click and reset activity state
