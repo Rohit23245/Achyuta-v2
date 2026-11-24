@@ -3852,6 +3852,8 @@ def handle_vobiz_stream_ws(handler, query_params):
     vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
     vobiz_in_activity = False
     bot_playback_until = 0.0
+    from collections import deque as _deque
+    vobiz_pre_buffer = _deque(maxlen=6)
     import queue as _q
     vobiz_audio_out_q = _q.Queue()
     def _vobiz_audio_sender_worker():
@@ -3990,6 +3992,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                             if sr_in and sr_in != 16000:
                                 pcm_in, _ = audioop.ratecv(pcm_in, 2, 1, sr_in, 16000, None)
                             rms = calculate_pcm16_rms(pcm_in)
+                            if not speech_detected:
+                                vobiz_pre_buffer.append(pcm_in)
                             
                             # Strict cellular speech detection (RMS > 900 ignores line static/breathing, captures real human voice)
                             if rms > 900:
@@ -4001,6 +4005,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     if not vobiz_in_activity:
                                         vobiz_bidi_session.start_activity()
                                         vobiz_in_activity = True
+                                        # Flush pre-buffer so the very first syllable ("kya...") is never clipped!
+                                        for pre_c in list(vobiz_pre_buffer):
+                                            accumulated_caller_pcm.extend(pre_c)
+                                            vobiz_bidi_session.send_audio_chunk_live(pre_c)
+                                        vobiz_pre_buffer.clear()
                                     speech_detected = True
                                     silence_after_speech_count = 0
                                     accumulated_caller_pcm.extend(pcm_in)
