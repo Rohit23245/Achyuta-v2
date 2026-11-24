@@ -13869,7 +13869,19 @@
         liveAudioWS.onmessage = async (event) => {
           try {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'thought' && msg.text) {
+            if (msg.type === 'user_transcript' && msg.text) {
+              if (!window._currentLiveUserMsgEl) {
+                if (typeof appendUserMessage === 'function') {
+                  appendUserMessage(msg.text);
+                  const container = document.getElementById('messages-container');
+                  if (container && container.lastElementChild) {
+                    window._currentLiveUserMsgEl = container.lastElementChild.querySelector('.chat-bubble-content, p, span') || container.lastElementChild;
+                  }
+                }
+              } else {
+                window._currentLiveUserMsgEl.textContent += msg.text;
+              }
+            } else if (msg.type === 'thought' && msg.text) {
               window._latestBotThought = msg.text;
               const chatInp = document.getElementById('prompt-input');
               const dockInp = document.getElementById('universal-prompt-input');
@@ -13914,6 +13926,7 @@
                 updateVoiceDebugPill('listening', 'Listening... boliye...');
               }
               window._currentLiveBotMsgEl = null;
+              window._currentLiveUserMsgEl = null;
             }
           } catch(e) {
             console.warn('[Live Audio WS Parse Error]:', e);
@@ -14463,12 +14476,9 @@
             liveVoiceThinkingStartTime = Date.now();
             liveVoiceThinkingTimerInterval = setInterval(() => {
               const elapsed = ((Date.now() - liveVoiceThinkingStartTime) / 1000).toFixed(1);
-              const detail = window._latestBotThought ? ` (${window._latestBotThought.slice(0, 25)}...)` : '';
-              txt.textContent = `Soch raha hai... ${elapsed}s${detail}`;
+              txt.textContent = `Soch raha hai... ${elapsed}s`;
             }, 100);
           }
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-bounce';
-          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-amber-950/85 text-amber-200 border-amber-500/60 ring-2 ring-amber-500/20';
           return;
         }
 
@@ -14479,15 +14489,6 @@
         }
 
         txt.textContent = text || state;
-        if (state === 'listening') {
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping';
-          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-teal-950/80 text-teal-200 border-teal-500/40';
-        } else if (state === 'speaking_user') {
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
-          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-emerald-950/80 text-emerald-200 border-emerald-500/50';
-        } else if (state === 'bot_speaking') {
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-400 animate-pulse';
-          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-rose-950/80 text-rose-200 border-rose-500/50';
         } else if (state === 'error') {
           dot.className = 'w-2.5 h-2.5 rounded-full bg-red-400 animate-ping';
           pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-red-950/90 text-red-200 border-red-500/60 ring-2 ring-red-500/30';
@@ -15066,10 +15067,10 @@
   </div>
 
 
-    <!-- LIVE VOICE FLOATING DEBUG TELEMETRY BADGE -->
-    <div id="live-voice-debug-pill" class="fixed top-4 right-4 z-50 px-3 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-zinc-900/90 text-zinc-200 border-zinc-700/60 pointer-events-none">
-      <span id="live-voice-debug-dot" class="w-2.5 h-2.5 rounded-full bg-zinc-500 animate-pulse"></span>
-      <span id="live-voice-debug-text">Voice Idle</span>
+    <!-- LIVE VOICE SIMPLE PLAIN-TEXT STATUS ABOVE PROMPT INPUT -->
+    <div id="live-voice-debug-pill" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 text-xs font-medium text-zinc-500 pointer-events-none select-none">
+      <span id="live-voice-debug-dot" class="hidden"></span>
+      <span id="live-voice-debug-text"></span>
     </div>
 
 </body>

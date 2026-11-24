@@ -3487,9 +3487,16 @@ class LiveGeminiBidiSession:
             in_tr = sc.get("inputTranscription", {}).get("text")
             if in_tr:
                 user_heard_parts.append(in_tr)
+                if on_text_chunk:
+                    try:
+                        on_text_chunk(in_tr, is_thought=False, is_user=True)
+                    except TypeError:
+                        pass
             out_tr = sc.get("outputTranscription", {}).get("text")
             if out_tr:
                 agent_said_parts.append(out_tr)
+                if on_text_chunk:
+                    on_text_chunk(out_tr, is_thought=False)
             turn = sc.get("modelTurn", {})
             for p in turn.get("parts", []):
                 if p.get("thought") and on_text_chunk:
@@ -3576,9 +3583,16 @@ class LiveGeminiBidiSession:
             in_tr = sc.get("inputTranscription", {}).get("text")
             if in_tr:
                 user_heard_parts.append(in_tr)
+                if on_text_chunk:
+                    try:
+                        on_text_chunk(in_tr, is_thought=False, is_user=True)
+                    except TypeError:
+                        pass
             out_tr = sc.get("outputTranscription", {}).get("text")
             if out_tr:
                 agent_said_parts.append(out_tr)
+                if on_text_chunk:
+                    on_text_chunk(out_tr, is_thought=False)
             turn = sc.get("modelTurn", {})
             for p in turn.get("parts", []):
                 # If Gemini Live returns thought / reasoning process
@@ -3702,11 +3716,11 @@ def handle_web_live_voice_ws(handler, query_params):
         }
         send_ws_frame(raw_sock, 0x1, json.dumps(frame))
 
-    def send_browser_text_chunk(text_chunk, is_thought=False):
+    def send_browser_text_chunk(text_chunk, is_thought=False, is_user=False):
         if not text_chunk:
             return
         frame = {
-            "type": "thought" if is_thought else "text",
+            "type": "user_transcript" if is_user else ("thought" if is_thought else "text"),
             "text": text_chunk
         }
         send_ws_frame(raw_sock, 0x1, json.dumps(frame))
