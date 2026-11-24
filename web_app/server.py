@@ -3419,7 +3419,9 @@ class LiveGeminiBidiSession:
                 },
                 "systemInstruction": {
                     "parts": [{"text": self.system_instruction}]
-                }
+                },
+                "inputAudioTranscription": {},
+                "outputAudioTranscription": {}
             }
         }
         await self.ws.send(json.dumps(setup))
@@ -3479,13 +3481,22 @@ class LiveGeminiBidiSession:
                 }
             }
 
+        turn_start_ts = time.time()
         await self.ws.send(json.dumps(turn_payload))
         audio_chunks_received = 0
         retried_empty = False
+        user_heard_parts = []
+        agent_said_parts = []
         while True:
             raw = await self.ws.recv()
             d = json.loads(raw)
             sc = d.get("serverContent", {})
+            in_tr = sc.get("inputTranscription", {}).get("text")
+            if in_tr:
+                user_heard_parts.append(in_tr)
+            out_tr = sc.get("outputTranscription", {}).get("text")
+            if out_tr:
+                agent_said_parts.append(out_tr)
             turn = sc.get("modelTurn", {})
             for p in turn.get("parts", []):
                 # If Gemini Live returns thought / reasoning process
@@ -3516,6 +3527,21 @@ class LiveGeminiBidiSession:
                         }
                     }))
                     continue
+                try:
+                    debug_entry = {
+                        "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "speech_bytes": len(caller_pcm_16k) if caller_pcm_16k else 0,
+                        "user_heard": "".join(user_heard_parts).strip(),
+                        "agent_said": "".join(agent_said_parts).strip(),
+                        "audio_chunks": audio_chunks_received,
+                        "retried": retried_empty,
+                        "duration_ms": int((time.time() - turn_start_ts) * 1000)
+                    }
+                    debug_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice_debug_transcripts.jsonl")
+                    with open(debug_path, "a", encoding="utf-8") as df:
+                        df.write(json.dumps(debug_entry, ensure_ascii=False) + "\n")
+                except Exception as log_err:
+                    print(f"[LiveGeminiBidi] Debug log write error: {log_err}", flush=True)
                 break
         return True
 
