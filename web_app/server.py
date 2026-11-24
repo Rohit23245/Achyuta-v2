@@ -3453,20 +3453,24 @@ class LiveGeminiBidiSession:
                     }
                 }))
 
-        # 2. Complete turn with the target objective direction (no STT roundtrip required!)
+        # 2. Complete turn - pure voice turn without overriding dummy text
         if step_target:
             instruction_text = f'Respond directly to the user in 1 short sentence in natural Hindi to achieve: "{step_target}"'
-            user_parts = [{"text": instruction_text}]
-        else:
-            # Natural pure voice turn without pre-canned override
-            user_parts = [{"text": "Kripya Hindi me sankshipt aur swabhavik jawab dein."}]
-
-        await self.ws.send(json.dumps({
-            "clientContent": {
-                "turns": [{"role": "user", "parts": user_parts}],
-                "turnComplete": True
+            turn_payload = {
+                "clientContent": {
+                    "turns": [{"role": "user", "parts": [{"text": instruction_text}]}],
+                    "turnComplete": True
+                }
             }
-        }))
+        else:
+            # Pure bidirectional voice turn: signal turn completion without extra text parts so audio is processed directly
+            turn_payload = {
+                "clientContent": {
+                    "turnComplete": True
+                }
+            }
+
+        await self.ws.send(json.dumps(turn_payload))
         audio_chunks_received = 0
         while True:
             raw = await self.ws.recv()
