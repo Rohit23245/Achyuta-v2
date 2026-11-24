@@ -4003,7 +4003,7 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             })
 
                                         caller_audio_slice = bytes(accumulated_caller_pcm)
-                                        print(f"[Vobiz Stream] Streaming {len(caller_audio_slice)} bytes directly to LiveGeminiBidiSession...", flush=True)
+                                        print(f"[Vobiz Stream] Streaming {len(caller_audio_slice)} bytes directly to LiveGeminiBidiSession (instant chunked playback)...", flush=True)
                                         if call_id:
                                             update_live_call_state(call_id, "connected", {
                                                 "current_speaker": "bot",
@@ -4016,19 +4016,14 @@ def handle_vobiz_stream_ws(handler, query_params):
                                                 "Listen to the human caller and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish."
                                             )
                                             vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
-                                        bot_pcm_chunks = bytearray()
-                                        def _collect_vobiz_pcm(chunk_24k):
-                                            if chunk_24k:
-                                                bot_pcm_chunks.extend(chunk_24k)
-                                        turn_ok = vobiz_bidi_session.stream_speech_turn(caller_audio_slice, "", _collect_vobiz_pcm)
+                                        # Stream each 24kHz audio chunk to Vobiz immediately as it arrives from Gemini (zero buffer wait!)
+                                        turn_ok = vobiz_bidi_session.stream_speech_turn(caller_audio_slice, "", stream_audio_bytes)
                                         if not turn_ok:
                                             try:
                                                 vobiz_bidi_session.close()
                                                 vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
                                             except Exception:
                                                 pass
-                                        if bot_pcm_chunks:
-                                            stream_audio_bytes(bytes(bot_pcm_chunks))
 
                                         # Reset audio accumulator for next conversational turn
                                         accumulated_caller_pcm.clear()
