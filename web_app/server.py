@@ -3492,10 +3492,10 @@ class LiveGeminiBidiSession:
                     fc_args = fc.get("args", {}) or {}
                     print(f"[LiveGeminiBidi] Executing CRM tool: {fc_name}({fc_args})", flush=True)
                     try:
-                        if "execute_crm_tool_call" in globals():
-                            res_obj = execute_crm_tool_call(fc_name, fc_args)
+                        if "resolve_gemini_tool_call" in globals():
+                            res_obj = resolve_gemini_tool_call(fc_name, fc_args)
                         else:
-                            res_obj = {"status": "ok", "message": f"Tool {fc_name} received"}
+                            res_obj = {"error": "resolve_gemini_tool_call not found"}
                     except Exception as te:
                         res_obj = {"error": str(te)}
                     fn_responses.append({
@@ -3610,10 +3610,10 @@ class LiveGeminiBidiSession:
                     fc_args = fc.get("args", {}) or {}
                     print(f"[LiveGeminiBidi] Executing CRM tool: {fc_name}({fc_args})", flush=True)
                     try:
-                        if "execute_crm_tool_call" in globals():
-                            res_obj = execute_crm_tool_call(fc_name, fc_args)
+                        if "resolve_gemini_tool_call" in globals():
+                            res_obj = resolve_gemini_tool_call(fc_name, fc_args)
                         else:
-                            res_obj = {"status": "ok", "message": f"Tool {fc_name} received"}
+                            res_obj = {"error": "resolve_gemini_tool_call not found"}
                     except Exception as te:
                         res_obj = {"error": str(te)}
                     fn_responses.append({
