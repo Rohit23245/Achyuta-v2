@@ -3864,6 +3864,7 @@ def handle_vobiz_stream_ws(handler, query_params):
     )
     vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
     vobiz_in_activity = False
+    bot_playback_until = 0.0
     print(f"[Vobiz Stream] Live 2-way Voice AI Connected & Pre-warmed for {cust_name} ({phone}). Ready to listen immediately.", flush=True)
 
     def stream_audio_bytes(pcm_bytes, target_rate=16000):
@@ -3971,6 +3972,14 @@ def handle_vobiz_stream_ws(handler, query_params):
                     accumulated_caller_pcm.clear()
 
                 elif event_name == "media" and state == "LISTENING_FOR_SPEECH":
+                    # Strict Echo Lock (same as web agent): ignore caller mic while bot is speaking + 600ms cooldown
+                    if time.time() < bot_playback_until + 0.6:
+                        speech_detected = False
+                        speech_energy_count = 0
+                        silence_after_speech_count = 0
+                        vobiz_in_activity = False
+                        accumulated_caller_pcm.clear()
+                        continue
                     media = event.get("media", {})
                     payload_b64 = media.get("payload", "")
                     if payload_b64:
@@ -4024,7 +4033,15 @@ def handle_vobiz_stream_ws(handler, query_params):
                                                 "latest_text": "Speaking live..."
                                             })
 
-                                        turn_ok = vobiz_bidi_session.end_activity_and_receive(stream_audio_bytes, speech_bytes=streamed_len)
+                                        def _vobiz_stream_and_track(chunk_24k):
+                                            nonlocal bot_playback_until
+                                            if chunk_24k:
+                                                # 24kHz 16-bit mono = 48000 bytes/sec
+                                                dur = len(chunk_24k) / 48000.0
+                                                bot_playback_until = max(bot_playback_until, time.time()) + dur
+                                                stream_audio_bytes(chunk_24k)
+
+                                        turn_ok = vobiz_bidi_session.end_activity_and_receive(_vobiz_stream_and_track, speech_bytes=streamed_len)
                                         vobiz_in_activity = False
                                         if not turn_ok:
                                             try:
