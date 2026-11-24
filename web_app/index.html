@@ -14385,8 +14385,8 @@
     }
 
     
-    let thinkingTimerInterval = null;
-    let thinkingStartTime = 0;
+    let liveVoiceThinkingTimerInterval = null;
+    let liveVoiceThinkingStartTime = 0;
 
     function updateVoiceDebugPill(state, text) {
       try {
@@ -14396,10 +14396,10 @@
         if (!pill || !dot || !txt) return;
 
         if (state === 'thinking') {
-          if (!thinkingTimerInterval) {
-            thinkingStartTime = Date.now();
-            thinkingTimerInterval = setInterval(() => {
-              const elapsed = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
+          if (!liveVoiceThinkingTimerInterval) {
+            liveVoiceThinkingStartTime = Date.now();
+            liveVoiceThinkingTimerInterval = setInterval(() => {
+              const elapsed = ((Date.now() - liveVoiceThinkingStartTime) / 1000).toFixed(1);
               const detail = window._latestBotThought ? ` (${window._latestBotThought.slice(0, 25)}...)` : '';
               txt.textContent = `Soch raha hai... ${elapsed}s${detail}`;
             }, 100);
@@ -14410,9 +14410,9 @@
         }
 
         // Clean thinking timer for other states
-        if (thinkingTimerInterval) {
-          clearInterval(thinkingTimerInterval);
-          thinkingTimerInterval = null;
+        if (liveVoiceThinkingTimerInterval) {
+          clearInterval(liveVoiceThinkingTimerInterval);
+          liveVoiceThinkingTimerInterval = null;
         }
 
         txt.textContent = text || state;
