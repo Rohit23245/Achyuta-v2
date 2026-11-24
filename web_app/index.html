@@ -14488,14 +14488,7 @@
           liveVoiceThinkingTimerInterval = null;
         }
 
-        txt.textContent = text || state;
-        } else if (state === 'error') {
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-red-400 animate-ping';
-          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-red-950/90 text-red-200 border-red-500/60 ring-2 ring-red-500/30';
-        } else {
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-zinc-500';
-          pill.className = 'fixed top-4 right-4 z-50 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-all duration-200 flex items-center gap-2 border bg-zinc-900/90 text-zinc-200 border-zinc-700/60';
-        }
+        txt.textContent = (state === 'idle') ? '' : (text || state);
       } catch(e) {}
     }
 
