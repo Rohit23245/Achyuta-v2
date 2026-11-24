@@ -14073,13 +14073,21 @@
             const rms = Math.sqrt(sumSq / inputFloat.length) * 100; // 0 to 100
             const now = Date.now();
 
-            // Single Source of Truth VAD: Direct mic energy detection
-            const speechThreshold = 0.5; // Highly sensitive threshold for normal speaking
-            if (rms > speechThreshold) {
+            // Dynamic Adaptive Noise Floor VAD
+            if (!window._vadBackgroundNoise) window._vadBackgroundNoise = 1.0;
+            if (!vadSpeechActive) {
+              // Learn room background noise when user is not speaking
+              window._vadBackgroundNoise = window._vadBackgroundNoise * 0.92 + rms * 0.08;
+            }
+
+            // Speech threshold is background noise + 2.5 (min 2.5) to avoid room hum
+            const dynamicThreshold = Math.max(2.5, window._vadBackgroundNoise + 2.2);
+
+            if (rms > dynamicThreshold) {
               if (!vadSpeechActive) {
                 vadSpeechActive = true;
                 vadSpeechStartTime = now;
-                console.log('[Live VAD] Voice started! RMS:', rms.toFixed(2));
+                console.log('[Live VAD] Voice started! RMS:', rms.toFixed(2), 'Threshold:', dynamicThreshold.toFixed(2));
                 updateVoiceDebugPill('speaking_user', 'Aap bol rahe hain (Vol: ' + rms.toFixed(1) + ')');
                 const chatInp = document.getElementById('prompt-input');
                 const dockInp = document.getElementById('universal-prompt-input');
@@ -14091,7 +14099,7 @@
               if (!vadSilenceStartTime) {
                 vadSilenceStartTime = now;
               } else if (now - vadSilenceStartTime > 450) {
-                // 450ms natural pause after speaking -> Instant trigger to Gemini Live
+                // Natural pause of 450ms -> Trigger turn to Gemini Live automatically!
                 const speechDuration = now - vadSpeechStartTime;
                 vadSpeechActive = false;
                 vadSilenceStartTime = 0;
@@ -14100,6 +14108,16 @@
                 setVoiceOrbState('thinking');
                 triggerLiveTurnEnd();
               }
+            }
+
+            // Fail-safe: If user speaks continuously for > 8 seconds, automatically send turn
+            if (vadSpeechActive && (now - vadSpeechStartTime > 8000)) {
+              vadSpeechActive = false;
+              vadSilenceStartTime = 0;
+              console.log('[Live VAD] Max utterance length reached (8s). Forcing turn_end!');
+              updateVoiceDebugPill('thinking', 'Gemini Soch raha hai...');
+              setVoiceOrbState('thinking');
+              triggerLiveTurnEnd();
             }
           };
 
