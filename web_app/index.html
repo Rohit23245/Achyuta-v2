@@ -14047,6 +14047,40 @@
             }
 
             sendLiveAudioPCM(pcm16);
+
+            // In-stream volume calculation directly from mic PCM (100% immune to CSS/Analyser issues)
+            let sumSq = 0;
+            for (let i = 0; i < inputFloat.length; i++) {
+              sumSq += inputFloat[i] * inputFloat[i];
+            }
+            const rms = Math.sqrt(sumSq / inputFloat.length) * 100; // 0 to 100
+            const now = Date.now();
+
+            // Direct sensitive speech detection (threshold 0.8)
+            if (rms > 0.8) {
+              if (!vadSpeechActive) {
+                vadSpeechActive = true;
+                vadSpeechStartTime = now;
+                console.log('[Direct VAD] User started speaking! RMS volume:', rms.toFixed(2));
+                const chatInp = document.getElementById('prompt-input');
+                const dockInp = document.getElementById('universal-prompt-input');
+                if (chatInp && isVoiceModeActive) chatInp.placeholder = 'Aap bol rahe hain...';
+                if (dockInp && isVoiceModeActive) dockInp.placeholder = 'Aap bol rahe hain...';
+              }
+              vadSilenceStartTime = 0;
+            } else if (vadSpeechActive) {
+              if (!vadSilenceStartTime) {
+                vadSilenceStartTime = now;
+              } else if (now - vadSilenceStartTime > 550) {
+                // Natural pause of 550ms -> Trigger turn to Gemini Live automatically!
+                const dur = now - vadSpeechStartTime;
+                vadSpeechActive = false;
+                vadSilenceStartTime = 0;
+                console.log('[Direct VAD] User stopped speaking (duration: ' + dur + 'ms). Triggering turn_end automatically!');
+                setVoiceOrbState('thinking');
+                triggerLiveTurnEnd();
+              }
+            }
           };
 
           source.connect(livePcmProcessor);
