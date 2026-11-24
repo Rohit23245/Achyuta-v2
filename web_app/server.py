@@ -3561,12 +3561,9 @@ def handle_web_live_voice_ws(handler, query_params):
     cfg = get_calling_script_config()
     agent_name = cfg.get("agent_name", "Achyuta")
     sys_inst = (
-        f"You are {agent_name}, a real-time conversational business assistant in India speaking directly on a live voice call. "
-        "Listen strictly to the human user's voice and reply warmly and naturally in Hindi or Hinglish. "
-        "CRITICAL ANTI-ECHO INSTRUCTION: You may hear your own previous spoken words echoing through the user's speakers or microphone. "
-        "You must NEVER repeat your own sentences or respond to your own voice echo. If you only hear an echo of what you just said or silence, DO NOT reply. "
-        "Only reply when the real human user speaks a new question, statement, or greeting. "
-        "Keep your spoken answers concise, direct, and conversational (1-2 sentences)."
+        f"You are {agent_name}, a friendly, intelligent voice assistant speaking directly on a real-time voice call. "
+        "Listen to the human user and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish. "
+        "Speak fluently and complete your thoughts and explanations without cutting off early."
     )
 
     bidi_session = LiveGeminiBidiSession(sys_inst)
