@@ -4023,8 +4023,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
                                     vobiz_bidi_session.send_audio_chunk_live(pcm_in)
-                                    # Turn end: ~600ms (12 frames) of silence triggers instant <1s Gemini reply
-                                    if silence_after_speech_count >= 12:
+                                    # Turn end: ~400ms (8 frames) of silence triggers ultra-fast Gemini reply
+                                    if silence_after_speech_count >= 8:
                                         # Accept speech chunk (>=6400 bytes, ~200ms) to prevent noise hallucination
                                         if len(accumulated_caller_pcm) < 6400:
                                             # Discard tiny line click and reset activity state
