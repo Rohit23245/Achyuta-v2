@@ -291,6 +291,12 @@
       -webkit-box-shadow: none !important;
     }
 </style>
+  <style>
+    @media (max-width: 640px) {
+      .overflow-x-hidden table { width: 100% !important; table-layout: fixed !important; }
+      .overflow-x-hidden td, .overflow-x-hidden th { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+    }
+  </style>
 </head>
 <body onclick="unlockAudioEngine()" class="flex h-screen overflow-hidden antialiased light-mode" style="background-color: var(--bg); color: var(--text);">
 
@@ -12121,7 +12127,13 @@
             td { padding: 10px; border-bottom: 1px solid #f4f4f5; }
             .summary { background: #f9fafb; padding: 15px; border-radius: 8px; font-size: 13px; }
           </style>
-        </head>
+          <style>
+    @media (max-width: 640px) {
+      .overflow-x-hidden table { width: 100% !important; table-layout: fixed !important; }
+      .overflow-x-hidden td, .overflow-x-hidden th { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+    }
+  </style>
+</head>
         <body>
           <div class="header">
             <div class="brand-name">${escapeHtml(cfg.company_name)}</div>
