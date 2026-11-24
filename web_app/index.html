@@ -7410,7 +7410,7 @@
       if (e) e.preventDefault();
       // If voice mode is active and user clicks send button, immediately commit the voice turn!
       if (isVoiceModeActive && !isSpeaking) {
-        handleVoiceTurnComplete();
+        triggerLiveTurnEnd();
         return;
       }
       const input = document.getElementById('universal-prompt-input');
@@ -7535,7 +7535,7 @@
       if (e) e.preventDefault();
       // If voice mode is active and user clicks send button, immediately commit the voice turn!
       if (isVoiceModeActive && !isSpeaking) {
-        handleVoiceTurnComplete();
+        triggerLiveTurnEnd();
         return;
       }
       
@@ -13823,6 +13823,8 @@
     let livePcmProcessor = null;
     let nextAudioPlayTime = 0;
     let liveAudioScheduledSources = [];
+    window._pendingPcmChunks = [];
+    window._pendingTurnEnd = false;
 
     function initLiveAudioWebSocket() {
       try {
@@ -13831,10 +13833,24 @@
         }
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = proto + '//' + window.location.host + '/ws/live_audio';
+        console.log('[Live Audio Engine] Connecting WebSocket to:', wsUrl);
         liveAudioWS = new WebSocket(wsUrl);
 
         liveAudioWS.onopen = () => {
           console.log('[Live Audio Engine] Connected directly to Gemini 2.5 Live WebSocket stream!');
+          // Flush any buffered chunks recorded during handshake
+          if (window._pendingPcmChunks && window._pendingPcmChunks.length > 0) {
+            console.log('[Live Audio Engine] Flushing', window._pendingPcmChunks.length, 'buffered audio chunks');
+            while (window._pendingPcmChunks.length > 0) {
+              const b64 = window._pendingPcmChunks.shift();
+              try { liveAudioWS.send(JSON.stringify({ type: 'audio_chunk', data: b64 })); } catch(e) {}
+            }
+          }
+          if (window._pendingTurnEnd) {
+            window._pendingTurnEnd = false;
+            console.log('[Live Audio Engine] Sending queued turn_end!');
+            try { liveAudioWS.send(JSON.stringify({ type: 'turn_end' })); } catch(e) {}
+          }
         };
 
         liveAudioWS.onmessage = async (event) => {
@@ -13858,7 +13874,9 @@
               console.log('[Live Audio Engine] Model turn finished sending audio.');
               window._currentLiveBotMsgEl = null;
             }
-          } catch(e) {}
+          } catch(e) {
+            console.warn('[Live Audio WS Parse Error]:', e);
+          }
         };
 
         liveAudioWS.onerror = (e) => {
@@ -13874,21 +13892,32 @@
     }
 
     function sendLiveAudioPCM(int16Array) {
+      const bytes = new Uint8Array(int16Array.buffer);
+      let binary = '';
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const b64 = btoa(binary);
+
       if (liveAudioWS && liveAudioWS.readyState === WebSocket.OPEN) {
-        const bytes = new Uint8Array(int16Array.buffer);
-        let binary = '';
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const b64 = btoa(binary);
         liveAudioWS.send(JSON.stringify({ type: 'audio_chunk', data: b64 }));
+      } else {
+        // Buffer up to 30 chunks (approx 3-4 seconds) while connecting
+        if (!window._pendingPcmChunks) window._pendingPcmChunks = [];
+        if (window._pendingPcmChunks.length < 35) {
+          window._pendingPcmChunks.push(b64);
+        }
       }
     }
 
     function triggerLiveTurnEnd() {
+      console.log('[Live Voice Turn] triggerLiveTurnEnd called. WS ReadyState:', liveAudioWS ? liveAudioWS.readyState : 'null');
       if (liveAudioWS && liveAudioWS.readyState === WebSocket.OPEN) {
         liveAudioWS.send(JSON.stringify({ type: 'turn_end' }));
+      } else {
+        window._pendingTurnEnd = true;
+        initLiveAudioWebSocket();
       }
     }
 
