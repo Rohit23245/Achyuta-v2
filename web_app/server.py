@@ -7174,26 +7174,28 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
 # GEMINI NATIVE AUDIO DIALOG ENGINE (2.5 FLASH UNLIMITED LIVE API)
 # ---------------------------------------------------------
 def load_voice_api_key():
-    k = os.environ.get('VOICE_API_KEY', '').strip()
-    if not k or k == 'YOUR_VOICE_API_KEY':
-        try:
-            key_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gemini_api_key.json")
-            if os.path.exists(key_file):
-                with open(key_file, "r", encoding="utf-8") as f:
-                    local_keys = json.load(f)
-                    # Prioritize dedicated voice_api_key, then fallback to gemini_api_key
-                    val = local_keys.get('voice_api_key') or local_keys.get('gemini_api_key') or ''
-                    if val:
-                        return val
-        except Exception as e:
-            print(f"Error loading voice key from file: {e}")
-        # Default fallback key for production voice synthesis
-        try:
-            # Fallback to verified Gemini Native Audio Dialog key
-            return base64.b64decode("QVEuQWI4Uk42SjZtYktGT0R6Nmc5ZlhRTnREWmRXY2RBUk0xMTlXMWtrNzBmX1E5bWtBZHc=").decode("utf-8")
-        except:
-            pass
-    return k
+    # 1. Load from gemini_api_key.json and prioritize valid Google AI Studio key (AIzaSy...)
+    try:
+        key_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gemini_api_key.json")
+        if os.path.exists(key_file):
+            with open(key_file, "r", encoding="utf-8") as f:
+                local_keys = json.load(f)
+                # Standard Google AI Studio API keys (starts with AIzaSy) work with Bidi Live WebSockets
+                for k in [local_keys.get('gemini_api_key'), local_keys.get('voice_api_key')]:
+                    if k and k.startswith('AIzaSy'):
+                        return k
+                val = local_keys.get('gemini_api_key') or local_keys.get('voice_api_key') or ''
+                if val:
+                    return val
+    except Exception as e:
+        print(f"Error loading voice api key from json: {e}", flush=True)
+
+    # 2. Check environment variables
+    for env_var in ['GEMINI_API_KEY', 'VOICE_API_KEY', 'AI_API_KEY']:
+        val = os.environ.get(env_var, '').strip()
+        if val and not val.startswith('YOUR_'):
+            return val
+    return ''
 
 VOICE_API_KEY = load_voice_api_key()
 print(f"DEBUG: Using Voice API Key: {VOICE_API_KEY[:5]}...")
