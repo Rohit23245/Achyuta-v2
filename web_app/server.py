@@ -3592,6 +3592,7 @@ def handle_web_live_voice_ws(handler, query_params):
                             speech_buffer.extend(pcm_in)
                     elif m_type == "turn_end":
                         # User stopped speaking, trigger instant model speech turn
+                        print(f"[Web Live Audio] turn_end received! speech_buffer bytes: {len(speech_buffer)}", flush=True)
                         send_ws_frame(raw_sock, 0x1, json.dumps({"type": "thinking"}))
                         audio_to_send = bytes(speech_buffer)
                         speech_buffer.clear()
