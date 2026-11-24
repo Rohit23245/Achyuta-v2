@@ -3421,7 +3421,12 @@ class LiveGeminiBidiSession:
                     "parts": [{"text": self.system_instruction}]
                 },
                 "inputAudioTranscription": {},
-                "outputAudioTranscription": {}
+                "outputAudioTranscription": {},
+                "realtimeInputConfig": {
+                    "automaticActivityDetection": {
+                        "disabled": True
+                    }
+                }
             }
         }
         await self.ws.send(json.dumps(setup))
@@ -3443,9 +3448,11 @@ class LiveGeminiBidiSession:
             return False
 
     async def _turn_streaming(self, caller_pcm_16k, step_target, on_pcm_chunk, on_text_chunk=None):
-        # 1. If real caller PCM audio bytes are available, send raw audio chunks efficiently in 500ms (16000 bytes) blocks
-        if caller_pcm_16k and len(caller_pcm_16k) > 1600:
-            chunk_size = 16000  # 500ms at 16kHz 16-bit mono for minimal WebSocket frame overhead
+        turn_start_ts = time.time()
+        if caller_pcm_16k and len(caller_pcm_16k) > 1600 and not step_target:
+            # Official Gemini Live manual activity flow: activityStart -> mediaChunks -> activityEnd (zero fake text!)
+            await self.ws.send(json.dumps({"realtimeInput": {"activityStart": {}}}))
+            chunk_size = 16000  # 500ms at 16kHz 16-bit mono
             for i in range(0, len(caller_pcm_16k), chunk_size):
                 chunk = caller_pcm_16k[i:i + chunk_size]
                 b64_data = base64.b64encode(chunk).decode('ascii')
@@ -3457,32 +3464,17 @@ class LiveGeminiBidiSession:
                         }]
                     }
                 }))
-
-        # 2. Complete turn - signal turn completion
-        # Gemini Bidi protocol requires turns list in clientContent to signal user turn completion
-        if step_target:
+            await self.ws.send(json.dumps({"realtimeInput": {"activityEnd": {}}}))
+        elif step_target:
             instruction_text = f'Respond directly to the user in 1 short sentence in natural Hindi to achieve: "{step_target}"'
-            turn_payload = {
+            await self.ws.send(json.dumps({
                 "clientContent": {
                     "turns": [{"role": "user", "parts": [{"text": instruction_text}]}],
                     "turnComplete": True
                 }
-            }
+            }))
         else:
-            # When completing pure speech turn, Gemini protocol requires non-empty parts list:
-            # We direct it to answer the audio input naturally in Hindi.
-            turn_payload = {
-                "clientContent": {
-                    "turns": [{
-                        "role": "user",
-                        "parts": [{"text": "Listen to the user's speech audio provided above and respond directly to what they said in Hindi."}]
-                    }],
-                    "turnComplete": True
-                }
-            }
-
-        turn_start_ts = time.time()
-        await self.ws.send(json.dumps(turn_payload))
+            return True
         audio_chunks_received = 0
         retried_empty = False
         user_heard_parts = []
