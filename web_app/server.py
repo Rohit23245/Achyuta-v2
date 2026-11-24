@@ -3927,7 +3927,10 @@ def handle_vobiz_stream_ws(handler, query_params):
                     start_meta = event.get("start", {})
                     stream_id = event.get("streamId") or start_meta.get("streamId")
                     call_id = event.get("callId") or start_meta.get("callId") or start_meta.get("callUUID")
-                    print(f"[Vobiz Stream] Received 'start' event! streamId={stream_id}, callId={call_id}", flush=True)
+                    mf = start_meta.get("mediaFormat", {})
+                    in_encoding = str(mf.get("encoding", "audio/x-l16")).lower()
+                    in_sample_rate = int(mf.get("sampleRate", 16000) or 16000)
+                    print(f"[Vobiz Stream] Received 'start' event! streamId={stream_id}, callId={call_id}, encoding={in_encoding}, sampleRate={in_sample_rate}", flush=True)
 
                     # Update live tracker immediately to connected/picked state
                     if call_id:
@@ -3973,6 +3976,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                     if payload_b64:
                         try:
                             pcm_in = base64.b64decode(payload_b64)
+                            if "mulaw" in locals().get("in_encoding", "") or "ulaw" in locals().get("in_encoding", ""):
+                                pcm_in = audioop.ulaw2lin(pcm_in, 2)
+                            sr_in = locals().get("in_sample_rate", 16000)
+                            if sr_in and sr_in != 16000:
+                                pcm_in, _ = audioop.ratecv(pcm_in, 2, 1, sr_in, 16000, None)
                             rms = calculate_pcm16_rms(pcm_in)
                             
                             # Cellular speech detection (RMS > 450 ignores line static/hum, captures real human voice)
