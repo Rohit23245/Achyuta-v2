@@ -4003,51 +4003,32 @@ def handle_vobiz_stream_ws(handler, query_params):
                                             })
 
                                         caller_audio_slice = bytes(accumulated_caller_pcm)
-                                        caller_spoken_text = ""
-                                        try:
-                                            wav_data = pcm16_to_wav_bytes(caller_audio_slice, sample_rate=16000)
-                                            if wav_data:
-                                                b64_audio = base64.b64encode(wav_data).decode("ascii")
-                                                txt, _ = transcribe_gemini_voice_audio(b64_audio, "audio/wav")
-                                                if txt and txt.strip() != "SILENCE":
-                                                    caller_spoken_text = txt.strip()
-                                        except Exception as te:
-                                            print(f"[Vobiz Stream] Transcribe caller error: {te}", flush=True)
-
-                                        if not caller_spoken_text:
-                                            caller_spoken_text = "Hello"
-
-                                        print(f"[Vobiz Stream] Caller actually said: '{caller_spoken_text}'", flush=True)
-                                        if call_id:
-                                            append_call_dialog_turn(call_id, "caller", caller_spoken_text)
-
-                                        # Fetch conversation history so AI remembers the flow
-                                        history_turns = []
-                                        if call_id and call_id in LIVE_CALL_TRACKER:
-                                            history_turns = LIVE_CALL_TRACKER[call_id].get("dialog", [])
-
-                                        # Generate pure conversational AI reply based on what the caller said
-                                        reply_text = generate_intelligent_second_response(
-                                            customer_speech=caller_spoken_text,
-                                            intent_direction=resp_intent or "",
-                                            agent_instructions=agent_inst or "",
-                                            conversation_history=history_turns
-                                        )
-
-                                        if not reply_text:
-                                            reply_text = "Haan ji, main aapki baat samajh rahi hoon. Kahiye kaise sahayata kar sakti hoon?"
-
-                                        print(f"[Vobiz Stream] AI generated speech reply: '{reply_text}'", flush=True)
+                                        print(f"[Vobiz Stream] Streaming {len(caller_audio_slice)} bytes directly to LiveGeminiBidiSession...", flush=True)
                                         if call_id:
                                             update_live_call_state(call_id, "connected", {
                                                 "current_speaker": "bot",
-                                                "latest_text": reply_text
+                                                "latest_text": "Speaking live..."
                                             })
-                                            append_call_dialog_turn(call_id, "bot", reply_text)
-
-                                        step_pcm = get_pcm24_from_text(reply_text)
-                                        if step_pcm:
-                                            stream_audio_bytes(step_pcm)
+                                        if "vobiz_bidi_session" not in locals() or vobiz_bidi_session is None:
+                                            vobiz_sys_inst = (
+                                                f"You are {get_calling_script_config().get('agent_name', 'Achyuta')}, a friendly, intelligent voice assistant speaking directly on a live phone call. "
+                                                f"Customer name: {cust_name}. {agent_inst or ''} "
+                                                "Listen to the human caller and answer completely, naturally, and helpfully in clear conversational Hindi or Hinglish."
+                                            )
+                                            vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
+                                        bot_pcm_chunks = bytearray()
+                                        def _collect_vobiz_pcm(chunk_24k):
+                                            if chunk_24k:
+                                                bot_pcm_chunks.extend(chunk_24k)
+                                        turn_ok = vobiz_bidi_session.stream_speech_turn(caller_audio_slice, "", _collect_vobiz_pcm)
+                                        if not turn_ok:
+                                            try:
+                                                vobiz_bidi_session.close()
+                                                vobiz_bidi_session = LiveGeminiBidiSession(vobiz_sys_inst)
+                                            except Exception:
+                                                pass
+                                        if bot_pcm_chunks:
+                                            stream_audio_bytes(bytes(bot_pcm_chunks))
 
                                         # Reset audio accumulator for next conversational turn
                                         accumulated_caller_pcm.clear()
