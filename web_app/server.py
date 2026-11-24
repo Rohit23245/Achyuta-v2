@@ -3481,6 +3481,7 @@ class LiveGeminiBidiSession:
 
         await self.ws.send(json.dumps(turn_payload))
         audio_chunks_received = 0
+        retried_empty = False
         while True:
             raw = await self.ws.recv()
             d = json.loads(raw)
@@ -3502,6 +3503,19 @@ class LiveGeminiBidiSession:
                     on_pcm_chunk(chunk)
             if sc.get("turnComplete"):
                 print(f"[LiveGeminiBidi] turnComplete received. Total audio chunks generated: {audio_chunks_received}", flush=True)
+                if audio_chunks_received == 0 and not retried_empty and caller_pcm_16k and len(caller_pcm_16k) > 3200:
+                    retried_empty = True
+                    print("[LiveGeminiBidi] 0 audio chunks for valid speech turn; retrying prompt once...", flush=True)
+                    await self.ws.send(json.dumps({
+                        "clientContent": {
+                            "turns": [{
+                                "role": "user",
+                                "parts": [{"text": "Please speak your response aloud in Hindi right now."}]
+                            }],
+                            "turnComplete": True
+                        }
+                    }))
+                    continue
                 break
         return True
 
