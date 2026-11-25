@@ -283,16 +283,15 @@ def pull_all_vaults_from_sheet(web_app_dir):
                     spreadsheetId=SHEET_ID, range=f"{tab_name}!A:B"
                 ).execute()
                 vals = res.get("values", [])
-                if len(vals) > 1:
+                if len(vals) >= 1:
                     items = []
                     for row in vals[1:]:
                         if len(row) >= 2 and row[1]:
                             items.append(json.loads(row[1]))
-                    if items:
-                        vpath = os.path.join(web_app_dir, vault_file)
-                        with open(vpath, "w", encoding="utf-8") as f:
-                            json.dump(items, f, ensure_ascii=False, indent=2)
-                        print(f"[Sheets Sync] Restored {len(items)} records from {tab_name} -> {vault_file}", flush=True)
+                    vpath = os.path.join(web_app_dir, vault_file)
+                    with open(vpath, "w", encoding="utf-8") as f:
+                        json.dump(items, f, ensure_ascii=False, indent=2)
+                    print(f"[Sheets Sync] Restored {len(items)} records from {tab_name} -> {vault_file}", flush=True)
             except Exception as te:
                 print(f"[Sheets Sync] Pull {tab_name} error: {te}", flush=True)
     except Exception as e:
