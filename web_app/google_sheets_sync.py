@@ -187,6 +187,9 @@ def push_client_to_sheet_async(client_data):
     t.start()
 
 def start_periodic_sheets_sync(clients_vault_path, interval_sec=180):
+    # Master DB is now CRM_* tabs via pull_all_vaults_from_sheet / sync_vault_to_sheet_async;
+    # do not re-import deleted leads from legacy Sheet1.
+    return
     """
     Periodically checks Google Sheet for newly added leads and pulls into JSON.
     """
