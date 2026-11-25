@@ -4693,9 +4693,9 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
       <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
         <div class="top-actions">
           <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleProposalTheme()">
-            <span id="themeToggleText">Switch to Dark Theme</span>
+            <span id="themeToggleText" style="white-space: nowrap;">Dark Theme</span>
           </button>
-          <span class="doc-pill">&bull; EXECUTIVE PROPOSAL</span>
+          <span class="doc-pill" style="white-space: nowrap;">&bull; EXECUTIVE PROPOSAL</span>
         </div>
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-muted);">#{doc_id}</div>
       </div>
