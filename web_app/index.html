@@ -8008,7 +8008,7 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                 <span>${isProp ? 'Open Proposal' : 'View Invoice'}</span>
               </a>
-              <button type="button" onclick="switchTab('invoices')" class="px-3 py-1.5 rounded-xl border text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 transition" style="border-color: var(--border-color); color: var(--text);">
+              <button type="button" onclick="switchTab('${isProp ? 'proposals' : 'invoices'}')" class="px-3 py-1.5 rounded-xl border text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 transition" style="border-color: var(--border-color); color: var(--text);">
                 Manage
               </button>
             </div>
