@@ -7264,6 +7264,9 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                             req_loop = urllib.request.Request(loop_url, data=json.dumps(round_payload).encode("utf-8"), headers={"Content-Type": "application/json"})
                             res_loop, http_err_loop = execute_gemini_request(req_loop)
                             if http_err_loop:
+                                if action_executed_flag and action_meta_dict:
+                                    reply = action_meta_dict.get("message") or action_meta_dict.get("reply") or "Action completed successfully!"
+                                    break
                                 err_code, err_text = http_err_loop
                                 raise urllib.error.HTTPError(loop_url, err_code, err_text, {}, None)
                             cand = res_loop.get("candidates", [{}])[0].get("content", {})
