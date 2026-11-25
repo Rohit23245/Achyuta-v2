@@ -212,6 +212,16 @@ CRM_VAULT_TABS = {
     "invoices_vault.json": "CRM_Invoices",
     "proposals_vault.json": "CRM_Proposals",
     "salary_vault.json": "CRM_Salary",
+    "attendance_vault.json": "CRM_Attendance",
+    "calling_lists_vault.json": "CRM_CallingLists",
+    "call_logs_vault.json": "CRM_CallLogs",
+    "campaigns_vault.json": "CRM_Campaigns",
+    "contracts_vault.json": "CRM_Contracts",
+    "employees_vault.json": "CRM_Employees",
+    "meetings_vault.json": "CRM_Meetings",
+    "reminders_vault.json": "CRM_Reminders",
+    "tickets_vault.json": "CRM_Tickets",
+    "users_vault.json": "CRM_Users",
 }
 
 def _ensure_sheet_tab(service, tab_name):
