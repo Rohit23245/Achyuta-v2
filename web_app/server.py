@@ -7722,7 +7722,7 @@ def start_server():
         vault_path = os.path.join(DATA_DIR, "clients_vault.json")
         try:
             if pull_all_vaults_from_sheet:
-                pull_all_vaults_from_sheet(DATA_DIR)
+                threading.Thread(target=pull_all_vaults_from_sheet, args=(DATA_DIR,), daemon=True).start()
             start_periodic_sheets_sync(vault_path, interval_sec=180)
             print("[Sheets Sync] Auto-sync background thread started successfully.", flush=True)
         except Exception as e:
