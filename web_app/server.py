@@ -7265,7 +7265,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                             res_loop, http_err_loop = execute_gemini_request(req_loop)
                             if http_err_loop:
                                 err_code, err_text = http_err_loop
-                                raise urllib.error.HTTPError(url, err_code, err_text, {}, None)
+                                raise urllib.error.HTTPError(loop_url, err_code, err_text, {}, None)
                             cand = res_loop.get("candidates", [{}])[0].get("content", {})
                             parts = cand.get("parts", [])
                             func_calls = [p["functionCall"] for p in parts if "functionCall" in p]
