@@ -1387,6 +1387,17 @@ GEMINI_CRM_TOOLS = [
                 }
             },
             {
+                "name": "search_clients",
+                "description": "Search clients/leads in the CRM vault by name, phone number, or status. Returns exact match count and matching records.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "query": {"type": "STRING", "description": "Name, phone number, or status to search for"}
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
                 "name": "get_recent_clients",
                 "description": "Returns the most recently added or updated clients in the CRM vault.",
                 "parameters": {
@@ -2173,6 +2184,23 @@ def resolve_gemini_tool_call(func_name, func_args):
             "action_executed": False,
             "recent_clients": clients[:limit],
             "message": f"Returning latest {min(limit, len(clients))} clients from vault."
+        }
+
+    elif func_name == "search_clients":
+        q = str(func_args.get("query") or "").strip().lower()
+        clients = read_vault(CLIENTS_VAULT_PATH)
+        matches = [
+            c for c in clients
+            if q in str(c.get("name", "")).lower()
+            or q in str(c.get("phone", "")).lower()
+            or q in str(c.get("status", "")).lower()
+        ]
+        return {
+            "success": True,
+            "action_executed": False,
+            "total_matches": len(matches),
+            "matches": matches[:25],
+            "message": f"Found {len(matches)} matching clients for '{q}'."
         }
 
     # -------------------------------------------------------------
