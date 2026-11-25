@@ -2806,7 +2806,7 @@ def resolve_gemini_tool_call(func_name, func_args):
     elif func_name == "delete_staff_member":
         query = str(func_args.get("name_or_username") or "").strip().lower()
         staff_list = read_vault(USERS_VAULT_PATH)
-        if query in ["all", "sari", "sab", "all staff", "everyone", "*"]:
+        if query in ["all", "sari", "sab", "sara", "sara staff", "all staff", "all_except_admin", "except admin", "everyone", "*"]:
             total_count = len(staff_list)
             # Retain default Admin user so access is never locked
             admin_retained = [s for s in staff_list if str(s.get("role", "")).lower() == "admin" or str(s.get("username", "")).lower() == "admin"]
