@@ -7175,7 +7175,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_chat_model}:generateContent?key={AI_API_KEY}"
                 for attempt in range(max_retries):
                     try:
-                        with urllib.request.urlopen(req_obj, timeout=4.5) as resp:
+                        with urllib.request.urlopen(req_obj, timeout=20) as resp:
                             return json.loads(resp.read().decode("utf-8")), None
                     except Exception as e:
                         if attempt < max_retries - 1:
