@@ -2603,7 +2603,7 @@ def resolve_gemini_tool_call(func_name, func_args):
         prefix = "PROP-" if is_proposal else "INV-"
         inv_id_val = f"{prefix}{int(time.time()) % 10000}"
         route_name = "proposal" if is_proposal else "invoice"
-        view_link = f"http://localhost:5000/{route_name}/{inv_id_val}"
+        view_link = f"https://achyuta.smartbharattech.com/{route_name}/{inv_id_val}"
         invoices = read_vault(INVOICES_VAULT_PATH)
         new_inv = {
             "id": inv_id_val,
