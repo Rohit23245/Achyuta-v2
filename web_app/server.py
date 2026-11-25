@@ -2615,7 +2615,7 @@ def resolve_gemini_tool_call(func_name, func_args):
             "date": datetime.now().strftime("%Y-%m-%d"),
             "due_date": due,
             "invoice_link": view_link,
-            "proposal_link": view_link if is_proposal else f"http://localhost:5000/proposal/{inv_id_val}"
+            "proposal_link": view_link if is_proposal else f"https://achyuta.smartbharattech.com/proposal/{inv_id_val}"
         }
         invoices.insert(0, new_inv)
         write_vault(INVOICES_VAULT_PATH, invoices)
@@ -3320,8 +3320,8 @@ class SystemPromptGatekeeper:
         "2. STEP-BY-STEP COMMUNICATION GATE FOR TASKS, MEETINGS, INVOICES & PROPOSALS:\n"
         "- When user asks to create an Invoice, Proposal/Quotation, schedule a Meeting, or create a Task:\n"
         "- STEP 1: Always execute the core action first ('create_invoice' with appropriate type, 'schedule_meeting', or 'create_task').\n"
-        "- When creating a Proposal / Quotation, ensure type is 'Quotation'. Live luxury proposal link will be http://localhost:5000/proposal/<id>.\n"
-        "- When creating an Invoice, live invoice link will be http://localhost:5000/invoice/<id>.\n"
+        "- When creating a Proposal / Quotation, ensure type is 'Quotation'. Live luxury proposal link will be https://achyuta.smartbharattech.com/proposal/<id>.\n"
+        "- When creating an Invoice, live invoice link will be https://achyuta.smartbharattech.com/invoice/<id>.\n"
         "- STEP 2 (WHATSAPP CONFIRMATION): In your reply, confirm the creation with clear details (ID, amount, link) and ALWAYS ask the user: 'Proposal/Invoice create ho gaya hai. Kya main client ko WhatsApp par proposal/invoice link send kar du?'\n"
         "- DO NOT send WhatsApp automatically unless the user confirms or says 'send kar do'.\n"
         "- STEP 3 (CALL CONFIRMATION): Once WhatsApp is dispatched, ask separately: 'WhatsApp details send kar di gayi hain. Kya client ko call karke bhi inform kar du?'\n"
@@ -6809,10 +6809,10 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             prefix = "PROP-" if is_prop else "INV-"
             rec["id"] = prefix + str(int(time.time()))[-4:]
             if is_prop:
-                rec["proposal_link"] = f"http://localhost:5000/proposal/{rec['id']}"
+                rec["proposal_link"] = f"https://achyuta.smartbharattech.com/proposal/{rec['id']}"
                 rec["invoice_link"] = rec["proposal_link"]
             else:
-                rec["invoice_link"] = f"http://localhost:5000/invoice/{rec['id']}"
+                rec["invoice_link"] = f"https://achyuta.smartbharattech.com/invoice/{rec['id']}"
             items.insert(0, rec)
             try:
                 with open(fpath, "w", encoding="utf-8") as f:
