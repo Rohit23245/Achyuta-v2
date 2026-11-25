@@ -216,11 +216,11 @@ CRM_VAULT_TABS = {
 
 def _ensure_sheet_tab(service, tab_name):
     try:
-        meta = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
+        meta = service.spreadsheets().get(spreadsheetId=SHEET_ID).execute()
         titles = [s["properties"]["title"] for s in meta.get("sheets", [])]
         if tab_name not in titles:
             service.spreadsheets().batchUpdate(
-                spreadsheetId=SPREADSHEET_ID,
+                spreadsheetId=SHEET_ID,
                 body={"requests": [{"addSheet": {"properties": {"title": tab_name}}}]}
             ).execute()
     except Exception as e:
@@ -245,10 +245,10 @@ def sync_vault_to_sheet_async(vault_filename, vault_path):
                 rid = str(item.get("id") or idx) if isinstance(item, dict) else str(idx)
                 rows.append([rid, json.dumps(item, ensure_ascii=False)])
             service.spreadsheets().values().clear(
-                spreadsheetId=SPREADSHEET_ID, range=f"{tab_name}!A:B"
+                spreadsheetId=SHEET_ID, range=f"{tab_name}!A:B"
             ).execute()
             service.spreadsheets().values().update(
-                spreadsheetId=SPREADSHEET_ID,
+                spreadsheetId=SHEET_ID,
                 range=f"{tab_name}!A1",
                 valueInputOption="RAW",
                 body={"values": rows}
@@ -267,7 +267,7 @@ def pull_all_vaults_from_sheet(web_app_dir):
             try:
                 _ensure_sheet_tab(service, tab_name)
                 res = service.spreadsheets().values().get(
-                    spreadsheetId=SPREADSHEET_ID, range=f"{tab_name}!A:B"
+                    spreadsheetId=SHEET_ID, range=f"{tab_name}!A:B"
                 ).execute()
                 vals = res.get("values", [])
                 if len(vals) > 1:
