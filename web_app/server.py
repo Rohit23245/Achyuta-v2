@@ -2678,6 +2678,10 @@ def resolve_gemini_tool_call(func_name, func_args):
 
         invoices = read_vault(INVOICES_VAULT_PATH)
 
+        if func_name == "delete_invoice" and inv_id in ["all", "all_invoices", "everything", "sab", "sare", "sari", "*"]:
+            write_vault(INVOICES_VAULT_PATH, [])
+            return {"success": True, "action_executed": True, "action_type": "delete_invoice", "message": "Sabhi invoices ko record se permanently delete kar diya gaya hai."}
+
         # Handling deletion of ALL proposals / quotations
         if func_name == "delete_proposal" and inv_id in ["all", "all_proposals", "everything", "sab", "sare", "sari", "*"]:
             remaining = [i for i in invoices if str(i.get("type", "")).lower() != "quotation" and not str(i.get("id", "")).upper().startswith("PROP-") and not str(i.get("id", "")).upper().startswith("QUO-")]
