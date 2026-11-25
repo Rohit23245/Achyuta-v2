@@ -203,3 +203,83 @@ def start_periodic_sheets_sync(clients_vault_path, interval_sec=180):
 
     t = threading.Thread(target=_loop, daemon=True)
     t.start()
+
+
+CRM_VAULT_TABS = {
+    "tasks_vault.json": "CRM_Tasks",
+    "accounts_vault.json": "CRM_Accounts",
+    "invoices_vault.json": "CRM_Invoices",
+    "proposals_vault.json": "CRM_Proposals",
+    "salary_vault.json": "CRM_Salary",
+}
+
+def _ensure_sheet_tab(service, tab_name):
+    try:
+        meta = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
+        titles = [s["properties"]["title"] for s in meta.get("sheets", [])]
+        if tab_name not in titles:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=SPREADSHEET_ID,
+                body={"requests": [{"addSheet": {"properties": {"title": tab_name}}}]}
+            ).execute()
+    except Exception as e:
+        print(f"[Sheets Sync] Ensure tab {tab_name} error: {e}", flush=True)
+
+def sync_vault_to_sheet_async(vault_filename, vault_path):
+    tab_name = CRM_VAULT_TABS.get(vault_filename)
+    if not tab_name:
+        return
+    def _push():
+        try:
+            service = get_sheets_service()
+            if not service or not os.path.exists(vault_path):
+                return
+            _ensure_sheet_tab(service, tab_name)
+            with open(vault_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                return
+            rows = [["id", "json_data"]]
+            for idx, item in enumerate(data):
+                rid = str(item.get("id") or idx) if isinstance(item, dict) else str(idx)
+                rows.append([rid, json.dumps(item, ensure_ascii=False)])
+            service.spreadsheets().values().clear(
+                spreadsheetId=SPREADSHEET_ID, range=f"{tab_name}!A:B"
+            ).execute()
+            service.spreadsheets().values().update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"{tab_name}!A1",
+                valueInputOption="RAW",
+                body={"values": rows}
+            ).execute()
+            print(f"[Sheets Sync] Synced {len(data)} records to {tab_name}!", flush=True)
+        except Exception as e:
+            print(f"[Sheets Sync] Push {tab_name} error: {e}", flush=True)
+    threading.Thread(target=_push, daemon=True).start()
+
+def pull_all_vaults_from_sheet(web_app_dir):
+    try:
+        service = get_sheets_service()
+        if not service:
+            return
+        for vault_file, tab_name in CRM_VAULT_TABS.items():
+            try:
+                _ensure_sheet_tab(service, tab_name)
+                res = service.spreadsheets().values().get(
+                    spreadsheetId=SPREADSHEET_ID, range=f"{tab_name}!A:B"
+                ).execute()
+                vals = res.get("values", [])
+                if len(vals) > 1:
+                    items = []
+                    for row in vals[1:]:
+                        if len(row) >= 2 and row[1]:
+                            items.append(json.loads(row[1]))
+                    if items:
+                        vpath = os.path.join(web_app_dir, vault_file)
+                        with open(vpath, "w", encoding="utf-8") as f:
+                            json.dump(items, f, ensure_ascii=False, indent=2)
+                        print(f"[Sheets Sync] Restored {len(items)} records from {tab_name} -> {vault_file}", flush=True)
+            except Exception as te:
+                print(f"[Sheets Sync] Pull {tab_name} error: {te}", flush=True)
+    except Exception as e:
+        print(f"[Sheets Sync] Pull all vaults error: {e}", flush=True)

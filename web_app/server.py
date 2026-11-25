@@ -30,7 +30,9 @@ try:
     from google_sheets_sync import (
         pull_clients_from_sheet_to_vault,
         push_client_to_sheet_async,
-        start_periodic_sheets_sync
+        start_periodic_sheets_sync,
+        sync_vault_to_sheet_async,
+        pull_all_vaults_from_sheet
     )
 except ImportError:
     try:
@@ -43,6 +45,8 @@ except ImportError:
         pull_clients_from_sheet_to_vault = None
         push_client_to_sheet_async = None
         start_periodic_sheets_sync = None
+        sync_vault_to_sheet_async = None
+        pull_all_vaults_from_sheet = None
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -1932,6 +1936,8 @@ def resolve_gemini_tool_call(func_name, func_args):
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False, indent=2)
+                if sync_vault_to_sheet_async:
+                    sync_vault_to_sheet_async(os.path.basename(path), path)
                 return True
             except Exception as e:
                 print(f"[VAULT WRITE ERROR] {path}: {e}")
@@ -7716,6 +7722,8 @@ def start_server():
         vault_path = os.path.join(DATA_DIR, "clients_vault.json")
         try:
             start_periodic_sheets_sync(vault_path, interval_sec=180)
+            if pull_all_vaults_from_sheet:
+                threading.Thread(target=pull_all_vaults_from_sheet, args=(DATA_DIR,), daemon=True).start()
             print("[Sheets Sync] Auto-sync background thread started successfully.", flush=True)
         except Exception as e:
             print(f"[Sheets Sync] Warning starting sync thread: {e}", flush=True)
