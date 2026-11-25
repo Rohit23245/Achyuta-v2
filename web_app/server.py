@@ -7306,9 +7306,12 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                             func_calls = [p["functionCall"] for p in parts if "functionCall" in p]
 
                         # Check if model provided natural text response
-                        text_parts = [p["text"] for p in parts if "text" in p]
+                        text_parts = [p["text"] for p in parts if "text" in p and not p.get("thought")]
                         if text_parts and not func_calls:
                             reply = " ".join(text_parts)
+                            break
+                        if not text_parts and not func_calls:
+                            reply = "Haan ji! Main aapki Achyuta AI Copilot hoon—main aapke Clients, Tasks, Invoices, Proposals, Staff, Meetings aur Accounts sab manage kar sakti hoon, aur aap mujhse koi bhi business ya general sawaal pooch sakte hain. Batayiye aaj kya madad karoon?"
                             break
 
                         # If model requested further tools, execute them
