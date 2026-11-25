@@ -206,6 +206,7 @@ def start_periodic_sheets_sync(clients_vault_path, interval_sec=180):
 
 
 CRM_VAULT_TABS = {
+    "clients_vault.json": "CRM_Clients",
     "tasks_vault.json": "CRM_Tasks",
     "accounts_vault.json": "CRM_Accounts",
     "invoices_vault.json": "CRM_Invoices",
