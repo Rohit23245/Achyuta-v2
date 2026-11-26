@@ -71,6 +71,8 @@ from googleapiclient.discovery import build
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 GOOGLE_CREDENTIALS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "credentials.json")
+if not os.path.exists(GOOGLE_CREDENTIALS_FILE) and os.path.exists("/etc/secrets/credentials.json"):
+    GOOGLE_CREDENTIALS_FILE = "/etc/secrets/credentials.json"
 GOOGLE_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "token.json")
 GOOGLE_SCOPES = [
     'https://www.googleapis.com/auth/calendar',
