@@ -164,9 +164,9 @@ PORT = 5000
 # ---------------------------------------------------------
 # VOBIZ AI CALLING AGENT INTEGRATION (EXACT 1:1 REPLICATION)
 # ---------------------------------------------------------
-VOBIZ_AUTH_ID = 'MA_02TGXRN3'
-VOBIZ_AUTH_TOKEN = 'bZXmXWFGlSTOGrBCbT5CSdJ253tHzrSHoiLabx6UKsTVrPQ53iCsrrwv8ZeUgEe8'
-VOBIZ_DID_NUMBER = '+918065354620'
+VOBIZ_AUTH_ID = 'MA_Q6Z4A5RF'
+VOBIZ_AUTH_TOKEN = 'wiThrryqX5BLWGxBkRJ8YP2VewSqGYUcmI9j3j5wxu7q76vYFyruFPdU61dyoT0S'
+VOBIZ_DID_NUMBER = '+918064264631'
 VOBIZ_TRIGGER_URL = 'https://kavyatraders.in/trigger-call'
 CALL_LOGS_PATH = os.path.join(DATA_DIR, "call_logs_vault.json")
 CALLING_SCRIPT_CONFIG_PATH = os.path.join(DATA_DIR, "calling_script_config.json")
@@ -5422,7 +5422,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 combined_recs.append({
                     "id": l.get("id"),
                     "call_uuid": l.get("call_uuid"),
-                    "from_number": "+918065354620",
+                    "from_number": "+918064264631",
                     "to_number": l.get("customer_phone"),
                     "customer_name": l.get("customer_name", "Customer"),
                     "duration": l.get("duration_seconds") or 35,

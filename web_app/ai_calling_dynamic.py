@@ -100,8 +100,8 @@ PORT = 5000
 # ---------------------------------------------------------
 # VOBIZ AI CALLING AGENT INTEGRATION (EXACT 1:1 REPLICATION)
 # ---------------------------------------------------------
-VOBIZ_AUTH_ID = 'MA_02TGXRN3'
-VOBIZ_AUTH_TOKEN = 'bZXmXWFGlSTOGrBCbT5CSdJ253tHzrSHoiLabx6UKsTVrPQ53iCsrrwv8ZeUgEe8'
+VOBIZ_AUTH_ID = 'MA_Q6Z4A5RF'
+VOBIZ_AUTH_TOKEN = 'wiThrryqX5BLWGxBkRJ8YP2VewSqGYUcmI9j3j5wxu7q76vYFyruFPdU61dyoT0S'
 VOBIZ_TRIGGER_URL = 'https://kavyatraders.in/trigger-call'
 CALL_LOGS_PATH = os.path.join(DATA_DIR, "call_logs_vault.json")
 
