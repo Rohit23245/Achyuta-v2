@@ -4175,13 +4175,12 @@ def handle_vobiz_stream_ws(handler, query_params):
                         })
                         append_call_dialog_turn(call_id, "bot", first_msg)
 
-                    # 1. Warm Greeting Delivered Immediately on Pickup via <Speak> or playAudio
-                    if "skip_greeting=1" not in path:
-                        print(f"[Vobiz Stream] Playing initial greeting to caller: '{first_msg}'", flush=True)
-                        state = "DELIVERING_RESPONSE"
-                        greeting_pcm = get_pcm24_from_text(first_msg)
-                        if greeting_pcm:
-                            stream_audio_bytes(greeting_pcm)
+                    # 1. Warm Greeting Delivered Immediately on Pickup via playAudio
+                    print(f"[Vobiz Stream] Playing initial greeting to caller: '{first_msg}'", flush=True)
+                    state = "DELIVERING_RESPONSE"
+                    greeting_pcm = get_pcm24_from_text(first_msg)
+                    if greeting_pcm:
+                        stream_audio_bytes(greeting_pcm)
 
                     # 2. After playing initial greeting, unlock ear to listen for caller
                     state = "LISTENING_FOR_SPEECH"
