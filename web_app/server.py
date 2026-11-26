@@ -352,16 +352,11 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     enc_intent = urllib.parse.quote(intent_text)
     enc_inst = urllib.parse.quote(inst_text)
     
-    ws_stream_url = f"wss://achyuta-v2.onrender.com/ws?customer_name={enc_cust}&amp;phone={enc_phone}&amp;custom_message={enc_msg}&amp;response_intent={enc_intent}&amp;agent_instructions={enc_inst}"
+    ws_stream_url = f"wss://achyuta-v2.onrender.com/ws?customer_name={enc_cust}&amp;phone={enc_phone}&amp;custom_message={enc_msg}&amp;response_intent={enc_intent}&amp;agent_instructions={enc_inst}&amp;skip_greeting=1"
     
-    # Vobiz Official Real-Time Conversational Voice Stream:
-    # 1. Bidirectional WebSocket stream connects to wss://achyuta-v2.onrender.com/ws
-    # 2. Agent delivers first message (Aoede natural voice) via playAudio frames
-    # 3. Agent strictly listens to caller audio and waits for true human speech (VAD / Energy detection)
-    # 4. Initial silence / blank noise is ignored
-    # 5. Only after caller speaks and completes, agent delivers second response intent
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+    <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">{ws_stream_url}</Stream>
 </Response>"""
     return xml
@@ -4176,12 +4171,13 @@ def handle_vobiz_stream_ws(handler, query_params):
                         })
                         append_call_dialog_turn(call_id, "bot", first_msg)
 
-                    # 1. Warm Greeting Delivered Immediately on Pickup via playAudio
-                    print(f"[Vobiz Stream] Playing initial greeting to caller: '{first_msg}'", flush=True)
-                    state = "DELIVERING_RESPONSE"
-                    greeting_pcm = get_pcm24_from_text(first_msg)
-                    if greeting_pcm:
-                        stream_audio_bytes(greeting_pcm)
+                    # 1. Warm Greeting Delivered Immediately on Pickup via <Speak> or playAudio
+                    if "skip_greeting=1" not in path:
+                        print(f"[Vobiz Stream] Playing initial greeting to caller: '{first_msg}'", flush=True)
+                        state = "DELIVERING_RESPONSE"
+                        greeting_pcm = get_pcm24_from_text(first_msg)
+                        if greeting_pcm:
+                            stream_audio_bytes(greeting_pcm)
 
                     # 2. After playing initial greeting, unlock ear to listen for caller
                     state = "LISTENING_FOR_SPEECH"
