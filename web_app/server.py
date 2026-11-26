@@ -339,6 +339,7 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
 
     speech_text = speech_text.replace("{customer_name}", customer_name).replace("{company_name}", comp_name).replace("{agent_name}", agent_name)
     safe_speech = html.escape(speech_text)
+    threading.Thread(target=get_pcm24_from_text, args=(speech_text,), daemon=True).start()
 
     # 2. Second Response Intent & Custom Instructions
     intent_text = str(response_intent or cfg.get("second_response_intent") or "").strip()
