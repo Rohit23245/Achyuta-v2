@@ -256,7 +256,12 @@ def sync_vault_to_sheet_async(vault_filename, vault_path):
             rows = [["id", "json_data"]]
             for idx, item in enumerate(data):
                 rid = str(item.get("id") or idx) if isinstance(item, dict) else str(idx)
-                rows.append([rid, json.dumps(item, ensure_ascii=False)])
+                serialized = json.dumps(item, ensure_ascii=False)
+                # Guard against Google Sheets 50,000-character per-cell limit
+                if len(serialized) > 48000 and isinstance(item, dict) and "custom_html" in item:
+                    compact_item = {k: v for k, v in item.items() if k != "custom_html"}
+                    serialized = json.dumps(compact_item, ensure_ascii=False)
+                rows.append([rid, serialized])
             service.spreadsheets().values().clear(
                 spreadsheetId=SHEET_ID, range=f"{tab_name}!A:B"
             ).execute()

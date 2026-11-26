@@ -47,6 +47,23 @@ except ImportError:
         start_periodic_sheets_sync = None
         sync_vault_to_sheet_async = None
         pull_all_vaults_from_sheet = None
+try:
+    from ai_doc_designer import (
+        generate_custom_document_html,
+        load_saved_custom_html,
+        save_custom_html_to_disk,
+    )
+except ImportError:
+    try:
+        from web_app.ai_doc_designer import (
+            generate_custom_document_html,
+            load_saved_custom_html,
+            save_custom_html_to_disk,
+        )
+    except ImportError:
+        generate_custom_document_html = None
+        load_saved_custom_html = None
+        save_custom_html_to_disk = None
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -754,6 +771,70 @@ def load_gemini_api_key():
 
 AI_API_KEY = load_gemini_api_key()
 AI_MODEL = "gemini-flash-lite-latest"
+
+
+def _load_company_settings():
+    settings_file = os.path.join(DATA_DIR, "company_settings.json")
+    if os.path.exists(settings_file):
+        try:
+            with open(settings_file, "r", encoding="utf-8") as sf:
+                return json.load(sf)
+        except Exception:
+            pass
+    return {}
+
+
+def _apply_ai_document_design(doc_record, design_style=None, custom_instructions=None):
+    """Generates bespoke LLM HTML for a proposal or invoice and attaches it to the record."""
+    if not generate_custom_document_html or not isinstance(doc_record, dict):
+        return False, None
+    comp_settings = _load_company_settings()
+    html_code, theme_label = generate_custom_document_html(
+        doc_record,
+        comp_settings=comp_settings,
+        design_style=design_style,
+        custom_instructions=custom_instructions,
+        api_key=AI_API_KEY,
+    )
+    if html_code:
+        doc_record["ai_designed"] = True
+        doc_record["design_theme"] = theme_label
+        doc_record["ai_designed_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        doc_record["custom_html"] = html_code
+        return True, theme_label
+    return False, None
+
+
+def _strip_heavy_doc_fields(doc_record):
+    """Returns a lightweight copy of an invoice/proposal without raw HTML payload for list APIs."""
+    if not isinstance(doc_record, dict):
+        return doc_record
+    copy_rec = {k: v for k, v in doc_record.items() if k != "custom_html"}
+    copy_rec["has_custom_html"] = bool(
+        doc_record.get("custom_html")
+        or (load_saved_custom_html and load_saved_custom_html(doc_record))
+    )
+    return copy_rec
+
+
+def _get_or_generate_doc_html(doc_record, invoices_list, invoices_file, force_regenerate=False, design_style=None):
+    """Loads existing LLM-designed HTML or generates + persists it on demand."""
+    if not force_regenerate and load_saved_custom_html:
+        existing = load_saved_custom_html(doc_record)
+        if existing:
+            return existing
+    ok, _ = _apply_ai_document_design(doc_record, design_style=design_style)
+    if ok:
+        with file_lock:
+            try:
+                with open(invoices_file, "w", encoding="utf-8") as f:
+                    json.dump(invoices_list, f, ensure_ascii=False, indent=2)
+                if sync_vault_to_sheet_async:
+                    sync_vault_to_sheet_async("invoices_vault.json", invoices_file)
+            except Exception:
+                pass
+        return doc_record.get("custom_html")
+    return None
 
 
 def execute_agent_database_operation(prompt):
@@ -1590,7 +1671,7 @@ GEMINI_CRM_TOOLS = [
             # 5. INVOICES & BILLING CRUD
             {
                 "name": "create_invoice",
-                "description": "Generates and records a new client Invoice or Quotation in Invoices Vault (invoices_vault.json).",
+                "description": "Generates and records a new client Invoice or Quotation in Invoices Vault (invoices_vault.json) with a unique AI-designed custom HTML page.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
@@ -1599,14 +1680,16 @@ GEMINI_CRM_TOOLS = [
                         "type": {"type": "STRING", "description": "'Invoice' (default) or 'Quotation'"},
                         "status": {"type": "STRING", "description": "'Pending' (default) or 'Paid'"},
                         "description": {"type": "STRING", "description": "Professional English description of services"},
-                        "due_date": {"type": "STRING", "description": "Due date (YYYY-MM-DD)"}
+                        "due_date": {"type": "STRING", "description": "Due date (YYYY-MM-DD)"},
+                        "design_style": {"type": "STRING", "description": "Optional creative visual theme requested by user (e.g. 'Dark Luxury Gold', 'Swiss Minimalist', 'Emerald Studio')"},
+                        "custom_instructions": {"type": "STRING", "description": "Optional custom layout, branding, or section instructions for the AI page designer"}
                     },
                     "required": ["client_name", "amount"]
                 }
             },
             {
                 "name": "update_invoice",
-                "description": "Updates or edits an existing proposal or invoice (change title/heading/description, amount, payment status, or client name). Always call this tool when user asks to update, edit, shorten, or change the heading, title, or price of a proposal/invoice.",
+                "description": "Updates or edits an existing proposal or invoice (change title/heading/description, amount, payment status, client name, or regenerate a fresh AI page design). Always call this tool when user asks to update, edit, shorten, redesign, or change the look, heading, title, or price of a proposal/invoice.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
@@ -1614,7 +1697,10 @@ GEMINI_CRM_TOOLS = [
                         "new_amount": {"type": "NUMBER", "description": "Updated amount in INR"},
                         "new_status": {"type": "STRING", "description": "'Paid', 'Pending', or 'Cancelled'"},
                         "new_client_name": {"type": "STRING", "description": "Updated client name"},
-                        "description": {"type": "STRING", "description": "Updated title, heading, or description of services (e.g. 'Meta Ads Management & Growth Campaign')"}
+                        "description": {"type": "STRING", "description": "Updated title, heading, or description of services (e.g. 'Meta Ads Management & Growth Campaign')"},
+                        "regenerate_design": {"type": "BOOLEAN", "description": "Set true when user asks to redesign, refresh, or change the visual template/layout of the proposal or invoice"},
+                        "design_style": {"type": "STRING", "description": "Optional new visual style/theme for the redesigned page"},
+                        "custom_instructions": {"type": "STRING", "description": "Optional custom design instructions"}
                     }
                 }
             },
@@ -2598,6 +2684,8 @@ def resolve_gemini_tool_call(func_name, func_args):
         status = str(func_args.get("status") or "Pending").strip().title()
         desc = str(func_args.get("description") or "Professional Business Consultation").strip()
         due = str(func_args.get("due_date") or datetime.now().strftime("%Y-%m-%d")).strip()
+        design_style = func_args.get("design_style")
+        custom_instructions = func_args.get("custom_instructions")
 
         is_proposal = inv_type in ["Quotation", "Proposal", "Quote"]
         prefix = "PROP-" if is_proposal else "INV-"
@@ -2617,17 +2705,22 @@ def resolve_gemini_tool_call(func_name, func_args):
             "invoice_link": view_link,
             "proposal_link": view_link if is_proposal else f"https://achyuta.smartbharattech.com/proposal/{inv_id_val}"
         }
+        ai_ok, theme_label = _apply_ai_document_design(
+            new_inv, design_style=design_style, custom_instructions=custom_instructions
+        )
         invoices.insert(0, new_inv)
         write_vault(INVOICES_VAULT_PATH, invoices)
         doc_label = "Proposal" if is_proposal else "Invoice"
+        theme_note = f" (AI Custom Design: {theme_label})" if ai_ok and theme_label else ""
         return {
             "success": True,
             "action_executed": True,
             "action_type": "create_invoice",
-            "invoice": new_inv,
+            "invoice": _strip_heavy_doc_fields(new_inv),
             "invoice_link": view_link,
             "proposal_link": view_link if is_proposal else None,
-            "message": f"{doc_label} {new_inv['id']} of ₹{amt:,.2f} generated for {client_name}. Live Link: {view_link}"
+            "design_theme": theme_label,
+            "message": f"{doc_label} {new_inv['id']} of ₹{amt:,.2f} generated for {client_name}{theme_note}. Live Link: {view_link}"
         }
 
     elif func_name == "update_invoice":
@@ -2636,6 +2729,9 @@ def resolve_gemini_tool_call(func_name, func_args):
         new_status = func_args.get("new_status")
         new_client = func_args.get("new_client_name")
         new_desc = func_args.get("description")
+        regen_design = bool(func_args.get("regenerate_design", False))
+        design_style = func_args.get("design_style")
+        custom_instructions = func_args.get("custom_instructions")
 
         invoices = read_vault(INVOICES_VAULT_PATH)
         target = None
@@ -2655,19 +2751,43 @@ def resolve_gemini_tool_call(func_name, func_args):
                 target = invoices[0]
 
         if target:
+            data_changed = False
             if new_amt is not None:
-                try: target["amount"] = float(new_amt)
+                try:
+                    target["amount"] = float(new_amt)
+                    target["subtotal"] = float(new_amt)
+                    gst_r = float(target.get("gst_rate") if target.get("gst_rate") is not None else 18)
+                    target["gst_amount"] = round((float(new_amt) * gst_r) / 100.0, 2)
+                    target["total_amount"] = round(float(new_amt) + target["gst_amount"], 2)
+                    target["total"] = target["total_amount"]
+                    data_changed = True
                 except: pass
-            if new_status: target["status"] = str(new_status).strip().title()
-            if new_client: target["client_name"] = str(new_client).strip().title()
-            if new_desc: target["description"] = str(new_desc).strip()
+            if new_status:
+                target["status"] = str(new_status).strip().title()
+                data_changed = True
+            if new_client:
+                target["client_name"] = str(new_client).strip().title()
+                data_changed = True
+            if new_desc:
+                target["description"] = str(new_desc).strip()
+                data_changed = True
+
+            theme_label = target.get("design_theme")
+            if regen_design or design_style or custom_instructions or data_changed:
+                ai_ok, new_theme = _apply_ai_document_design(
+                    target, design_style=design_style, custom_instructions=custom_instructions
+                )
+                if ai_ok and new_theme:
+                    theme_label = new_theme
+
             write_vault(INVOICES_VAULT_PATH, invoices)
             return {
                 "success": True,
                 "action_executed": True,
                 "action_type": "update_invoice",
-                "invoice": target,
-                "message": f"Invoice {target.get('id')} ({target.get('client_name')}) updated successfully."
+                "invoice": _strip_heavy_doc_fields(target),
+                "design_theme": theme_label,
+                "message": f"Document {target.get('id')} ({target.get('client_name')}) updated successfully" + (f" with AI theme '{theme_label}'." if theme_label else ".")
             }
         return {"success": False, "error": f"Invoice matching '{query}' not found."}
 
@@ -3303,7 +3423,7 @@ class SystemPromptGatekeeper:
         "- ACCOUNTS LEDGER: 'record_financial_transaction', 'update_financial_transaction', 'delete_financial_transaction', 'get_financial_transactions'.\n"
         "- TASKS & OPERATIONS: 'create_task', 'update_task', 'update_task_status', 'delete_task', 'get_tasks'.\n"
         "- SALARY & PAYROLL: 'pay_staff_salary', 'update_salary_record', 'delete_salary_record', 'get_salary_records'.\n"
-        "- INVOICES & PROPOSALS / BILLING: 'create_invoice' (use type='Quotation' for proposals, quotations, and estimates; type='Invoice' for tax invoices), 'update_invoice' (use to update price, amount, title, heading, or description of any proposal/invoice; when user says 'heading change karo', 'title chhota karo', or 'price edit karo', ALWAYS call 'update_invoice' with new description/amount), 'delete_invoice' (to delete an invoice or all invoices), 'delete_proposal' (to delete a specific proposal or all proposals: use proposal_id='all' when user asks 'sare proposals delete kar do'), 'get_invoices'.\n"
+        "- INVOICES & PROPOSALS / BILLING: 'create_invoice' (use type='Quotation' for proposals, quotations, and estimates; type='Invoice' for tax invoices; automatically generates a unique AI-designed creative web page—pass 'design_style' if user requests a specific aesthetic), 'update_invoice' (use to update price, amount, title, heading, description, or pass regenerate_design=True with optional design_style when user says 'design change karo', 'naye look me banao', or 'redesign karo'), 'delete_invoice' (to delete an invoice or all invoices), 'delete_proposal' (to delete a specific proposal or all proposals: use proposal_id='all' when user asks 'sare proposals delete kar do'), 'get_invoices'.\n"
         "- STAFF DIRECTORY: 'add_staff_member', 'update_staff_member', 'delete_staff_member', 'get_staff_members'.\n"
         "- MEETINGS & CALENDAR: 'schedule_meeting', 'update_meeting', 'delete_meeting', 'get_meetings'.\n"
         "- REMINDERS: 'add_reminder', 'toggle_reminder', 'delete_reminder', 'get_reminders'.\n"
@@ -4307,7 +4427,13 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/proposal/"):
-            prop_id = self.path[10:].split('?')[0].strip()
+            parsed_url = urllib.parse.urlparse(self.path)
+            parsed_qs = urllib.parse.parse_qs(parsed_url.query)
+            prop_id = parsed_url.path[10:].strip()
+            classic_mode = parsed_qs.get("classic", ["0"])[0] == "1"
+            force_regen = parsed_qs.get("regenerate", ["0"])[0] == "1"
+            req_style = parsed_qs.get("style", [None])[0]
+
             invoices_file = os.path.join(DATA_DIR, "invoices_vault.json")
             invoices = []
             if os.path.exists(invoices_file):
@@ -4329,7 +4455,18 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(b"<!DOCTYPE html><html><body style='font-family:sans-serif;background:#050505;color:#e2e8f0;text-align:center;padding:60px;'><h2>Proposal Not Found</h2><p>The requested proposal or quotation does not exist.</p></body></html>")
                 return
 
-            # Read saved proposal / invoice settings if available
+            if not classic_mode:
+                ai_html = _get_or_generate_doc_html(
+                    prop, invoices, invoices_file, force_regenerate=force_regen, design_style=req_style
+                )
+                if ai_html:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(ai_html.encode("utf-8"))
+                    return
+
+            # Read saved proposal / invoice settings if available (classic fallback)
             settings_file = os.path.join(DATA_DIR, "company_settings.json")
             comp_settings = {}
             if os.path.exists(settings_file):
@@ -4838,7 +4975,13 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/invoice/"):
-            inv_id = self.path[9:].split('?')[0].strip()
+            parsed_url = urllib.parse.urlparse(self.path)
+            parsed_qs = urllib.parse.parse_qs(parsed_url.query)
+            inv_id = parsed_url.path[9:].strip()
+            classic_mode = parsed_qs.get("classic", ["0"])[0] == "1"
+            force_regen = parsed_qs.get("regenerate", ["0"])[0] == "1"
+            req_style = parsed_qs.get("style", [None])[0]
+
             invoices_file = os.path.join(DATA_DIR, "invoices_vault.json")
             invoices = []
             if os.path.exists(invoices_file):
@@ -4859,6 +5002,17 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;padding:50px;'><h2>Invoice Not Found</h2><p>The requested invoice does not exist.</p></body></html>")
                 return
+
+            if not classic_mode:
+                ai_html = _get_or_generate_doc_html(
+                    inv, invoices, invoices_file, force_regenerate=force_regen, design_style=req_style
+                )
+                if ai_html:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(ai_html.encode("utf-8"))
+                    return
 
             subtotal = float(inv.get("amount") or 0.0)
             gst_rate = float(inv.get("gst_rate", 18))
@@ -5513,7 +5667,8 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                         items = json.load(f)
                 except:
                     pass
-            self.wfile.write(json.dumps(items).encode("utf-8"))
+            lightweight_items = [_strip_heavy_doc_fields(it) for it in items]
+            self.wfile.write(json.dumps(lightweight_items).encode("utf-8"))
             return
         elif self.path == "/api/company_settings":
             self.send_response(200)
@@ -6808,21 +6963,81 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             is_prop = rec.get("type") in ["Quotation", "Quote", "Proposal"]
             prefix = "PROP-" if is_prop else "INV-"
             rec["id"] = prefix + str(int(time.time()))[-4:]
+            if "amount" not in rec and "subtotal" in rec:
+                rec["amount"] = rec["subtotal"]
+            if not rec.get("date") and rec.get("invoice_date"):
+                rec["date"] = rec["invoice_date"]
             if is_prop:
                 rec["proposal_link"] = f"https://achyuta.smartbharattech.com/proposal/{rec['id']}"
                 rec["invoice_link"] = rec["proposal_link"]
             else:
                 rec["invoice_link"] = f"https://achyuta.smartbharattech.com/invoice/{rec['id']}"
+
+            design_style = rec.pop("design_style", None)
+            custom_instructions = rec.pop("custom_instructions", None)
+            skip_ai = bool(rec.pop("skip_ai_design", False))
+            if not skip_ai:
+                _apply_ai_document_design(rec, design_style=design_style, custom_instructions=custom_instructions)
+
             items.insert(0, rec)
-            try:
-                with open(fpath, "w", encoding="utf-8") as f:
-                    json.dump(items, f, ensure_ascii=False, indent=2)
-            except:
-                pass
+            with file_lock:
+                try:
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        json.dump(items, f, ensure_ascii=False, indent=2)
+                    if sync_vault_to_sheet_async:
+                        sync_vault_to_sheet_async("invoices_vault.json", fpath)
+                except:
+                    pass
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps({"success": True, "invoice": rec}).encode("utf-8"))
+            self.wfile.write(json.dumps({"success": True, "invoice": _strip_heavy_doc_fields(rec)}).encode("utf-8"))
+            return
+
+        elif self.path == "/api/invoices/regenerate_design":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            req_data = json.loads(body)
+            doc_id = str(req_data.get("id") or "").strip()
+            design_style = req_data.get("design_style")
+            custom_instructions = req_data.get("custom_instructions")
+            fpath = os.path.join(DATA_DIR, "invoices_vault.json")
+            items = []
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                except:
+                    pass
+            target = next((it for it in items if str(it.get("id", "")).lower() == doc_id.lower()), None)
+            if not target:
+                self.send_response(404)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "Document not found"}).encode("utf-8"))
+                return
+
+            ai_ok, theme_label = _apply_ai_document_design(
+                target, design_style=design_style, custom_instructions=custom_instructions
+            )
+            if ai_ok:
+                with file_lock:
+                    try:
+                        with open(fpath, "w", encoding="utf-8") as f:
+                            json.dump(items, f, ensure_ascii=False, indent=2)
+                        if sync_vault_to_sheet_async:
+                            sync_vault_to_sheet_async("invoices_vault.json", fpath)
+                    except:
+                        pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": bool(ai_ok),
+                "theme": theme_label,
+                "invoice": _strip_heavy_doc_fields(target),
+                "error": None if ai_ok else "LLM design generation failed or quota reached; existing fallback remains active."
+            }).encode("utf-8"))
             return
 
         elif self.path == "/api/company_settings/save":
