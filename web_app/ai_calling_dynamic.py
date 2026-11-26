@@ -3522,7 +3522,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 self.send_response(404)
                 self.end_headers()
                 return
-        if self.path == "/" or self.path == "/index.html":
+        if urllib.parse.urlparse(self.path).path in ("/", "/index.html"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()

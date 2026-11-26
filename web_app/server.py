@@ -5162,7 +5162,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 self.send_response(404)
                 self.end_headers()
                 return
-        if self.path == "/" or self.path == "/index.html":
+        if urllib.parse.urlparse(self.path).path in ("/", "/index.html"):
             file_path = os.path.join(DATA_DIR, "index.html")
             with open(file_path, "rb") as f:
                 content = f.read()
