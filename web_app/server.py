@@ -5174,6 +5174,58 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
             self.wfile.write(content)
             return
 
+        elif urllib.parse.urlparse(self.path).path == "/privacy-policy":
+            html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Achyuta</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1f2937; background: #f9fafb; }
+    .card { background: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    h1 { font-size: 26px; margin-bottom: 8px; color: #111827; }
+    h2 { font-size: 18px; margin-top: 24px; margin-bottom: 8px; color: #111827; }
+    p, li { font-size: 15px; color: #374151; }
+    .muted { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+    a { color: #0d9488; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Privacy Policy</h1>
+    <p class="muted">Effective Date: November 26, 2026 &bull; Application: Achyuta (achyuta.smartbharattech.com)</p>
+    <p>Achyuta ("we", "our", or "us") provides a business operations, CRM, task management, and AI-assisted communication platform. This Privacy Policy explains how we collect, use, and protect your information when you use our web application and Google OAuth integration.</p>
+    <h2>1. Information We Collect</h2>
+    <ul>
+      <li><strong>Google Account Information:</strong> When you sign in with Google, we receive your basic profile information (name, email address, and profile picture) to identify your account.</li>
+      <li><strong>Google Workspace Data (Calendar &amp; Sheets):</strong> With your explicit consent, we access Google Calendar events and Google Sheets data solely to display, schedule, and sync your business meetings and records inside Achyuta.</li>
+      <li><strong>Operational Data:</strong> Business records, client notes, tasks, and call/message logs that you or your organization enter into Achyuta.</li>
+    </ul>
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>To authenticate your identity and maintain your session.</li>
+      <li>To sync meetings, reminders, and spreadsheet records requested by you.</li>
+      <li>To provide, maintain, and improve Achyuta's CRM and workflow features.</li>
+    </ul>
+    <h2>3. Data Sharing &amp; Storage</h2>
+    <p>We do not sell, rent, or trade your personal or Google user data to third parties. OAuth tokens and application data are stored securely and used strictly to operate the features you authorize. We comply with the Google API Services User Data Policy, including the Limited Use requirements.</p>
+    <h2>4. Data Retention &amp; Deletion</h2>
+    <p>You may revoke Achyuta's access to your Google account at any time from your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account Permissions</a> page. You may also request deletion of your stored data by contacting us.</p>
+    <h2>5. Contact Us</h2>
+    <p>If you have any questions about this Privacy Policy, please contact us at <a href="mailto:aman9572117523@gmail.com">aman9572117523@gmail.com</a>.</p>
+    <p style="margin-top: 28px;"><a href="/">&larr; Back to Achyuta</a></p>
+  </div>
+</body>
+</html>"""
+            content = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+            return
+
         elif self.path == "/api/google/oauth2start":
             try:
                 flow = Flow.from_client_secrets_file(
