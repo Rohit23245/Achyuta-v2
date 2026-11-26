@@ -5181,11 +5181,15 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                     scopes=GOOGLE_SCOPES,
                     redirect_uri='https://achyuta.smartbharattech.com/api/google/oauth2callback'
                 )
-                auth_url, _ = flow.authorization_url(
+                auth_url, state = flow.authorization_url(
                     access_type='offline',
                     include_granted_scopes='true',
                     prompt='consent'
                 )
+                if not hasattr(self.server, '_oauth_code_verifiers'):
+                    self.server._oauth_code_verifiers = {}
+                if getattr(flow, 'code_verifier', None):
+                    self.server._oauth_code_verifiers[state] = flow.code_verifier
                 self.send_response(302)
                 self.send_header('Location', auth_url)
                 self.end_headers()
@@ -5201,6 +5205,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 parsed_url = urllib.parse.urlparse(self.path)
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 code = query_params.get('code', [None])[0]
+                state = query_params.get('state', [None])[0]
 
                 if not code:
                     raise Exception("No authorization code returned from Google.")
@@ -5210,6 +5215,9 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                     scopes=GOOGLE_SCOPES,
                     redirect_uri='https://achyuta.smartbharattech.com/api/google/oauth2callback'
                 )
+                verifiers = getattr(self.server, '_oauth_code_verifiers', {})
+                if state and state in verifiers:
+                    flow.code_verifier = verifiers.pop(state)
                 flow.fetch_token(code=code)
                 credentials = flow.credentials
 
