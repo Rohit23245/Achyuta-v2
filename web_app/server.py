@@ -3891,6 +3891,11 @@ def get_pcm24_from_text(text):
         print(f"[Vobiz Stream] Error generating/caching PCM for text '{text[:20]}': {e}", flush=True)
     return None
 
+try:
+    threading.Thread(target=get_pcm24_from_text, args=("Namaste! Main Achyuta se baat kar raha hoon.",), daemon=True).start()
+except Exception:
+    pass
+
 def handle_web_live_voice_ws(handler, query_params):
     """
     Direct Browser Web Audio-to-Audio Live Streaming Endpoint (/ws/live_audio).
