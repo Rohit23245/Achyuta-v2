@@ -352,11 +352,10 @@ def generate_vobiz_call_xml(customer_name="Rohit", phone="", custom_message="", 
     enc_intent = urllib.parse.quote(intent_text)
     enc_inst = urllib.parse.quote(inst_text)
     
-    ws_stream_url = f"wss://achyuta-v2.onrender.com/ws?customer_name={enc_cust}&amp;phone={enc_phone}&amp;custom_message={enc_msg}&amp;response_intent={enc_intent}&amp;agent_instructions={enc_inst}&amp;skip_greeting=1"
+    ws_stream_url = f"wss://achyuta-v2.onrender.com/ws?customer_name={enc_cust}&amp;phone={enc_phone}&amp;custom_message={enc_msg}&amp;response_intent={enc_intent}&amp;agent_instructions={enc_inst}"
     
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Speak voice="{voice}" language="{lang}">{safe_speech}</Speak>
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=16000" statusCallbackUrl="https://achyuta-v2.onrender.com/stream-status" statusCallbackMethod="POST">{ws_stream_url}</Stream>
 </Response>"""
     return xml
