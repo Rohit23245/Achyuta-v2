@@ -3442,7 +3442,7 @@ class SystemPromptGatekeeper:
         "- STEP 1: Always execute the core action first ('create_invoice' with appropriate type, 'schedule_meeting', or 'create_task').\n"
         "- When creating a Proposal / Quotation, ensure type is 'Quotation'. Live luxury proposal link will be https://achyuta.smartbharattech.com/proposal/<id>.\n"
         "- When creating an Invoice, live invoice link will be https://achyuta.smartbharattech.com/invoice/<id>.\n"
-        "- STEP 2 (WHATSAPP CONFIRMATION): In your reply, confirm the creation with clear details (ID, amount, link) and ALWAYS ask the user: 'Proposal/Invoice create ho gaya hai. Kya main client ko WhatsApp par proposal/invoice link send kar du?'\n"
+        "- STEP 2 (CUSTOMIZATION & WHATSAPP CONFIRMATION): Right after creating or updating a Proposal/Invoice, ALWAYS confirm the details (ID, amount, theme, live link) and explicitly ask the user TWO things in natural Hinglish: (1) 'Kya main isme kuch changes apply kar du (jaise pricing, title, deliverables, ya design style)?' AND (2) 'Ya phir client ko WhatsApp par link send kar du?'\n"
         "- DO NOT send WhatsApp automatically unless the user confirms or says 'send kar do'.\n"
         "- STEP 3 (CALL CONFIRMATION): Once WhatsApp is dispatched, ask separately: 'WhatsApp details send kar di gayi hain. Kya client ko call karke bhi inform kar du?'\n"
         "- Always follow this polite, step-by-step confirmation flow: First WhatsApp, then Call."

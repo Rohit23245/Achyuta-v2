@@ -10,76 +10,52 @@ from datetime import datetime, timedelta
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 GENERATED_DOCS_DIR = os.path.join(DATA_DIR, "generated_docs")
 
-# Curated luxury aesthetic directions rotated dynamically so every proposal/invoice feels bespoke
+# Curated Rich & Premium Corporate World aesthetic directions
 PROPOSAL_DESIGN_THEMES = [
     {
-        "name": "Obsidian & Liquid Gold",
-        "palette": "Deep obsidian charcoal (#09090b) canvas, warm gold (#f59e0b / #d97706) hairline accents, crisp ivory (#f8fafc) typography, glassmorphic cards with 1px subtle borders",
-        "typography": "Outfit for dramatic geometric headings, Plus Jakarta Sans for readable body, JetBrains Mono for pricing & IDs",
-        "layout": "Asymmetric executive cover header, vertical timeline roadmap for deliverables, split investment summary box"
+        "name": "Sovereign Corporate Navy & Champagne Gold",
+        "palette": "Deep executive navy (#0a192f) hero & header band, crisp alabaster (#ffffff) content body, champagne gold (#c5a059 / #b48a3e) hairline borders and section accents, slate-700 (#334155) body text",
+        "typography": "Playfair Display / Cormorant Garamond for authoritative corporate titles, Plus Jakarta Sans for crisp executive copy, JetBrains Mono for tabular pricing & IDs",
+        "layout": "Fortune-500 boardroom dossier: full-width navy executive cover strip, 4-column governance metadata grid, numbered phased deliverables table, gold-bordered investment summary, formal dual-signatory block"
     },
     {
-        "name": "Swiss Editorial Architecture",
-        "palette": "Warm alabaster paper (#fafaf9) background, bold ink black (#111827), vermilion/terracotta (#dc2626) micro-accents, razor-sharp 1px grid dividers",
-        "typography": "Playfair Display or Instrument Serif for editorial headlines paired with Inter and JetBrains Mono",
-        "layout": "Magazine-style 12-column Swiss grid, oversized serif hero title, numbered deliverable matrix, clean bottom signature ledger"
+        "name": "Executive Boardroom Obsidian & Platinum",
+        "palette": "Rich obsidian charcoal (#0c0f14) outer frame, elevated pure white (#ffffff) or pearl (#f8fafc) document sheet, brushed platinum (#64748b) & warm gold (#d97706) micro-accents",
+        "typography": "Outfit for sharp geometric corporate headings, Inter for clean readability, JetBrains Mono for financial figures",
+        "layout": "Private-banker style executive brief with top-right status seal, structured scope & SLA matrix, clear milestone investment breakdown, and crisp signature ledger"
     },
     {
-        "name": "Emerald Sovereign Private Banking",
-        "palette": "Deep forest emerald (#022c22) hero banner transitioning into crisp pearl white (#ffffff) content cards, muted sage (#d1fae5) highlights, champagne gold (#b45309) badges",
-        "typography": "Cormorant Garamond / Outfit headings with Inter body and tabular monospace numbers",
-        "layout": "Two-tone executive dossier with floating KPI strip, milestone investment breakdown cards, formal dual-signatory block"
+        "name": "Private Equity Ivory & Deep Emerald",
+        "palette": "Warm ivory (#fdfcf8) paper surface, deep forest emerald (#064e3b) executive header & primary CTA, burnished bronze (#9a6b2f) thin dividers, charcoal (#111827) ink",
+        "typography": "DM Serif Display for refined corporate headings, Inter for body, JetBrains Mono for numbers",
+        "layout": "Big-4 consulting proposal layout: executive summary callout, 3-phase strategic roadmap cards, transparent GST-compliant investment table, and dual-signatory block"
     },
     {
-        "name": "Midnight Sapphire Fintech",
-        "palette": "Deep navy midnight (#0b1120) with subtle cyan/indigo radial glow, slate-900 (#0f172a) cards, electric teal (#14b8a6) interactive pills",
-        "typography": "Space Grotesk for tech-forward headings, Inter for copy, JetBrains Mono for metrics",
-        "layout": "Modern SaaS pitch-deck style layout with scope cards, ROI/timeline pills, and glowing CTA dock"
-    },
-    {
-        "name": "Warm Ivory & Bronze Atelier",
-        "palette": "Cream linen (#fdfbf7) surface, espresso brown (#1c1917) text, burnished bronze (#a16207) borders and section markers, soft sand (#f5f5f4) callout panels",
-        "typography": "DM Serif Display / Outfit with DM Sans and JetBrains Mono",
-        "layout": "Boutique agency proposal layout with executive letter intro, 3-column scope pillars, transparent cost breakdown"
-    },
-    {
-        "name": "Nordic Minimalist Glass",
-        "palette": "Cool ice slate (#f1f5f9) canvas, pure white frosted cards, Nordic cobalt (#2563eb) and teal (#0d9488) duotone accents, ultra-clean spacing",
+        "name": "Enterprise Architectural Slate & Gold",
+        "palette": "Cool platinum (#f1f5f9) canvas, pure white (#ffffff) elevated sheet with 2px deep slate (#0f172a) top rule, muted gold (#b45309) badges and subtle 1px grid lines",
         "typography": "Plus Jakarta Sans + Inter + JetBrains Mono",
-        "layout": "Linear/Stripe-inspired ultra-crisp layout with status pill bar, horizontal phase progress tracker, sticky-feel summary card"
+        "layout": "Swiss corporate precision grid with KPI-style metadata strip, clean deliverables breakdown, and high-trust payment/acceptance dock"
     }
 ]
 
 INVOICE_DESIGN_THEMES = [
     {
-        "name": "Stripe-Grade Minimalist Ledger",
-        "palette": "Crisp white (#ffffff) sheet on cool slate (#f8fafc) backdrop, deep ink (#0f172a) text, emerald/teal (#0d9488) accent rule and status pill",
+        "name": "Corporate Sovereign Navy & Gold Ledger",
+        "palette": "Crisp white (#ffffff) sheet on cool slate (#f1f5f9) backdrop, deep corporate navy (#0f172a) header bar, champagne gold (#b48a3e) accent rule, emerald (#047857) Paid / amber (#b45309) Pending pill",
         "typography": "Inter with strict tabular-nums + JetBrains Mono for invoice numbers, HSN, and amounts",
-        "layout": "Clean top bar with monochrome brand mark, 4-column metadata strip, high-contrast itemized ledger, right-aligned GST & total box"
+        "layout": "Enterprise tax invoice with monochrome corporate header, 4-column billing metadata strip, high-contrast itemized ledger, right-aligned GST & total box"
     },
     {
-        "name": "Dark Executive Fintech Receipt",
-        "palette": "Charcoal (#09090b) outer frame with elevated zinc-900 (#18181b) invoice card, electric emerald (#10b981) or amber (#f59e0b) status glow, crisp white totals",
-        "typography": "Space Grotesk headings + Inter + JetBrains Mono",
-        "layout": "Sleek fintech statement aesthetic with split From/To cards, subtle zebra-striped item rows, prominent UPI payment dock"
+        "name": "Executive Platinum & Charcoal Statement",
+        "palette": "Elevated pure white (#ffffff) sheet, charcoal (#18181b) 2px top & bottom rules, subtle slate-50 (#f8fafc) zebra rows, teal-emerald (#0d9488) primary Pay CTA",
+        "typography": "Plus Jakarta Sans headings + Inter + JetBrains Mono",
+        "layout": "Big-4 / Stripe-grade precision accounting statement with boxed From/To blocks, HSN/SAC & GST columns, and formal verification footer"
     },
     {
-        "name": "Royal Peacock & Ivory Statement",
-        "palette": "Deep peacock teal (#042f2e) top header block paired with crisp ivory (#ffffff) itemized body, gold (#d97706) thin accent line",
+        "name": "Royal Emerald & Ivory Corporate Voucher",
+        "palette": "Deep emerald (#042f2e) top header block paired with crisp ivory (#ffffff) itemized body, warm gold (#d97706) thin accent line",
         "typography": "Outfit headings + Plus Jakarta Sans + JetBrains Mono",
-        "layout": "Signature header banner, clean boxed billing blocks, structured GST tax breakdown table, formal footer stamp"
-    },
-    {
-        "name": "Architectural Monolith Paper",
-        "palette": "Warm stone (#f5f5f4) background, pure paper white (#ffffff) with sharp 2px black (#18181b) top & bottom borders, vermilion (#e11d48) or cobalt (#2563eb) badge",
-        "typography": "IBM Plex Sans / Inter + JetBrains Mono",
-        "layout": "Precision accounting voucher layout with grid-bordered metadata cells, clear HSN/Tax columns, crisp print-ready proportions"
-    },
-    {
-        "name": "Modern Studio Glass Invoice",
-        "palette": "Soft lavender-slate gradient backdrop (#eef2ff to #f0fdfa), crisp white card with indigo (#4f46e5) and teal (#0d9488) gradient accent strip",
-        "typography": "Plus Jakarta Sans + JetBrains Mono",
-        "layout": "Creative agency billing sheet with rounded pill badges, clean itemized breakdown, interactive UPI & Print action footer"
+        "layout": "Signature corporate header banner, clean boxed billing blocks, structured GST tax breakdown table, formal footer stamp"
     }
 ]
 
