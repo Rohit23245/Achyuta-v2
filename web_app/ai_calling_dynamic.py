@@ -3535,7 +3535,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 flow = Flow.from_client_secrets_file(
                     GOOGLE_CREDENTIALS_FILE,
                     scopes=GOOGLE_SCOPES,
-                    redirect_uri='http://localhost:5000/api/google/oauth2callback'
+                    redirect_uri='https://achyuta.smartbharattech.com/api/google/oauth2callback'
                 )
                 auth_url, _ = flow.authorization_url(
                     access_type='offline',
@@ -3564,7 +3564,7 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 flow = Flow.from_client_secrets_file(
                     GOOGLE_CREDENTIALS_FILE,
                     scopes=GOOGLE_SCOPES,
-                    redirect_uri='http://localhost:5000/api/google/oauth2callback'
+                    redirect_uri='https://achyuta.smartbharattech.com/api/google/oauth2callback'
                 )
                 flow.fetch_token(code=code)
                 credentials = flow.credentials
