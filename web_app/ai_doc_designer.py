@@ -10,52 +10,22 @@ from datetime import datetime, timedelta
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 GENERATED_DOCS_DIR = os.path.join(DATA_DIR, "generated_docs")
 
-# Curated Rich & Premium Corporate World aesthetic directions
+# Approved Simple & Sober Corporate Design Standard (Light-only, Clean Paper Letterhead)
 PROPOSAL_DESIGN_THEMES = [
     {
-        "name": "Sovereign Corporate Navy & Champagne Gold",
-        "palette": "Deep executive navy (#0a192f) hero & header band, crisp alabaster (#ffffff) content body, champagne gold (#c5a059 / #b48a3e) hairline borders and section accents, slate-700 (#334155) body text",
-        "typography": "Playfair Display / Cormorant Garamond for authoritative corporate titles, Plus Jakarta Sans for crisp executive copy, JetBrains Mono for tabular pricing & IDs",
-        "layout": "Fortune-500 boardroom dossier: full-width navy executive cover strip, 4-column governance metadata grid, numbered phased deliverables table, gold-bordered investment summary, formal dual-signatory block"
-    },
-    {
-        "name": "Executive Boardroom Obsidian & Platinum",
-        "palette": "Rich obsidian charcoal (#0c0f14) outer frame, elevated pure white (#ffffff) or pearl (#f8fafc) document sheet, brushed platinum (#64748b) & warm gold (#d97706) micro-accents",
-        "typography": "Outfit for sharp geometric corporate headings, Inter for clean readability, JetBrains Mono for financial figures",
-        "layout": "Private-banker style executive brief with top-right status seal, structured scope & SLA matrix, clear milestone investment breakdown, and crisp signature ledger"
-    },
-    {
-        "name": "Private Equity Ivory & Deep Emerald",
-        "palette": "Warm ivory (#fdfcf8) paper surface, deep forest emerald (#064e3b) executive header & primary CTA, burnished bronze (#9a6b2f) thin dividers, charcoal (#111827) ink",
-        "typography": "DM Serif Display for refined corporate headings, Inter for body, JetBrains Mono for numbers",
-        "layout": "Big-4 consulting proposal layout: executive summary callout, 3-phase strategic roadmap cards, transparent GST-compliant investment table, and dual-signatory block"
-    },
-    {
-        "name": "Enterprise Architectural Slate & Gold",
-        "palette": "Cool platinum (#f1f5f9) canvas, pure white (#ffffff) elevated sheet with 2px deep slate (#0f172a) top rule, muted gold (#b45309) badges and subtle 1px grid lines",
-        "typography": "Plus Jakarta Sans + Inter + JetBrains Mono",
-        "layout": "Swiss corporate precision grid with KPI-style metadata strip, clean deliverables breakdown, and high-trust payment/acceptance dock"
+        "name": "Sober Corporate Letterhead",
+        "palette": "Pure white (#ffffff) sheet on subtle neutral (#f5f5f5) backdrop, 3px solid charcoal (#18181b) top border, muted zinc (#71717a) labels, crisp 1px (#e4e4e7) hairlines, NO dark mode",
+        "typography": "Inter (400, 500, 600, 700) everywhere with font-variant-numeric: tabular-nums (NO monospace)",
+        "layout": "Clean 2-line letterhead header (Company + contact left, PROPOSAL #ID + Status right), crisp title + 2-line executive summary, 4-column hairline metadata row (human-readable dates), clean deliverables table, Commercial Terms left + right-aligned Subtotal/GST/Total, and bottom Footer Action Bar (Download PDF + Accept Proposal)"
     }
 ]
 
 INVOICE_DESIGN_THEMES = [
     {
-        "name": "Corporate Sovereign Navy & Gold Ledger",
-        "palette": "Crisp white (#ffffff) sheet on cool slate (#f1f5f9) backdrop, deep corporate navy (#0f172a) header bar, champagne gold (#b48a3e) accent rule, emerald (#047857) Paid / amber (#b45309) Pending pill",
-        "typography": "Inter with strict tabular-nums + JetBrains Mono for invoice numbers, HSN, and amounts",
-        "layout": "Enterprise tax invoice with monochrome corporate header, 4-column billing metadata strip, high-contrast itemized ledger, right-aligned GST & total box"
-    },
-    {
-        "name": "Executive Platinum & Charcoal Statement",
-        "palette": "Elevated pure white (#ffffff) sheet, charcoal (#18181b) 2px top & bottom rules, subtle slate-50 (#f8fafc) zebra rows, teal-emerald (#0d9488) primary Pay CTA",
-        "typography": "Plus Jakarta Sans headings + Inter + JetBrains Mono",
-        "layout": "Big-4 / Stripe-grade precision accounting statement with boxed From/To blocks, HSN/SAC & GST columns, and formal verification footer"
-    },
-    {
-        "name": "Royal Emerald & Ivory Corporate Voucher",
-        "palette": "Deep emerald (#042f2e) top header block paired with crisp ivory (#ffffff) itemized body, warm gold (#d97706) thin accent line",
-        "typography": "Outfit headings + Plus Jakarta Sans + JetBrains Mono",
-        "layout": "Signature corporate header banner, clean boxed billing blocks, structured GST tax breakdown table, formal footer stamp"
+        "name": "Sober Corporate Invoice",
+        "palette": "Pure white (#ffffff) sheet on subtle neutral (#f5f5f5) backdrop, 3px solid charcoal (#18181b) top border, muted zinc (#71717a) labels, crisp 1px (#e4e4e7) hairlines, NO dark mode",
+        "typography": "Inter (400, 500, 600, 700) everywhere with font-variant-numeric: tabular-nums (NO monospace)",
+        "layout": "Clean 2-line letterhead header (Company + contact left, INVOICE #ID + Status right), 4-column hairline metadata row, clean itemized billing table, Commercial Terms left + right-aligned Subtotal/GST/Total, and bottom Footer Action Bar (Download PDF + Pay via UPI)"
     }
 ]
 
@@ -276,45 +246,31 @@ def generate_custom_document_html(doc_record, comp_settings=None, design_style=N
 
     if ctx["is_proposal"]:
         doc_requirements = f"""
-DOCUMENT TYPE: EXECUTIVE BUSINESS PROPOSAL / QUOTATION
-Build a high-converting, agency-grade commercial proposal web page tailored specifically to the project scope ("{ctx['description']}").
-REQUIRED SECTIONS & INTERACTIVITY:
-1. Executive Header: Brand name ("{ctx['company_name']}"), GSTIN ("{ctx['company_gstin']}"), Contact ("{ctx['company_contact']}"), Document badge "#{ctx['doc_id']}", Status pill ("{ctx['status']}"), plus a working Light/Dark Theme toggle button.
-2. Hero Section: Compelling bespoke headline + executive summary tailored to "{ctx['client_name']}" and "{ctx['description']}" (no generic Lorem Ipsum!).
-3. Metadata Grid: Prepared For ({ctx['client_name']}), Effective Date ({ctx['date']}), Valid Until ({ctx['due_date']}), Engagement ID (#{ctx['doc_id']}).
-4. Tailored Deliverables & Phased Scope: Break down "{ctx['description']}" into 3 to 4 realistic, domain-specific execution phases/milestones whose subtotal values add up cleanly to ₹{ctx['subtotal']:,.2f} (e.g., Phase 1 Discovery/Strategy, Phase 2 Core Build/Execution, Phase 3 QA/Launch/Optimization — customized to the actual service!).
-5. Investment Summary Card:
-   - Subtotal: ₹{ctx['subtotal']:,.2f}
-   - GST ({ctx['gst_rate']:.0f}%): ₹{ctx['gst_amount']:,.2f}
-   - Total Investment (Incl. GST): ₹{ctx['total_amount']:,.2f}
-6. Action Buttons (MUST work):
-   - "Download PDF / Print" button calling `window.print()`
-   - "Accept Proposal & Sign" anchor linking to `{ctx['accept_wa_url']}` (target="_blank")
-7. Digital Signatory Block: "{ctx['company_name']} Authorized Signatory" ({ctx['proposal_signatory']}) and "{ctx['client_name']} — Authorized Client Signature".
+DOCUMENT TYPE: SOBER CORPORATE COMMERCIAL PROPOSAL
+Build an ultra-clean, simple, sober white-paper corporate proposal (NO dark theme, NO theme toggle button, NO flashy gradients, NO signature block).
+REQUIRED STRUCTURE:
+1. Header: 2-line letterhead with `border-top: 3px solid #18181b` on `.page`. Left: "{ctx['company_name']}" + "{ctx['company_contact']} • GSTIN: {ctx['company_gstin']}". Right: "PROPOSAL #{ctx['doc_id']}" + "Status: {ctx['status']}".
+2. Title & Executive Summary: Crisp heading for "{ctx['description']}" + 2-line executive summary tailored to "{ctx['client_name']}"'s business (do NOT repeat "Prepared for..." in the summary).
+3. 4-Column Hairline Metadata Row (`border-top` & `border-bottom: 1px solid #e4e4e7`): Prepared For ({ctx['client_name']}), Date ({ctx['date']}), Valid Until ({ctx['due_date']}), Timeline.
+4. Clean Deliverables Table: Break down "{ctx['description']}" into 3 realistic phases whose amounts sum cleanly to ₹{ctx['subtotal']:,.2f} with columns: Deliverable, Timeline, Amount.
+5. Commercial Terms & Totals (NO bottom border under this section): Left: quiet "Commercial Terms" note. Right: Subtotal (₹{ctx['subtotal']:,.2f}), GST ({ctx['gst_rate']:.0f}%: ₹{ctx['gst_amount']:,.2f}), Total (₹{ctx['total_amount']:,.2f}).
+6. Bottom Footer Action Bar (`border-top: 1px solid #e4e4e7`): Left: "Valid until {ctx['due_date']} • Questions? {ctx['company_contact']}". Right: "Download PDF" (`window.print()`) + "Accept Proposal" (`{ctx['accept_wa_url']}`).
 """
     else:
         pay_cta = (
-            f'<div class="paid-banner">Payment Completed & Verified</div>'
+            f'<span style="font-size:13px;font-weight:600;color:#15803d;">Payment Completed</span>'
             if ctx["is_paid"]
-            else f'An interactive "Pay ₹{ctx["total_amount"]:,.2f} via UPI / Online" anchor linking to `{ctx["upi_url"]}`'
+            else f'<a href="{ctx["upi_url"]}" class="btn-solid">Pay ₹{ctx["total_amount"]:,.2f} via UPI</a>'
         )
         doc_requirements = f"""
-DOCUMENT TYPE: OFFICIAL TAX INVOICE
-Build an ultra-clean, Stripe/Linear-grade yet visually distinctive creative tax invoice page.
-REQUIRED SECTIONS & INTERACTIVITY:
-1. Header: Brand name ("{ctx['company_name']}"), GSTIN ("{ctx['company_gstin']}"), Contact ("{ctx['company_contact']}"), Invoice Title ("{ctx['doc_type_label']}"), Invoice ID "#{ctx['doc_id']}", and clear Status Pill ("{'Paid' if ctx['is_paid'] else 'Pending Payment'}").
-2. Metadata Block: Invoice Date ({ctx['date']}), Due Date ({ctx['due_date']}), Billed To ({ctx['client_name']}{(' — ' + ctx['client_email']) if ctx['client_email'] else ''}), Payment Mode (UPI / Bank Transfer).
-3. Itemized Billing Table:
-   Use these exact line items JSON: {json.dumps(ctx['items'], ensure_ascii=False)}
-   Show Description, HSN/SAC, Qty, Rate (₹), and Amount (₹) with crisp tabular-nums monospace alignment.
-4. Financial Totals Box (exact numbers, DO NOT alter math):
-   - Subtotal: ₹{ctx['subtotal']:,.2f}
-   - GST ({ctx['gst_rate']:.0f}%): ₹{ctx['gst_amount']:,.2f}
-   - Total Due: ₹{ctx['total_amount']:,.2f}
-5. Action Controls (MUST work):
-   - "Print / Save PDF" button calling `window.print()`
-   - {pay_cta}
-   - Also include a subtle Light/Dark toggle button if appropriate, and clean `@media print` CSS hiding action buttons when printing!
+DOCUMENT TYPE: SOBER CORPORATE TAX INVOICE
+Build an ultra-clean, simple, sober white-paper corporate tax invoice (NO dark theme, NO theme toggle button, NO flashy gradients, NO signature block).
+REQUIRED STRUCTURE:
+1. Header: 2-line letterhead with `border-top: 3px solid #18181b` on `.page`. Left: "{ctx['company_name']}" + "{ctx['company_contact']} • GSTIN: {ctx['company_gstin']}". Right: "INVOICE #{ctx['doc_id']}" + "Status: {'Paid' if ctx['is_paid'] else 'Pending Payment'}".
+2. 4-Column Hairline Metadata Row: Billed To ({ctx['client_name']}), Invoice Date ({ctx['date']}), Due Date ({ctx['due_date']}), Payment Mode (UPI / Bank).
+3. Clean Itemized Table using exact items JSON: {json.dumps(ctx['items'], ensure_ascii=False)} (Description, Qty, Rate, Amount).
+4. Commercial Terms & Totals (NO bottom border under this section): Left: quiet "Payment Terms" note. Right: Subtotal (₹{ctx['subtotal']:,.2f}), GST ({ctx['gst_rate']:.0f}%: ₹{ctx['gst_amount']:,.2f}), Total Due (₹{ctx['total_amount']:,.2f}).
+5. Bottom Footer Action Bar (`border-top: 1px solid #e4e4e7`): Left: "Due by {ctx['due_date']} • Questions? {ctx['company_contact']}". Right: "Download PDF" (`window.print()`) + {pay_cta}.
 """
 
     prompt = f"""You are an award-winning Senior Product Designer & Frontend Creative Technologist.
