@@ -4228,11 +4228,11 @@ def handle_vobiz_stream_ws(handler, query_params):
                             if not speech_detected:
                                 vobiz_pre_buffer.append(pcm_in)
                             
-                            # Strict cellular speech detection (RMS > 900 ignores line static/breathing, captures real human voice)
-                            if rms > 900:
+                            # Cellular speech detection (RMS > 400 captures normal human voice cleanly without clipping)
+                            if rms > 400:
                                 speech_energy_count += 1
-                                # Speech lock: 4 consecutive frames (~80ms) to filter out line clicks/noise
-                                if speech_energy_count >= 4:
+                                # Speech lock: 3 consecutive frames (~60ms) to filter out line clicks/noise
+                                if speech_energy_count >= 3:
                                     if not speech_detected:
                                         print(f"[Vobiz Stream] Caller speech detected! RMS={rms}", flush=True)
                                     if not vobiz_in_activity:
@@ -4252,8 +4252,8 @@ def handle_vobiz_stream_ws(handler, query_params):
                                     silence_after_speech_count += 1
                                     accumulated_caller_pcm.extend(pcm_in)
                                     vobiz_bidi_session.send_audio_chunk_live(pcm_in)
-                                    # Turn end: ~800ms (16 frames) of silence matches web agent so sentences are never cut mid-word
-                                    if silence_after_speech_count >= 16:
+                                    # Turn end: ~600ms (12 frames) of silence for snappy turn-taking
+                                    if silence_after_speech_count >= 12:
                                         # Accept speech chunk (>=6400 bytes, ~200ms) to prevent noise hallucination
                                         if len(accumulated_caller_pcm) < 6400:
                                             # Discard tiny line click and reset activity state
