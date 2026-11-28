@@ -7635,11 +7635,11 @@ class AchyutaWebHandler(SimpleHTTPRequestHandler):
                 else:
                     reply = ""
                     for p in parts:
-                        if "text" in p:
+                        if "text" in p and not p.get("thought"):
                             reply = p["text"]
                             break
                     if not reply:
-                        reply = "Query acknowledged. Live database synchronized." 
+                        reply = "Kripya thoda aur clear batayein—jaise kis client, staff member, ya record par yeh action karna hai? Main turant update kar dungi."
             except urllib.error.HTTPError as e:
                 err_text = ""
                 try:
