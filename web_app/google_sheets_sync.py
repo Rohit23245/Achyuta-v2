@@ -6,13 +6,13 @@ import re
 from datetime import datetime
 
 # Google Sheets Sync Engine for Achyuta
-# Master database: Google Sheet (1QWIb0zW46OA517IZZzD5V9n4kpiTVJqb4eQzGRM0WJE)
+# Master database: Google Sheet (1mwsgQcvfBeefhqb8b4-YGXFiyebYl4eszokChYdIsmc)
 # Flow:
 # 1. Sheet -> JSON (Pull on startup and periodic)
 # 2. CRM / App -> JSON (Instant 0ms read/write)
 # 3. JSON -> Sheet (Async instant push on any change)
 
-SHEET_ID = "1QWIb0zW46OA517IZZzD5V9n4kpiTVJqb4eQzGRM0WJE"
+SHEET_ID = "1mwsgQcvfBeefhqb8b4-YGXFiyebYl4eszokChYdIsmc"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 _creds_path = None
